@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -183,7 +183,7 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
                   />
                   <YAxis domain={[0, 100]} />
                   <Tooltip formatter={(value) => [`${value}%`, 'Score']} />
-                    <Bar dataKey="score" fill="#3B82F6" />
+                  <Bar dataKey="score" fill="#3B82F6" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -215,7 +215,7 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
             <div className="text-center">
               <div className="font-medium text-lg">{getScoreLabel(result?.overallScore || 0)}</div>
               <p className="text-sm text-muted-foreground mt-1">
-                {result?.overallScore || 0 < 60 ? 
+                {(result?.overallScore || 0) < 60 ? 
                   "Your organization needs to improve its AI readiness" : 
                   "Your organization has good AI readiness foundations"}
               </p>
