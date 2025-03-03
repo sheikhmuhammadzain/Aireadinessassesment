@@ -183,7 +183,7 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
                   />
                   <YAxis domain={[0, 100]} />
                   <Tooltip formatter={(value) => [`${value}%`, 'Score']} />
-                  <Bar dataKey="score" nameKey="category" fill="#3B82F6" />
+                    <Bar dataKey="score" fill="#3B82F6" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
