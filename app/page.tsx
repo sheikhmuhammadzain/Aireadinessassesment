@@ -65,21 +65,16 @@ export default function Home() {
     <div className="min-h-screen bg-background">
       {/* Hero Section - Enhanced with gradient and more professional design */}
       <header className="relative bg-gradient-to-r from-primary/10 via-background to-primary/10 dark:from-primary/5 dark:via-background dark:to-primary/5 border-b border-border">
-        <div className="container mx-auto px-4 py-24">
-          <div className="max-w-3xl mx-auto text-center space-y-6">
-            <h1 className="text-5xl md:text-6xl font-bold tracking-tight text-foreground">
+        <div className="container mx-auto px-4 py-[200px]">
+          <div className="max-w-3xl mx-auto text-center space-y-12">
+            <h1 className="text-5xl md:text-6xl font-black tracking-tight text-foreground">
               AI Readiness Assessment
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
               Evaluate your organization's readiness for AI adoption across six key dimensions
               and receive personalized recommendations.
             </p>
-            <div className="pt-4">
-              <Button size="lg"  className="font-medium rounded-md px-8">
-                Start Assessment
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </div>
+          
           </div>
         </div>
       </header>
@@ -243,10 +238,7 @@ export default function Home() {
           <p className="text-lg text-muted-foreground mb-8">
             Start your AI readiness assessment today and receive a detailed report with actionable recommendations tailored to your organization.
           </p>
-          <Button size="lg" className="font-medium rounded-md px-8">
-            Begin Assessment
-            <ArrowRight className="ml-2 h-5 w-5" />
-          </Button>
+         
         </div>
       </section>
 
