@@ -75,7 +75,7 @@ export default function Home() {
               and receive personalized recommendations.
             </p>
             <div className="pt-4">
-              <Button size="lg" className="font-medium rounded-md px-8">
+              <Button size="lg"  className="font-medium rounded-md px-8" href="#assessment-framework">
                 Start Assessment
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>

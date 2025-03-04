@@ -39,7 +39,8 @@ export default function AssessmentPage({ params }: { params: { type: string } })
   useEffect(() => {
     const fetchQuestionnaire = async () => {
       try {
-        const response = await fetch(`http://103.18.20.205:8080/questionnaire/${assessmentType}`);
+        // Use the proxy endpoint provided by our rewrite rule in next.config.js
+        const response = await fetch(`/api/questionnaire/${assessmentType}`);
         if (!response.ok) {
           throw new Error("Failed to fetch questionnaire");
         }
@@ -150,7 +151,8 @@ export default function AssessmentPage({ params }: { params: { type: string } })
         categoryResponses
       };
 
-      const response = await fetch("http://103.18.20.205:8080/calculate-results", {
+      // Use the proxy endpoint for submitting results
+      const response = await fetch("/api/calculate-results", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
