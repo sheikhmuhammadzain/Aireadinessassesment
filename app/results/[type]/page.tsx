@@ -302,7 +302,8 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
                       <Cell key={`cell-${index}`} fill={getColor(index, qValuesData.length)} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value) => value.toFixed(3)} />
+                  <Tooltip formatter={(value) => value !== null && value !== undefined ? (value as number).toFixed(3) : ''} />
+
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
