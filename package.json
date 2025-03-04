@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.23.0",
     "@hookform/resolvers": "^3.9.0",
     "@next/swc-wasm-nodejs": "14.1.0",
     "@radix-ui/react-accordion": "^1.1.2",
@@ -46,6 +47,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",
     "date-fns": "^3.6.0",
+    "dotenv": "^16.4.7",
     "embla-carousel-react": "^8.3.0",
     "eslint": "8.49.0",
     "eslint-config-next": "14.1.0",

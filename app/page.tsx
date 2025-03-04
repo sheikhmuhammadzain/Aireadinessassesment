@@ -190,7 +190,6 @@ export default function Home() {
                   </div>
                   <div>
                     <p className="font-semibold">Sarah Chen</p>
-                    <p className="text-sm text-muted-foreground">CTO, Global Finance Corp</p>
                   </div>
                 </div>
               </CardContent>
@@ -206,7 +205,6 @@ export default function Home() {
                   </div>
                   <div>
                     <p className="font-semibold">Mark Johnson</p>
-                    <p className="text-sm text-muted-foreground">VP of Innovation, HealthTech Solutions</p>
                   </div>
                 </div>
               </CardContent>
@@ -222,7 +220,6 @@ export default function Home() {
                   </div>
                   <div>
                     <p className="font-semibold">Priya Sharma</p>
-                    <p className="text-sm text-muted-foreground">Chief Data Officer, Retail Innovations</p>
                   </div>
                 </div>
               </CardContent>
