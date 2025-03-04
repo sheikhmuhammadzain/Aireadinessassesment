@@ -335,7 +335,8 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
                       <Cell key={`cell-${index}`} fill={getColor(index, softmaxData.length)} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value) => `${value.toFixed(1)}%`} />
+                  <Tooltip formatter={(value) => value !== null && value !== undefined ? (value as number).toFixed(3) : ''} />
+
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
