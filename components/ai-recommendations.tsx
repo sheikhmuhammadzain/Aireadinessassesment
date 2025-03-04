@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -59,16 +57,19 @@ export function AIRecommendations({
           // Handle the response: parse if it's a string with backticks
           let parsedRecs: string[];
           if (typeof aiRecs === "string") {
-            // Remove ```json and ``` markers and parse the JSON content
-            const cleanedRecs = aiRecs.replace(/```json\n|\n```/g, "").trim();
+            // Remove `````` markers and parse the JSON content
+            const cleanedRecs = (aiRecs as string).replace(/``````/g, "").trim();
             try {
               parsedRecs = JSON.parse(cleanedRecs);
             } catch (error) {
               console.error(`Failed to parse recommendations for ${rec.category}:`, error);
-              parsedRecs = [aiRecs]; // Fallback: treat as a single recommendation
+              parsedRecs = [cleanedRecs]; // Fallback: treat as a single recommendation
             }
+          } else if (Array.isArray(aiRecs)) {
+            parsedRecs = aiRecs as string[]; // Assume it's already an array of strings
           } else {
-            parsedRecs = aiRecs; // Assume it's already an array
+            console.error(`Unexpected type for recommendations: ${typeof aiRecs}`);
+            parsedRecs = ["Unable to parse recommendations."];
           }
 
           setRecommendations(prev => {
