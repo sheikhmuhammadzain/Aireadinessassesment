@@ -39,12 +39,17 @@ const GlowingSphere = () => (
   <div className="absolute top-0 right-0 -z-10 w-96 h-96 rounded-full bg-gradient-to-br from-primary/30 to-transparent blur-3xl opacity-30"></div>
 );
 
-const Glow = ({ position }) => (
+// Fix: Add type definition for position prop
+interface GlowProps {
+  position: string;
+}
+
+const Glow = ({ position }: GlowProps) => (
   <div className={`absolute ${position} -z-10 w-64 h-64 rounded-full bg-primary/20 blur-3xl opacity-40`}></div>
 );
 
 export default function Home() {
-  const benefitsRef = useRef(null);
+  const benefitsRef = useRef<HTMLDivElement>(null);
 
   const scrollToBenefits = () => {
     benefitsRef.current?.scrollIntoView({ behavior: 'smooth' });
