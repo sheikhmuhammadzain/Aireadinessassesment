@@ -133,7 +133,7 @@ export default function AssessmentPage() {
     fetchQuestionnaires();
   }, [toast]);
 
-  const handleCompanyInfoSubmit = async (info: CompanyInfo) => {
+  const handleCompanyInfoSubmit = async (info: CompanyInfo, suggestedWeights?: Record<string, number>) => {
     setCompanyInfo(info);
     setLoading(true);
     
@@ -141,8 +141,18 @@ export default function AssessmentPage() {
       // Store company info in localStorage
       localStorage.setItem('company_info', JSON.stringify(info));
       
-      // Fetch recommended weights based on company info
-      await fetchRecommendedWeights(info);
+      if (suggestedWeights) {
+        // Use weights suggested by web search
+        setRecommendedWeights(suggestedWeights);
+        setWeights(suggestedWeights);
+        toast({
+          title: "Web-suggested weights applied",
+          description: "We've applied the weights suggested based on your company's web profile.",
+        });
+      } else {
+        // Fetch recommended weights based on company info
+        await fetchRecommendedWeights(info);
+      }
       
       setStep('weight-adjustment');
     } catch (error) {
@@ -251,41 +261,41 @@ export default function AssessmentPage() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-            {assessmentTypes.map((assessment) => (
-              <Card 
-                key={assessment.id} 
-                className="bg-card/30 backdrop-blur-sm border border-border/40 hover:border-primary/30 shadow-sm hover:shadow-md transition-all duration-300 group overflow-hidden"
-              >
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-gradient-to-br from-primary/5 to-transparent transition-opacity duration-300"></div>
-                <CardHeader className="pb-2 relative">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-md bg-primary/10 group-hover:bg-primary/20 transition-colors duration-300">
-                      <assessment.icon className="h-5 w-5 text-primary" />
+            {assessmentTypes.map((type) => {
+              const Icon = type.icon;
+              return (
+                <Card key={type.id} className="hover:shadow-lg transition-shadow">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Icon className="h-5 w-5 text-primary" />
+                      {type.title}
+                    </CardTitle>
+                    <CardDescription>{type.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-sm">
+                      <div className="flex items-center justify-between mb-2">
+                        <span>Weight:</span>
+                        <span className="font-medium">{weights[type.id]?.toFixed(1)}%</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Questions:</span>
+                        <span className="font-medium">{questionnaires[type.id]?.length || 0}</span>
+                      </div>
                     </div>
-                    <CardTitle className="text-xl font-semibold">{assessment.title}</CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-2 relative">
-                  <CardDescription className="text-muted-foreground text-sm min-h-[80px]">
-                    {assessment.description}
-                  </CardDescription>
-                  <div className="mt-2 text-sm">
-                    <span className="font-medium">Weight: </span>
-                    <span className="text-primary">{weights[assessment.id]?.toFixed(1)}%</span>
-                  </div>
-                </CardContent>
-                <CardFooter className="pt-0 pb-4 relative">
-                  <Button 
-                    variant="outline" 
-                    className="w-full border-border/60 flex items-center justify-center gap-2 group-hover:border-primary/40 group-hover:text-primary transition-colors duration-300"
-                    onClick={() => handleStartSingleAssessment(assessment.id)}
-                  >
-                    <span>Start Assessment</span>
-                    <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-                  </Button>
-                </CardFooter>
-              </Card>
-            ))}
+                  </CardContent>
+                  <CardFooter>
+                    <Button 
+                      className="w-full" 
+                      onClick={() => handleStartSingleAssessment(type.id)}
+                    >
+                      Start Assessment
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </CardFooter>
+                </Card>
+              );
+            })}
           </div>
         </div>
       )}

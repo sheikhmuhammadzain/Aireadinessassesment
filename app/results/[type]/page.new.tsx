@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ArrowLeft, Download, Home, Loader2, TrendingUp, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AIRecommendations } from "@/components/ai-recommendations";
-import { AIGapAnalysis } from "@/components/ai-gap-analysis";
 import {
   BarChart,
   Bar,
@@ -244,7 +243,7 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
           </Button>
           <Button variant="default" onClick={handleDownloadPDF}>
             <Download className="mr-2 h-4 w-4" />
-           Get Full Report
+            Get Full Report
           </Button>
         </div>
       </div>
@@ -257,28 +256,28 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
         </TabsList>
 
         <TabsContent value="overview" className="mt-6">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Category Scores</CardTitle>
-            <CardDescription>
-              Breakdown of your scores across different categories
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[400px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={chartData}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 70 }}
-                >
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle>Category Scores</CardTitle>
+                <CardDescription>
+                  Breakdown of your scores across different categories
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[400px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={chartData}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 70 }}
+                    >
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis
-                    dataKey="category"
-                    angle={-45}
-                    textAnchor="end"
-                    height={80}
-                    tick={{ fontSize: 12 }}
+                      <XAxis
+                        dataKey="category"
+                        angle={-45}
+                        textAnchor="end"
+                        height={80}
+                        tick={{ fontSize: 12 }}
                         stroke="#888888"
                       />
                       <YAxis domain={[0, 100]} stroke="#888888" />
@@ -291,77 +290,77 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
                           <Cell key={`cell-${index}`} fill={entry.fill} />
                         ))}
                       </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Overall Score</CardTitle>
-            <CardDescription>
-              Your organization's overall AI readiness
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col items-center justify-center pt-6">
-            <div
-              className="relative w-48 h-48 rounded-full flex items-center justify-center mb-6"
-              style={{
-                    background: `conic-gradient(${getColorForScore(result.overallScore)} ${result.overallScore / 100 * 360}deg, #f0f0f0 0)`
-              }}
-            >
-              <div className="absolute w-36 h-36 bg-background rounded-full flex items-center justify-center">
-                <div className="text-center">
-                  <div className="text-4xl font-bold">{Math.round(result.overallScore)}%</div>
-                  <div className="text-sm text-muted-foreground">Overall Score</div>
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
 
-            <div className="text-center">
-              <div className="font-medium text-lg">{getScoreLabel(result.overallScore)}</div>
-              <p className="text-sm text-muted-foreground mt-1">
-                {result.overallScore < 60 ?
-                  "Your organization needs to improve its AI readiness" :
-                  "Your organization has good AI readiness foundations"}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>Overall Score</CardTitle>
+                <CardDescription>
+                  Your organization's overall AI readiness
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col items-center justify-center pt-6">
+                <div
+                  className="relative w-48 h-48 rounded-full flex items-center justify-center mb-6"
+                  style={{
+                    background: `conic-gradient(${getColorForScore(result.overallScore)} ${result.overallScore / 100 * 360}deg, #f0f0f0 0)`
+                  }}
+                >
+                  <div className="absolute w-36 h-36 bg-background rounded-full flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="text-4xl font-bold">{Math.round(result.overallScore)}%</div>
+                      <div className="text-sm text-muted-foreground">Overall Score</div>
+                    </div>
+                  </div>
+                </div>
 
-      {/* Radar Chart */}
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle>Radar Analysis</CardTitle>
-          <CardDescription>
-            Visualize your organization's AI readiness across all dimensions
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[500px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart outerRadius="80%" data={radarData}>
+                <div className="text-center">
+                  <div className="font-medium text-lg">{getScoreLabel(result.overallScore)}</div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {result.overallScore < 60 ?
+                      "Your organization needs to improve its AI readiness" :
+                      "Your organization has good AI readiness foundations"}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Radar Chart */}
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle>Radar Analysis</CardTitle>
+              <CardDescription>
+                Visualize your organization's AI readiness across all dimensions
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[500px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart outerRadius="80%" data={radarData}>
                     <PolarGrid stroke="#e0e0e0" />
                     <PolarAngleAxis dataKey="subject" stroke="#888888" />
                     <PolarRadiusAxis domain={[0, 100]} stroke="#888888" />
-                <Radar
-                  name="Your Organization"
-                  dataKey="A"
+                    <Radar
+                      name="Your Organization"
+                      dataKey="A"
                       stroke="#8ECAE6"
                       fill="#8ECAE6"
-                  fillOpacity={0.6}
-                />
+                      fillOpacity={0.6}
+                    />
                     <Tooltip 
                       formatter={(value) => [`${value}%`, 'Score']}
                       contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)', border: 'none' }}
                     />
-              </RadarChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
+                  </RadarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="gap-analysis" className="mt-6">
@@ -548,30 +547,30 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
         </TabsContent>
 
         <TabsContent value="detailed" className="mt-6">
-      {/* Weights Comparison and Q-Values */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>Category Weights Comparison</CardTitle>
-            <CardDescription>
-              User-defined vs. AI-adjusted weights
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[400px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart 
-                  data={weightsComparisonData}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 70 }}
-                  barGap={0}
-                >
+          {/* Weights Comparison and Q-Values */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Category Weights Comparison</CardTitle>
+                <CardDescription>
+                  User-defined vs. AI-adjusted weights
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[400px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart 
+                      data={weightsComparisonData}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 70 }}
+                      barGap={0}
+                    >
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis 
-                    dataKey="category"
-                    angle={-45}
-                    textAnchor="end"
-                    height={80}
-                    tick={{ fontSize: 12 }}
+                      <XAxis 
+                        dataKey="category"
+                        angle={-45}
+                        textAnchor="end"
+                        height={80}
+                        tick={{ fontSize: 12 }}
                         stroke="#888888"
                       />
                       <YAxis 
@@ -583,70 +582,62 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
                         formatter={(value) => [`${value}%`, 'Weight']}
                         contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)', border: 'none' }}
                       />
-                  <Legend />
+                      <Legend />
                       <Bar name="User-defined Weight" dataKey="userWeight" fill="#A8DADC" radius={[4, 4, 0, 0]} />
                       <Bar name="AI-adjusted Weight" dataKey="adjustedWeight" fill="#FFB4A2" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Q-Values Distribution</CardTitle>
-            <CardDescription>
-              Reinforcement learning Q-values by category
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[400px] w-full">
-              <ResponsiveContainer>
-                <PieChart>
-                  <Pie
-                    data={qValuesData}
-                    dataKey="qValue"
-                    nameKey="category"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={150}
+            <Card>
+              <CardHeader>
+                <CardTitle>Q-Values Distribution</CardTitle>
+                <CardDescription>
+                  Reinforcement learning Q-values by category
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[400px] w-full">
+                  <ResponsiveContainer>
+                    <PieChart>
+                      <Pie
+                        data={qValuesData}
+                        dataKey="qValue"
+                        nameKey="category"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={150}
                         label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
                         labelLine={false}
-                  >
-                    {qValuesData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
-                  </Pie>
+                      >
+                        {qValuesData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Pie>
                       <Tooltip 
                         formatter={(value) => value !== null && value !== undefined ? (value as number).toFixed(3) : ''}
                         contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)', border: 'none' }}
                       />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
 
-      {/* AI Gap Analysis */}
-      {!loading && result && (
-        <AIGapAnalysis
-          categories={chartData}
-          weights={result.userWeights}
-        />
-      )}
-
       {/* AI Recommendations */}
-      {/* {!loading && result && (
+      {!loading && result && (
         <AIRecommendations
           categories={chartData}
           overallScore={result.overallScore}
           categoryScores={result.categoryScores}
           onSummaryGenerated={setAiSummary}
         />
-      )} */}
+      )}
 
       <div className="flex justify-center mt-8">
         <Button
@@ -659,4 +650,4 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
       </div>
     </div>
   );
-}
+} 

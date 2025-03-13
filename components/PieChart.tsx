@@ -57,50 +57,33 @@ export function PieChart({ data }: PieChartProps) {
       ctx.fillStyle = colors[index % colors.length];
       ctx.fill();
       
-      // Draw label if slice is large enough
-      if (item.value / total > 0.05) {
+      // Draw percentage inside the slice
+      const percentage = Math.round((item.value / total) * 100);
+      
+      // Only show percentage if slice is large enough
+      if (percentage >= 5) {
         const labelAngle = startAngle + sliceAngle / 2;
-        const labelRadius = radius * 0.7;
+        const labelRadius = radius * 0.65; // Position closer to the center for better visibility
         const labelX = centerX + labelRadius * Math.cos(labelAngle);
         const labelY = centerY + labelRadius * Math.sin(labelAngle);
         
         ctx.fillStyle = '#ffffff';
-        ctx.font = '12px sans-serif';
+        ctx.font = 'bold 14px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         
-        // Abbreviate long category names
-        const shortName = item.name.split(' ')[1] || item.name.substring(0, 4);
-        ctx.fillText(shortName, labelX, labelY);
+        // Show percentage
+        ctx.fillText(`${percentage}%`, labelX, labelY);
       }
       
       startAngle = endAngle;
     });
 
-    // Draw legend
-    const legendX = 10;
-    let legendY = canvas.height - (data.length * 20) - 10;
-    
-    data.forEach((item, index) => {
-      // Draw color box
-      ctx.fillStyle = colors[index % colors.length];
-      ctx.fillRect(legendX, legendY, 15, 15);
-      
-      // Draw text
-      ctx.fillStyle = '#000000';
-      ctx.font = '12px sans-serif';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'middle';
-      
-      // Truncate long names
-      const displayName = item.name.length > 15 
-        ? item.name.substring(0, 12) + '...' 
-        : item.name;
-      
-      ctx.fillText(`${displayName} (${item.value.toFixed(1)}%)`, legendX + 20, legendY + 7.5);
-      
-      legendY += 20;
-    });
+    // Add a white circle in the center for better aesthetics
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius * 0.3, 0, 2 * Math.PI);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
 
   }, [data]);
 

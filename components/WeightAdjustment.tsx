@@ -87,7 +87,7 @@ export function WeightAdjustment({
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-xl">Category Weights</CardTitle>
+            <CardTitle className="text-xl">Pillar Weights</CardTitle>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -105,7 +105,7 @@ export function WeightAdjustment({
             </TooltipProvider>
           </div>
           <CardDescription>
-            Define how important each category is to your assessment (total: {totalWeight.toFixed(1)}%)
+            Define how important each Pillar is to your assessment (total: {totalWeight.toFixed(1)}%)
           </CardDescription>
         </CardHeader>
         

@@ -39,4 +39,10 @@ export interface AssessmentResult {
   qValues: Record<string, number>;
   adjustedWeights: Record<string, number>;
   overallScore: number;
+}
+
+export interface WebSearchResult {
+  weights: CategoryWeights;
+  explanation: string;
+  companyInsights: string;
 } 
