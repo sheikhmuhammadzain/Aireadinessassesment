@@ -29,8 +29,9 @@ import {
 interface AssessmentResult {
   assessmentType: string;
   categoryScores: Record<string, number>;
+  userWeights: Record<string, number>;
   qValues: Record<string, number>;
-  softmaxWeights: Record<string, number>;
+  adjustedWeights: Record<string, number>;
   overallScore: number;
 }
 
@@ -52,7 +53,7 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
   const [chartData, setChartData] = useState<any[]>([]);
   const [radarData, setRadarData] = useState<any[]>([]);
   const [qValuesData, setQValuesData] = useState<any[]>([]);
-  const [softmaxData, setSoftmaxData] = useState<any[]>([]);
+  const [weightsComparisonData, setWeightsComparisonData] = useState<any[]>([]);
   const [aiSummary, setAiSummary] = useState<string>("");
 
   useEffect(() => {
@@ -80,18 +81,23 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
         setRadarData(radarData);
 
         // Prepare data for Q-values
-        const qValuesData = Object.entries(parsedResult.qValues).map(([category, qValue]) => ({
+        const qValuesData = Object.entries(parsedResult.qValues).map(([category, qValue], index) => ({
           category,
-          qValue: Math.round(qValue * 1000) / 1000
+          qValue: Math.round(qValue * 1000) / 1000,
+          fill: getColor(index, Object.keys(parsedResult.qValues).length)
         }));
         setQValuesData(qValuesData);
 
-        // Prepare data for softmax weights (scale to percentage)
-        const softmaxData = Object.entries(parsedResult.softmaxWeights).map(([category, weight]) => ({
-          category,
-          weight: Math.round(weight * 10000) / 100
-        }));
-        setSoftmaxData(softmaxData);
+        // Prepare data for weights comparison (user weights vs adjusted weights)
+        const weightsComparisonData = Object.entries(parsedResult.userWeights).map(([category, userWeight]) => {
+          const adjustedWeight = parsedResult.adjustedWeights[category] || 0;
+          return {
+            category,
+            userWeight: Math.round(userWeight * 100) / 100,
+            adjustedWeight: Math.round(adjustedWeight * 100) / 100
+          };
+        });
+        setWeightsComparisonData(weightsComparisonData);
 
         setLoading(false);
       } catch (error) {
@@ -173,9 +179,9 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
             <Home className="mr-2 h-4 w-4" />
             Home
           </Button>
-          <Button variant="outline" onClick={handleDownloadPDF}>
+          <Button variant="default" onClick={handleDownloadPDF}>
             <Download className="mr-2 h-4 w-4" />
-            Download Report
+           Get Full Report
           </Button>
         </div>
       </div>
@@ -276,13 +282,47 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
         </CardContent>
       </Card>
 
-      {/* Q-Values and Softmax Weights */}
+      {/* Weights Comparison and Q-Values */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <Card>
           <CardHeader>
-            <CardTitle>Q‑Values Distribution</CardTitle>
+            <CardTitle>Category Weights Comparison</CardTitle>
             <CardDescription>
-              Distribution of Q‑values across categories
+              User-defined vs. AI-adjusted weights
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[400px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart 
+                  data={weightsComparisonData}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 70 }}
+                  barGap={0}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="category"
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <YAxis domain={[0, 100]} label={{ value: 'Weight (%)', angle: -90, position: 'insideLeft' }} />
+                  <Tooltip formatter={(value) => [`${value}%`, 'Weight']} />
+                  <Legend />
+                  <Bar name="User-defined Weight" dataKey="userWeight" fill="#8884d8" />
+                  <Bar name="AI-adjusted Weight" dataKey="adjustedWeight" fill="#82ca9d" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Q-Values Distribution</CardTitle>
+            <CardDescription>
+              Reinforcement learning Q-values by category
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -296,47 +336,13 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
                     cx="50%"
                     cy="50%"
                     outerRadius={150}
-                    fill="#8884d8"
+                    label={(entry) => entry.category}
                   >
                     {qValuesData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={getColor(index, qValuesData.length)} />
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
                   </Pie>
                   <Tooltip formatter={(value) => value !== null && value !== undefined ? (value as number).toFixed(3) : ''} />
-
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Softmax Weights Distribution</CardTitle>
-            <CardDescription>
-              Distribution of softmax weights across categories
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[400px] w-full">
-              <ResponsiveContainer>
-                <PieChart>
-                  <Pie
-                    data={softmaxData}
-                    dataKey="weight"
-                    nameKey="category"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={150}
-                    fill="#8884d8"
-                  >
-                    {softmaxData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={getColor(index, softmaxData.length)} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => value !== null && value !== undefined ? (value as number).toFixed(3) : ''} />
-
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>

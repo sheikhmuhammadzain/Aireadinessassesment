@@ -76,6 +76,13 @@ const assessmentTypes = [
     color: "bg-indigo-100 dark:bg-indigo-900",
     textColor: "text-indigo-700 dark:text-indigo-300",
   },
+  {
+    id: "AI Security",
+    title: "AI Security",
+    icon: Shield,
+    color: "bg-indigo-100 dark:bg-indigo-900",
+    textColor: "text-indigo-700 dark:text-indigo-300",
+  },
 ];
 
 export default function DashboardPage() {

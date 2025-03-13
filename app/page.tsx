@@ -1,4 +1,4 @@
-import { Metadata } from "next";
+"use client"
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,276 +13,289 @@ import {
   CheckCircle,
   TrendingUp,
   Clock,
-  Award
+  Award,
+  ExternalLink
 } from "lucide-react";
+import { useRef } from "react";
 
-export const metadata: Metadata = {
-  title: "AI Readiness Assessment",
-  description: "Evaluate your organization's readiness for AI adoption",
-};
+// Animation components
+const GridBackground = () => (
+  <div className="absolute inset-0 -z-10 overflow-hidden">
+    <div className="absolute inset-0 bg-background/80 backdrop-blur-sm"></div>
+    <div className="grid grid-cols-[repeat(40,minmax(0,1fr))] grid-rows-[repeat(20,minmax(0,1fr))] h-full w-full opacity-30">
+      {Array.from({ length: 800 }).map((_, i) => (
+        <div 
+          key={i} 
+          className={`col-span-1 row-span-1 border-[0.5px] border-primary/20 ${Math.random() > 0.97 ? 'bg-primary/20' : ''}`}
+        ></div>
+      ))}
+    </div>
+    <div className="absolute inset-0 bg-gradient-to-b from-background via-transparent to-background"></div>
+  </div>
+);
 
-const assessmentTypes = [
-  {
-    id: "AI Governance",
-    title: "AI Governance",
-    description: "Evaluate your organization's AI policies, accountability, and risk management frameworks.",
-    icon: Shield,
-  },
-  {
-    id: "AI Culture",
-    title: "AI Culture",
-    description: "Assess your organization's AI adoption culture, leadership support, and collaborative practices.",
-    icon: Users,
-  },
-  {
-    id: "AI Infrastructure",
-    title: "AI Infrastructure",
-    description: "Evaluate your technical infrastructure's readiness to support AI initiatives.",
-    icon: Layers,
-  },
-  {
-    id: "AI Strategy",
-    title: "AI Strategy",
-    description: "Assess your organization's AI strategy, security measures, and deployment approaches.",
-    icon: BarChart4,
-  },
-  {
-    id: "AI Data",
-    title: "AI Data",
-    description: "Evaluate your data management practices, quality, and governance for AI readiness.",
-    icon: Database,
-  },
-  {
-    id: "AI Talent",
-    title: "AI Talent",
-    description: "Assess your organization's AI talent acquisition, training, and development strategies.",
-    icon: Brain,
-  },
-];
+const GlowingSphere = () => (
+  <div className="absolute top-0 right-0 -z-10 w-96 h-96 rounded-full bg-gradient-to-br from-primary/30 to-transparent blur-3xl opacity-30"></div>
+);
+
+const Glow = ({ position }) => (
+  <div className={`absolute ${position} -z-10 w-64 h-64 rounded-full bg-primary/20 blur-3xl opacity-40`}></div>
+);
 
 export default function Home() {
+  const benefitsRef = useRef(null);
+
+  const scrollToBenefits = () => {
+    benefitsRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   return (
-    <div className="min-h-screen bg-background">
-      {/* Hero Section - Enhanced with gradient and more professional design */}
-      <header className="relative bg-gradient-to-r from-primary/10 via-background to-primary/10 dark:from-primary/5 dark:via-background dark:to-primary/5 border-b border-border">
-        <div className="container mx-auto px-4 py-[200px]">
-          <div className="max-w-3xl mx-auto text-center space-y-12">
-            <h1 className="text-5xl md:text-6xl font-black tracking-tight text-foreground">
-              AI Readiness Assessment
+    <div className="relative min-h-screen bg-background overflow-hidden">
+      {/* Background elements */}
+      <GridBackground />
+      <GlowingSphere />
+      <Glow position="top-1/4 -left-32" />
+      <Glow position="bottom-1/4 -right-32" />
+      
+      {/* Hero Section */}
+      <header className="relative border-b border-border/40">
+        <div className="container mx-auto px-4 py-24 md:py-32 lg:py-40">
+          <div className="max-w-3xl mx-auto text-center space-y-8">
+            <div className="inline-block mb-4 px-4 py-1 bg-primary/10 rounded-full backdrop-blur-sm">
+              <p className="text-primary text-sm font-medium">Enterprise-Grade AI Assessment</p>
+            </div>
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tight text-foreground bg-clip-text">
+              <span className="bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">
+                AI Readiness Assessment
+              </span>
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-              Evaluate your organization's readiness for AI adoption across six key dimensions
+              Evaluate your organization's readiness for AI adoption across seven key dimensions
               and receive personalized recommendations.
             </p>
-          
+            <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
+              <Link href="/assessment">
+                <Button 
+                  size="lg" 
+                  className="bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-md hover:shadow-lg transition-all duration-300 rounded-lg w-full sm:w-auto"
+                >
+                  Start Free Assessment
+                </Button>
+              </Link>
+              <Button 
+                variant="outline" 
+                size="lg" 
+                className="border-border/60 backdrop-blur-sm hover:bg-background/50 rounded-lg"
+                onClick={scrollToBenefits}
+              >
+                Learn More <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
+        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent"></div>
       </header>
 
-      {/* Assessment Types Section */}
-      <section className="container mx-auto px-4 py-16">
-        <div className="max-w-3xl mx-auto text-center mb-12">
-          <h2 className="text-3xl font-bold text-foreground mb-4">Our Assessment Framework</h2>
-          <p className="text-muted-foreground text-lg">
-            Comprehensive evaluation across six dimensions critical to successful AI implementation
-          </p>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {assessmentTypes.map((assessment) => (
-            <Card 
-              key={assessment.id} 
-              className="border border-border bg-card shadow-sm hover:shadow-md transition-shadow duration-200"
-            >
-              <CardHeader className="pb-2">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-md bg-primary/10">
-                    <assessment.icon className="h-5 w-5 text-primary" />
-                  </div>
-                  <CardTitle className="text-xl font-semibold">{assessment.title}</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-2">
-                <CardDescription className="text-muted-foreground text-sm min-h-[80px]">
-                  {assessment.description}
-                </CardDescription>
-              </CardContent>
-              <CardFooter className="pt-0 pb-4">
-                <Link href={`/assessment/${encodeURIComponent(assessment.id)}`} className="w-full">
-                  <Button variant="outline" className="w-full flex items-center justify-center gap-2">
-                    <span>Start Assessment</span>
-                    <ArrowRight className="h-4 w-4" />
-                  </Button>
-                </Link>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
-      </section>
-
       {/* Benefits Section */}
-      <section className="bg-muted py-16">
+      <section ref={benefitsRef} className="relative py-24">
+        <div className="absolute inset-0 -z-10 bg-muted/70 backdrop-blur-sm"></div>
         <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto text-center mb-12">
-            <h2 className="text-3xl font-bold text-foreground mb-4">Why Take Our Assessment?</h2>
+          <div className="max-w-3xl mx-auto text-center mb-16">
+            <div className="inline-block mb-4 px-4 py-1 bg-primary/10 rounded-full backdrop-blur-sm">
+              <p className="text-primary text-sm font-medium">Value Proposition</p>
+            </div>
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+              Why Take Our Assessment?
+            </h2>
             <p className="text-muted-foreground text-lg">
               Gain valuable insights to accelerate your AI transformation journey
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-            <div className="bg-card border border-border p-6 rounded-lg flex items-start gap-4 shadow-sm">
-              <div className="p-3 rounded-md bg-primary/10 text-primary">
-                <CheckCircle className="h-6 w-6" />
-              </div>
-              <div>
-                <h3 className="text-xl font-semibold mb-2">Comprehensive Evaluation</h3>
-                <p className="text-muted-foreground">Get a 360° view of your organization's AI readiness with detailed analysis across all critical dimensions</p>
-              </div>
-            </div>
-            <div className="bg-card border border-border p-6 rounded-lg flex items-start gap-4 shadow-sm">
-              <div className="p-3 rounded-md bg-primary/10 text-primary">
-                <TrendingUp className="h-6 w-6" />
-              </div>
-              <div>
-                <h3 className="text-xl font-semibold mb-2">Actionable Insights</h3>
-                <p className="text-muted-foreground">Receive tailored recommendations prioritized by impact and implementation feasibility</p>
-              </div>
-            </div>
-            <div className="bg-card border border-border p-6 rounded-lg flex items-start gap-4 shadow-sm">
-              <div className="p-3 rounded-md bg-primary/10 text-primary">
-                <Clock className="h-6 w-6" />
-              </div>
-              <div>
-                <h3 className="text-xl font-semibold mb-2">Time Efficient</h3>
-                <p className="text-muted-foreground">Complete the assessment in under 30 minutes and get immediate results with detailed analysis</p>
-              </div>
-            </div>
-            <div className="bg-card border border-border p-6 rounded-lg flex items-start gap-4 shadow-sm">
-              <div className="p-3 rounded-md bg-primary/10 text-primary">
-                <Award className="h-6 w-6" />
-              </div>
-              <div>
-                <h3 className="text-xl font-semibold mb-2">Benchmark Comparison</h3>
-                <p className="text-muted-foreground">See how your organization compares to industry peers with detailed benchmark analytics</p>
-              </div>
-            </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <Card className="bg-card/30 backdrop-blur-sm border border-border/40 hover:border-primary/30 shadow-sm hover:shadow-md transition-all duration-300">
+              <CardHeader>
+                <div className="p-2 w-fit rounded-md bg-primary/10">
+                  <CheckCircle className="h-5 w-5 text-primary" />
+                </div>
+                <CardTitle className="text-xl mt-4">Comprehensive Evaluation</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CardDescription className="text-muted-foreground">
+                  Assess your organization across seven critical dimensions of AI readiness, with customizable weights based on your company profile.
+                </CardDescription>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-card/30 backdrop-blur-sm border border-border/40 hover:border-primary/30 shadow-sm hover:shadow-md transition-all duration-300">
+              <CardHeader>
+                <div className="p-2 w-fit rounded-md bg-primary/10">
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                </div>
+                <CardTitle className="text-xl mt-4">Actionable Insights</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CardDescription className="text-muted-foreground">
+                  Receive tailored recommendations and practical next steps to improve your AI readiness score.
+                </CardDescription>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-card/30 backdrop-blur-sm border border-border/40 hover:border-primary/30 shadow-sm hover:shadow-md transition-all duration-300">
+              <CardHeader>
+                <div className="p-2 w-fit rounded-md bg-primary/10">
+                  <Clock className="h-5 w-5 text-primary" />
+                </div>
+                <CardTitle className="text-xl mt-4">Quick & Easy</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CardDescription className="text-muted-foreground">
+                  Complete the assessment in under 30 minutes and get immediate results with visualizations.
+                </CardDescription>
+              </CardContent>
+            </Card>
+          </div>
+          
+          <div className="mt-12 text-center">
+            <Link href="/assessment">
+              <Button 
+                size="lg" 
+                className="bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-md hover:shadow-lg transition-all duration-300 rounded-lg"
+              >
+                Start Your Assessment <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
-
-      {/* Testimonials Section */}
-      <section className="py-16 border-y border-border">
+      
+      {/* Features Section */}
+      <section className="py-24">
         <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto text-center mb-12">
-            <h2 className="text-3xl font-bold text-foreground mb-4">What Organizations Say</h2>
+          <div className="max-w-3xl mx-auto text-center mb-16">
+            <div className="inline-block mb-4 px-4 py-1 bg-primary/10 rounded-full backdrop-blur-sm">
+              <p className="text-primary text-sm font-medium">Key Features</p>
+            </div>
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+              Comprehensive Assessment Framework
+            </h2>
             <p className="text-muted-foreground text-lg">
-              Trusted by leading enterprises across industries
+              Our assessment evaluates your organization across seven critical dimensions
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
-            <Card className="shadow-md">
-              <CardContent className="pt-6">
-                <blockquote className="border-l-4 border-primary pl-4 italic text-muted-foreground mb-6">
-                  "The assessment provided us clear direction on where to focus our AI transformation efforts. The insights were invaluable for our strategic planning."
-                </blockquote>
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
-                    SC
-                  </div>
-                  <div>
-                    <p className="font-semibold">Sarah Chen</p>
-                  </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <Card className="bg-card/30 backdrop-blur-sm border border-border/40 hover:border-primary/30 shadow-sm hover:shadow-md transition-all duration-300">
+              <CardHeader className="pb-2">
+                <div className="p-2 w-fit rounded-md bg-primary/10">
+                  <Shield className="h-5 w-5 text-primary" />
                 </div>
+                <CardTitle className="text-lg mt-2">AI Governance</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CardDescription className="text-muted-foreground text-sm">
+                  Evaluate your organization's AI policies, accountability, and risk management frameworks.
+                </CardDescription>
               </CardContent>
             </Card>
-            <Card className="shadow-md">
-              <CardContent className="pt-6">
-                <blockquote className="border-l-4 border-primary pl-4 italic text-muted-foreground mb-6">
-                  "We used the insights to develop a roadmap that aligned our technical capabilities with our strategic AI goals. The framework was comprehensive yet practical."
-                </blockquote>
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
-                    MJ
-                  </div>
-                  <div>
-                    <p className="font-semibold">Mark Johnson</p>
-                  </div>
+            
+            <Card className="bg-card/30 backdrop-blur-sm border border-border/40 hover:border-primary/30 shadow-sm hover:shadow-md transition-all duration-300">
+              <CardHeader className="pb-2">
+                <div className="p-2 w-fit rounded-md bg-primary/10">
+                  <Users className="h-5 w-5 text-primary" />
                 </div>
+                <CardTitle className="text-lg mt-2">AI Culture</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CardDescription className="text-muted-foreground text-sm">
+                  Assess your organization's AI adoption culture, leadership support, and collaborative practices.
+                </CardDescription>
               </CardContent>
             </Card>
-            <Card className="shadow-md">
-              <CardContent className="pt-6">
-                <blockquote className="border-l-4 border-primary pl-4 italic text-muted-foreground mb-6">
-                  "The recommendations were practical and immediately actionable, which helped us accelerate our AI adoption journey. We've seen tangible improvements."
-                </blockquote>
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
-                    PS
-                  </div>
-                  <div>
-                    <p className="font-semibold">Priya Sharma</p>
-                  </div>
+            
+            <Card className="bg-card/30 backdrop-blur-sm border border-border/40 hover:border-primary/30 shadow-sm hover:shadow-md transition-all duration-300">
+              <CardHeader className="pb-2">
+                <div className="p-2 w-fit rounded-md bg-primary/10">
+                  <Layers className="h-5 w-5 text-primary" />
                 </div>
+                <CardTitle className="text-lg mt-2">AI Infrastructure</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CardDescription className="text-muted-foreground text-sm">
+                  Evaluate your technical infrastructure's readiness to support AI initiatives.
+                </CardDescription>
               </CardContent>
             </Card>
+            
+            <Card className="bg-card/30 backdrop-blur-sm border border-border/40 hover:border-primary/30 shadow-sm hover:shadow-md transition-all duration-300">
+              <CardHeader className="pb-2">
+                <div className="p-2 w-fit rounded-md bg-primary/10">
+                  <BarChart4 className="h-5 w-5 text-primary" />
+                </div>
+                <CardTitle className="text-lg mt-2">AI Strategy</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CardDescription className="text-muted-foreground text-sm">
+                  Assess your organization's AI strategy, security measures, and deployment approaches.
+                </CardDescription>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-card/30 backdrop-blur-sm border border-border/40 hover:border-primary/30 shadow-sm hover:shadow-md transition-all duration-300">
+              <CardHeader className="pb-2">
+                <div className="p-2 w-fit rounded-md bg-primary/10">
+                  <Database className="h-5 w-5 text-primary" />
+                </div>
+                <CardTitle className="text-lg mt-2">AI Data</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CardDescription className="text-muted-foreground text-sm">
+                  Evaluate your data management practices, quality, and governance for AI readiness.
+                </CardDescription>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-card/30 backdrop-blur-sm border border-border/40 hover:border-primary/30 shadow-sm hover:shadow-md transition-all duration-300">
+              <CardHeader className="pb-2">
+                <div className="p-2 w-fit rounded-md bg-primary/10">
+                  <Brain className="h-5 w-5 text-primary" />
+                </div>
+                <CardTitle className="text-lg mt-2">AI Talent</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CardDescription className="text-muted-foreground text-sm">
+                  Assess your organization's AI talent acquisition, training, and development strategies.
+                </CardDescription>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-card/30 backdrop-blur-sm border border-border/40 hover:border-primary/30 shadow-sm hover:shadow-md transition-all duration-300">
+              <CardHeader className="pb-2">
+                <div className="p-2 w-fit rounded-md bg-primary/10">
+                  <Shield className="h-5 w-5 text-primary" />
+                </div>
+                <CardTitle className="text-lg mt-2">AI Security</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CardDescription className="text-muted-foreground text-sm">
+                  Assess your organization's AI security measures, privacy controls, and risk mitigation strategies.
+                </CardDescription>
+              </CardContent>
+            </Card>
+          </div>
+          
+          <div className="mt-12 text-center">
+            <Link href="/assessment">
+              <Button 
+                size="lg" 
+                className="bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-md hover:shadow-lg transition-all duration-300 rounded-lg"
+              >
+                Start Assessment Now <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
-
-      {/* CTA Section */}
-      <section className="bg-gradient-to-r from-primary/10 via-background to-primary/10 dark:from-primary/5 dark:via-background dark:to-primary/5 py-16">
-        <div className="container mx-auto px-4 text-center max-w-3xl">
-          <h2 className="text-3xl font-bold mb-4">Ready to Transform Your AI Capabilities?</h2>
-          <p className="text-lg text-muted-foreground mb-8">
-            Start your AI readiness assessment today and receive a detailed report with actionable recommendations tailored to your organization.
-          </p>
-         
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="bg-muted text-foreground py-12 border-t border-border">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div>
-              <h3 className="text-lg font-bold mb-4">AI Readiness</h3>
-              <p className="text-muted-foreground">Enterprise-grade assessment for organizations at any stage of AI adoption.</p>
-            </div>
-            <div>
-              <h4 className="font-bold mb-4">Assessment</h4>
-              <ul className="space-y-2">
-                {assessmentTypes.map((type) => (
-                  <li key={type.id}>
-                    <Link href={`/assessment/${encodeURIComponent(type.id)}`} className="text-muted-foreground hover:text-primary transition-colors">
-                      {type.title}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-bold mb-4">Resources</h4>
-              <ul className="space-y-2">
-                <li><Link href="/resources/case-studies" className="text-muted-foreground hover:text-primary transition-colors">Case Studies</Link></li>
-                <li><Link href="/resources/white-papers" className="text-muted-foreground hover:text-primary transition-colors">White Papers</Link></li>
-                <li><Link href="/resources/ai-glossary" className="text-muted-foreground hover:text-primary transition-colors">AI Glossary</Link></li>
-                <li><Link href="/resources/blog" className="text-muted-foreground hover:text-primary transition-colors">Blog</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-bold mb-4">Company</h4>
-              <ul className="space-y-2">
-                <li><Link href="/about" className="text-muted-foreground hover:text-primary transition-colors">About Us</Link></li>
-                <li><Link href="/contact" className="text-muted-foreground hover:text-primary transition-colors">Contact</Link></li>
-                <li><Link href="/privacy" className="text-muted-foreground hover:text-primary transition-colors">Privacy Policy</Link></li>
-                <li><Link href="/terms" className="text-muted-foreground hover:text-primary transition-colors">Terms of Service</Link></li>
-              </ul>
-            </div>
-          </div>
-          <div className="border-t border-border mt-8 pt-8 text-center text-muted-foreground">
-            <p>© {new Date().getFullYear()} AI Readiness Assessment. All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
