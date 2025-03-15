@@ -247,7 +247,7 @@ export function PremiumHero({
           {/* Image with Glow */}
           {image && (
             <motion.div 
-              className="relative pt-12 w-full"
+              className="relative py-12 w-full"
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 1, delay: 0.6, ease: [0.23, 0.86, 0.39, 0.96] }}

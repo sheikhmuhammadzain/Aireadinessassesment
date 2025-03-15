@@ -88,7 +88,7 @@ export default function Home() {
           },
         ]}
         image={{
-          src: "https://images.klipfolio.com/website/public/5eaa172d-9c85-4a66-9a34-8dd8e3abb8d3/financial-dashboard-example.png",
+          src: "/hero.png", // Path to your image in the public folder
           alt: "AI Readiness Assessment Dashboard",
         }}
       />

@@ -98,15 +98,18 @@ export const PremiumTestimonials = ({
                     className="absolute inset-0 origin-bottom"
                   >
                     <div className="relative h-full w-full rounded-3xl overflow-hidden border border-border shadow-lg">
-                      <Image
-                        src={testimonial.src}
-                        alt={testimonial.name}
-                        width={500}
-                        height={500}
-                        draggable={false}
-                        className="h-full w-full object-cover object-center"
-                      />
-                      <div className="absolute inset-0 bg-black/20"></div>
+                      <div className="h-full w-full relative">
+                        <Image
+                          src={testimonial.src}
+                          alt={testimonial.name}
+                          fill
+                          sizes="(max-width: 768px) 100vw, 500px"
+                          priority
+                          className="object-cover object-center"
+                          style={{ objectFit: "cover" }}
+                        />
+                        <div className="absolute inset-0 bg-black/20"></div>
+                      </div>
                     </div>
                   </motion.div>
                 ))}
@@ -161,13 +164,13 @@ export const PremiumTestimonials = ({
                   ))}
                 </motion.p>
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full overflow-hidden border border-border">
+                  <div className="h-10 w-10 rounded-full overflow-hidden border border-border relative">
                     <Image
                       src={testimonials[active].src}
                       alt={testimonials[active].name}
-                      width={40}
-                      height={40}
-                      className="h-full w-full object-cover"
+                      fill
+                      sizes="40px"
+                      className="object-cover"
                     />
                   </div>
                   <div>
@@ -215,4 +218,4 @@ export const PremiumTestimonials = ({
       </div>
     </div>
   );
-}; 
+};
