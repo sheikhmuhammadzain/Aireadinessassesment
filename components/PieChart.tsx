@@ -25,16 +25,18 @@ export function PieChart({ data }: PieChartProps) {
     // Calculate total value
     const total = data.reduce((sum, item) => sum + item.value, 0);
     
-    // Define colors for each segment
+    // Define light blue shades for each segment
     const colors = [
-      '#0ea5e9', // sky-500
-      '#8b5cf6', // violet-500
-      '#ec4899', // pink-500
-      '#f97316', // orange-500
-      '#10b981', // emerald-500
-      '#f59e0b', // amber-500
-      '#ef4444', // red-500
-      '#6366f1', // indigo-500
+      '#E0F7FF', // Lightest blue
+      '#C2EAFF', // Very light blue
+      '#A5DBFF', // Light blue
+      '#8ECAE6', // Medium light blue
+      '#73BFDC', // Medium blue
+      '#5BA3C6', // Blue
+      '#4389B0', // Deeper blue
+      '#2C6F9B', // Rich blue
+      '#1A5785', // Deep blue
+      '#0A4570', // Darkest blue
     ];
 
     // Draw pie chart
@@ -67,7 +69,9 @@ export function PieChart({ data }: PieChartProps) {
         const labelX = centerX + labelRadius * Math.cos(labelAngle);
         const labelY = centerY + labelRadius * Math.sin(labelAngle);
         
-        ctx.fillStyle = '#ffffff';
+        // Use dark text for light backgrounds and light text for dark backgrounds
+        const colorIndex = index % colors.length;
+        ctx.fillStyle = colorIndex < 5 ? '#0A4570' : '#ffffff'; // Dark blue text for light slices, white for dark slices
         ctx.font = 'bold 14px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
