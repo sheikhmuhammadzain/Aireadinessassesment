@@ -233,7 +233,11 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
     link.click();
     document.body.removeChild(link);
     
-    toast.success('Report downloaded successfully');
+    toast({
+      title: "Success",
+      description: "Report downloaded successfully",
+      variant: "default",
+    });
   };
 
   if (loading) {
