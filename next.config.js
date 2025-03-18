@@ -14,7 +14,7 @@ const nextConfig = {
   },
   // Handle API rewrites - Note: for production deployment these URLs should be updated
   async rewrites() {
-    const apiUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const apiUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://103.18.20.205:8090';
     console.log('Using API URL for rewrites:', apiUrl);
     
     return [
