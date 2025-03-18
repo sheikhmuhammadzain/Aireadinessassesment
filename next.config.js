@@ -14,18 +14,17 @@ const nextConfig = {
   },
   // Handle API rewrites - Note: for production deployment these URLs should be updated
   async rewrites() {
+    const apiUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    console.log('Using API URL for rewrites:', apiUrl);
+    
     return [
       {
         source: '/api/questionnaire/:slug*',
-        destination: process.env.NODE_ENV === 'production' 
-          ? process.env.API_URL + '/questionnaire/:slug*' 
-          : 'http://127.0.0.1:8000/questionnaire/:slug*'
+        destination: `${apiUrl}/questionnaire/:slug*`
       },
       {
         source: '/api/calculate-results',
-        destination: process.env.NODE_ENV === 'production'
-          ? process.env.API_URL + '/calculate-results'
-          : 'http://127.0.0.1:8000/calculate-results'
+        destination: `${apiUrl}/calculate-results`
       }
     ];
   }
