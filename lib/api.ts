@@ -1,4 +1,4 @@
-import { AssessmentResponse, AssessmentResult, CompanyInfo } from "@/types";
+import { AssessmentResponse, AssessmentResult, CompanyInfo, CategoryWeights, SubcategoryWeights } from "@/types";
 
 // Remove trailing slash if present to avoid double slash issues
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/$/, "");
@@ -66,6 +66,16 @@ export async function fetchAllQuestionnaires() {
 export async function submitAssessment(payload: AssessmentResponse): Promise<AssessmentResult> {
   try {
     console.log(`Submitting assessment for: ${payload.assessmentType}`);
+    
+    // Log the payload to help with debugging
+    console.log(`Assessment payload structure:`, 
+      JSON.stringify({
+        assessmentType: payload.assessmentType,
+        categoryCount: payload.categoryResponses.length,
+        hasSubcategoryInfo: !!payload.categoryResponses[0]?.subcategoryResponses
+      })
+    );
+    
     const response = await fetch(normalizeUrl("/calculate-results"), {
       method: "POST",
       headers: {
@@ -96,29 +106,11 @@ export async function getRecommendedWeights(companyInfo: CompanyInfo) {
   try {
     console.log(`Getting recommended weights for: ${companyInfo.name}`);
     
-    // First try to get weights from the backend
-    try {
-      const response = await fetch(normalizeUrl("/recommend-weights"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-        },
-        body: JSON.stringify(companyInfo),
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        return data.weights;
-      }
-    } catch (backendError) {
-      console.warn("Backend weight recommendation failed, using fallback:", backendError);
-      // Continue to fallback if backend call fails
-    }
+    // Since the FastAPI backend doesn't have a recommend-weights endpoint (404 error),
+    // we'll use a client-side fallback to generate weights
     
-    // Fallback to client-side logic if backend call fails
     // Simulate API delay for better UX
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    await new Promise(resolve => setTimeout(resolve, 500));
     
     // Default weights
     const defaultWeights = {

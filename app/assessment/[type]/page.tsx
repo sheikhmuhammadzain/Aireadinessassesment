@@ -10,15 +10,17 @@ import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, ArrowRight, CheckCircle, Loader2, Info } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle, Loader2, Info, Lock, Unlock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { CompanyInfoForm } from "@/components/CompanyInfoForm";
 import { WeightAdjustment } from "@/components/WeightAdjustment";
-import { CompanyInfo, CategoryQuestions, CategoryWeights } from "@/types";
+import { SubcategoryWeightAdjustment } from "@/components/SubcategoryWeightAdjustment";
+import { CompanyInfo, CategoryQuestions, CategoryWeights, SubcategoryWeights } from "@/types";
 import { fetchQuestionnaire, submitAssessment, getRecommendedWeights } from "@/lib/api";
 import { Slider } from "@/components/ui/slider";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 // Configure your FastAPI backend URL
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -31,19 +33,29 @@ export default function AssessmentPage({ params }: { params: { type: string } })
   const [step, setStep] = useState<'company-info' | 'weight-adjustment' | 'questions'>('questions');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [questionnaire, setQuestionnaire] = useState<Record<string, string[]>>({});
+  const [questionnaire, setQuestionnaire] = useState<Record<string, Record<string, string[]>>>({});
   const [currentCategory, setCurrentCategory] = useState<string>("");
   const [categories, setCategories] = useState<string[]>([]);
   const [categoryIndex, setCategoryIndex] = useState(0);
   const [questions, setQuestions] = useState<CategoryQuestions>({});
+  
+  // Keep the old weights for backward compatibility
   const [weights, setWeights] = useState<CategoryWeights>({});
   const [recommendedWeights, setRecommendedWeights] = useState<CategoryWeights | undefined>(undefined);
+  
+  // New state for subcategory weights
+  const [subcategoryWeights, setSubcategoryWeights] = useState<SubcategoryWeights>({});
+  const [recommendedSubcategoryWeights, setRecommendedSubcategoryWeights] = useState<SubcategoryWeights | undefined>(undefined);
+  
   const [progress, setProgress] = useState(0);
   const [activeTab, setActiveTab] = useState<string>("questions");
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
   const [isDoingAllAssessments, setIsDoingAllAssessments] = useState(false);
   const [allAssessmentTypes, setAllAssessmentTypes] = useState<string[]>([]);
   const [currentAssessmentIndex, setCurrentAssessmentIndex] = useState(0);
+  
+  // State for tracking locked categories
+  const [lockedCategories, setLockedCategories] = useState<Record<string, boolean>>({});
   
   useEffect(() => {
     // Check if we're doing all assessments
@@ -59,17 +71,30 @@ export default function AssessmentPage({ params }: { params: { type: string } })
     
     // Check if company info is stored in localStorage
     const storedCompanyInfo = localStorage.getItem('company_info');
-    const storedWeights = localStorage.getItem('assessment_weights');
+    const storedSubcategoryWeights = localStorage.getItem('subcategory_weights');
+    const storedLockedCategories = localStorage.getItem('locked_categories');
+    
+    if (storedLockedCategories) {
+      try {
+        const parsedLocked = JSON.parse(storedLockedCategories);
+        setLockedCategories(parsedLocked);
+      } catch (error) {
+        console.error("Error parsing stored locked categories:", error);
+        setLockedCategories({});
+      }
+    }
     
     if (storedCompanyInfo) {
       try {
         const parsedInfo = JSON.parse(storedCompanyInfo);
         setCompanyInfo(parsedInfo);
         
-        if (storedWeights) {
+        if (storedSubcategoryWeights) {
           try {
-            const parsedWeights = JSON.parse(storedWeights);
-            setWeights(parsedWeights);
+            const parsedWeights = JSON.parse(storedSubcategoryWeights);
+            setSubcategoryWeights(parsedWeights);
+            // Also set the category weights for backward compatibility
+            setWeights(convertSubcategoryToCategory(parsedWeights));
             fetchQuestionnaires();
           } catch (error) {
             console.error("Error parsing stored weights:", error);
@@ -92,37 +117,126 @@ export default function AssessmentPage({ params }: { params: { type: string } })
     try {
       // Direct call to FastAPI backend
       const data = await fetchQuestionnaire(assessmentType);
-      setQuestionnaire(data);
+        setQuestionnaire(data);
 
-      const categoryList = Object.keys(data);
-      setCategories(categoryList);
+        const categoryList = Object.keys(data);
+        setCategories(categoryList);
 
-      if (categoryList.length > 0) {
-        setCurrentCategory(categoryList[0]);
-      }
+        if (categoryList.length > 0) {
+          setCurrentCategory(categoryList[0]);
+        }
 
-      // Initialize questions structure
-      const initialQuestions: CategoryQuestions = {};
+        // Initialize questions structure
+        const initialQuestions: CategoryQuestions = {};
       
       for (const category in data) {
-        initialQuestions[category] = data[category].map((q: string) => ({
-          question: q,
-          answer: null
-        }));
-      }
+        initialQuestions[category] = [];
+        
+        // Flatten subcategory questions into a single array for each category
+        for (const subcategory in data[category]) {
+          // Check if data[category][subcategory] is an array before calling map
+          if (Array.isArray(data[category][subcategory])) {
+            const subcategoryQuestions = data[category][subcategory].map((q: string) => ({
+            question: q,
+            answer: null
+          }));
+            
+            initialQuestions[category].push(...subcategoryQuestions);
+          } else {
+            // If it's not an array, it might be a single question or another format
+            // Log it for debugging
+            console.log(`Warning: data[${category}][${subcategory}] is not an array:`, data[category][subcategory]);
+            
+            // Try to handle it as a single question if it's a string
+            if (typeof data[category][subcategory] === 'string') {
+              initialQuestions[category].push({
+                question: data[category][subcategory] as string,
+                answer: null
+              });
+            }
+          }
+        }
+        }
+        
+        setQuestions(initialQuestions);
       
-      setQuestions(initialQuestions);
-      setLoading(false);
+      // If subcategory weights are not set yet, initialize them
+      if (Object.keys(subcategoryWeights).length === 0) {
+        initializeSubcategoryWeights(data);
+      }
+
+        setLoading(false);
       setStep('questions');
-    } catch (error) {
-      console.error("Error fetching questionnaire:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load the assessment questions. Please try again.",
-        variant: "destructive",
-      });
-      setLoading(false);
+      } catch (error) {
+        console.error("Error fetching questionnaire:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load the assessment questions. Please try again.",
+          variant: "destructive",
+        });
+        setLoading(false);
+      }
+    };
+
+  // Convert subcategory weights to category weights
+  const convertSubcategoryToCategory = (subWeights: SubcategoryWeights): CategoryWeights => {
+    const catWeights: CategoryWeights = {};
+    
+    for (const category in subWeights) {
+      catWeights[category] = 0;
+      for (const subcategory in subWeights[category]) {
+        catWeights[category] += subWeights[category][subcategory];
+      }
     }
+    
+    return catWeights;
+  };
+
+  // New function to calculate weights for main categories only
+  const initializeCategoryWeightsOnly = (data: Record<string, Record<string, string[] | string>>) => {
+    const categoryCount = Object.keys(data).length;
+    const equalWeight = 100 / categoryCount;
+    
+    // Set equal weights for all categories
+    const categoryWeights: CategoryWeights = {};
+    Object.keys(data).forEach(category => {
+      categoryWeights[category] = equalWeight;
+    });
+    
+    return categoryWeights;
+  };
+
+  // Initialize subcategory weights
+  const initializeSubcategoryWeights = (data: Record<string, Record<string, string[] | string>>) => {
+    // First, initialize the main category weights with equal distribution
+    const mainCategoryWeights = initializeCategoryWeightsOnly(data);
+    
+    // Then distribute those weights to subcategories
+    const newWeights: SubcategoryWeights = {};
+    
+    for (const category in data) {
+      newWeights[category] = {};
+      
+      if (typeof data[category] === 'object' && data[category] !== null) {
+        const subcategories = Object.keys(data[category]);
+        if (subcategories.length > 0) {
+          // Divide the category weight equally among subcategories
+          const categoryWeight = mainCategoryWeights[category];
+          const subcategoryWeight = categoryWeight / subcategories.length;
+          
+          for (const subcategory in data[category]) {
+            newWeights[category][subcategory] = subcategoryWeight;
+          }
+        }
+      }
+    }
+    
+    setSubcategoryWeights(newWeights);
+    // Set the main category weights for display and submission
+    setWeights(mainCategoryWeights);
+    
+    localStorage.setItem('subcategory_weights', JSON.stringify(newWeights));
+    localStorage.setItem('assessment_weights', JSON.stringify(mainCategoryWeights));
   };
 
   useEffect(() => {
@@ -171,25 +285,51 @@ export default function AssessmentPage({ params }: { params: { type: string } })
 
   const fetchRecommendedWeights = async (info: CompanyInfo) => {
     try {
-      const recommendedWeights = await getRecommendedWeights(info);
-      setRecommendedWeights(recommendedWeights);
-      setWeights(recommendedWeights);
+      // First try to get questionnaire data to structure the weights
+      const data = await fetchQuestionnaire(assessmentType);
+      setQuestionnaire(data);
+      
+      // Get the recommended category weights
+      const recommendedCategoryWeights = await getRecommendedWeights(info);
+      setRecommendedWeights(recommendedCategoryWeights);
+      setWeights(recommendedCategoryWeights);
+      
+      // Generate subcategory weights based on main category weights
+      const recSubWeights: SubcategoryWeights = {};
+      
+      for (const category in data) {
+        // Skip if category data is not an object
+        if (!data[category] || typeof data[category] !== 'object') {
+          console.warn(`Skipping category ${category} - not an object:`, data[category]);
+          continue;
+        }
+        
+        recSubWeights[category] = {};
+        
+        const categoryWeight = recommendedCategoryWeights[category] || (100 / Object.keys(data).length);
+        const subcategories = Object.keys(data[category]);
+        
+        // Skip if there are no subcategories
+        if (subcategories.length === 0) {
+          console.warn(`No subcategories found for ${category}`);
+          continue;
+        }
+        
+        const subcategoryWeight = categoryWeight / subcategories.length;
+        
+        for (const subcategory in data[category]) {
+          recSubWeights[category][subcategory] = subcategoryWeight;
+        }
+      }
+      
+      setRecommendedSubcategoryWeights(recSubWeights);
+      setSubcategoryWeights(recSubWeights);
     } catch (error) {
       console.error("Error fetching recommended weights:", error);
-      // Fall back to equal distribution
-      const defaultWeight = 100 / 7; // 7 categories
-      
-      const fallbackWeights: CategoryWeights = {
-        "AI Governance": defaultWeight,
-        "AI Culture": defaultWeight,
-        "AI Infrastructure": defaultWeight,
-        "AI Strategy": defaultWeight,
-        "AI Data": defaultWeight,
-        "AI Talent": defaultWeight,
-        "AI Security": defaultWeight
-      };
-      
-      setWeights(fallbackWeights);
+      // Fall back to equal distribution 
+      if (Object.keys(questionnaire).length > 0) {
+        initializeSubcategoryWeights(questionnaire);
+      }
     }
   };
 
@@ -197,8 +337,15 @@ export default function AssessmentPage({ params }: { params: { type: string } })
     setWeights(newWeights);
   };
 
+  const handleSubcategoryWeightsChange = (newWeights: SubcategoryWeights) => {
+    setSubcategoryWeights(newWeights);
+    // Also update category weights for backward compatibility
+    setWeights(convertSubcategoryToCategory(newWeights));
+  };
+
   const handleWeightsSubmit = () => {
     // Store weights in localStorage
+    localStorage.setItem('subcategory_weights', JSON.stringify(subcategoryWeights));
     localStorage.setItem('assessment_weights', JSON.stringify(weights));
     fetchQuestionnaires();
   };
@@ -241,19 +388,119 @@ export default function AssessmentPage({ params }: { params: { type: string } })
     }
   };
 
+  // Prepare subcategory responses for the API
+  const prepareSubcategoryResponses = () => {
+    const responsesBySubcategory = {};
+    
+    // Process each category and its questions
+    for (const category in questionnaire) {
+      // Track questions by subcategory
+      const subcategoryQuestionMap = {};
+      let questionIndex = 0;
+      
+      // Map each question to its subcategory
+      for (const subcategory in questionnaire[category]) {
+        // Check if the subcategory contains an array of questions
+        const subcategoryData = questionnaire[category][subcategory];
+        let questionCount = 0;
+        
+        if (Array.isArray(subcategoryData)) {
+          questionCount = subcategoryData.length;
+        } else if (typeof subcategoryData === 'string') {
+          // If it's a single question as a string
+          questionCount = 1;
+        } else {
+          // Skip if we can't determine question count
+          console.warn(`Skipping subcategory ${subcategory} - unsupported data type:`, subcategoryData);
+          continue;
+        }
+        
+        subcategoryQuestionMap[subcategory] = {
+          start: questionIndex,
+          end: questionIndex + questionCount - 1
+        };
+        questionIndex += questionCount;
+      }
+      
+      // Assign each question to its subcategory
+      for (const subcategory in subcategoryQuestionMap) {
+        const { start, end } = subcategoryQuestionMap[subcategory];
+        
+        // Safety check: ensure we have enough questions in the array
+        if (!questions[category] || start >= questions[category].length) {
+          console.warn(`Not enough questions for ${category}/${subcategory}. Expected to start at index ${start} but array length is ${questions[category]?.length || 0}`);
+          continue;
+        }
+        
+        if (!responsesBySubcategory[category]) {
+          responsesBySubcategory[category] = {};
+        }
+        
+        // Use a safe end index
+        const safeEnd = Math.min(end, questions[category].length - 1);
+        
+        responsesBySubcategory[category][subcategory] = questions[category]
+          .slice(start, safeEnd + 1)
+          .map(q => ({
+            question: q.question,
+            answer: q.answer as number
+          }));
+      }
+    }
+    
+    return responsesBySubcategory;
+  };
+
   const handleSubmit = async () => {
     setSubmitting(true);
     
     try {
-      // Format the data for the API
-      const categoryResponses = Object.entries(questions).map(([category, questionList]) => ({
+      // Get responses organized by subcategory
+      const subcategoryResponses = prepareSubcategoryResponses();
+      
+      // Normalize weights to ensure they exactly sum to 100
+      let totalWeight = Object.values(weights).reduce((sum, w) => sum + w, 0);
+      const normalizedWeights = { ...weights };
+      
+      if (Math.abs(totalWeight - 100) > 0.01) {
+        // Normalize all weights to exactly 100
+        const normalizationFactor = 100 / totalWeight;
+        for (const category in normalizedWeights) {
+          normalizedWeights[category] = Math.round(normalizedWeights[category] * normalizationFactor * 10) / 10;
+        }
+        
+        // Check if we're still not exactly 100 due to rounding
+        const newTotal = Object.values(normalizedWeights).reduce((sum, w) => sum + w, 0);
+        if (Math.abs(newTotal - 100) > 0.01) {
+          // Add/subtract the small difference to/from the largest weight
+          const categories = Object.keys(normalizedWeights);
+          const largestCategory = categories.reduce((a, b) => 
+            normalizedWeights[a] > normalizedWeights[b] ? a : b
+          );
+          normalizedWeights[largestCategory] += (100 - newTotal);
+        }
+      }
+      
+      // Format the data for the API - we're keeping the original structure
+      // but adding subcategory information within it
+      const categoryResponses = Object.entries(questions).map(([category, questionList]) => {
+        // Get normalized weight for this category
+        const categoryWeight = normalizedWeights[category];
+        
+        return {
         category,
         responses: questionList.map(q => ({
           question: q.question,
           answer: q.answer as number
         })),
-        weight: weights[category] || (100 / Object.keys(questions).length)  // Use stored weight or default
-      }));
+          weight: categoryWeight,
+          subcategoryResponses: Object.entries(subcategoryWeights[category] || {}).map(([subcategory, weight]) => ({
+            subcategory,
+            weight,
+            responses: (subcategoryResponses[category]?.[subcategory] || [])
+          }))
+        };
+      });
       
       const payload = {
         assessmentType,
@@ -265,6 +512,9 @@ export default function AssessmentPage({ params }: { params: { type: string } })
 
       // Store result in localStorage
       localStorage.setItem(`assessment_result_${assessmentType}`, JSON.stringify(result));
+
+      // Also store subcategory weights for future reference
+      localStorage.setItem(`subcategory_weights_${assessmentType}`, JSON.stringify(subcategoryWeights));
 
       // Check if we're doing all assessments
       if (isDoingAllAssessments) {
@@ -282,7 +532,7 @@ export default function AssessmentPage({ params }: { params: { type: string } })
         }
       } else {
         // Single assessment, go directly to results
-        router.push(`/results/${encodeURIComponent(assessmentType)}`);
+      router.push(`/results/${encodeURIComponent(assessmentType)}`);
       }
     } catch (error) {
       console.error("Error submitting assessment:", error);
@@ -293,6 +543,20 @@ export default function AssessmentPage({ params }: { params: { type: string } })
       });
       setSubmitting(false);
     }
+  };
+
+  // Toggle lock for a category
+  const toggleCategoryLock = (category: string) => {
+    setLockedCategories(prev => {
+      const updated = { ...prev };
+      // Toggle the lock status
+      updated[category] = !updated[category];
+      
+      // Save to localStorage
+      localStorage.setItem('locked_categories', JSON.stringify(updated));
+      
+      return updated;
+    });
   };
 
   if (step === 'company-info') {
@@ -312,12 +576,13 @@ export default function AssessmentPage({ params }: { params: { type: string } })
         <div className="max-w-4xl mx-auto">
           <h1 className="text-3xl font-bold text-center mb-2">Assessment Weights</h1>
           <p className="text-center text-muted-foreground mb-8">
-            {companyInfo?.name ? `Based on ${companyInfo.name}'s profile, we recommend the following weights` : 'Customize the importance of each assessment category'}
+            {companyInfo?.name ? `Based on ${companyInfo.name}'s profile, we recommend the following weights` : 'Customize the importance of each subcategory in your assessment'}
           </p>
-          <WeightAdjustment 
-            weights={weights}
-            recommendedWeights={recommendedWeights}
-            onWeightsChange={handleWeightsChange}
+          
+          <SubcategoryWeightAdjustment 
+            weights={subcategoryWeights}
+            recommendedWeights={recommendedSubcategoryWeights}
+            onWeightsChange={handleSubcategoryWeightsChange}
             onSubmit={handleWeightsSubmit}
             loading={loading}
           />
@@ -365,7 +630,7 @@ export default function AssessmentPage({ params }: { params: { type: string } })
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full mb-6">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="questions">Questions</TabsTrigger>
-          <TabsTrigger value="weights">Category Weights</TabsTrigger>
+          <TabsTrigger value="weights">Subcategory Weights</TabsTrigger>
         </TabsList>
         
         <TabsContent value="questions">
@@ -425,14 +690,14 @@ export default function AssessmentPage({ params }: { params: { type: string } })
                     </TooltipTrigger>
                     <TooltipContent>
                       <p className="max-w-xs">
-                        Adjust the importance of each category. The weights will be used to calculate your final score.
+                        Adjust the weight of each main category. Lock a category to prevent its weight from changing when adjusting others.
                       </p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               </div>
               <CardDescription>
-                Customize weights for each category in your assessment
+                Set the importance of each category in your assessment (total: 100%)
               </CardDescription>
             </CardHeader>
             
@@ -440,53 +705,186 @@ export default function AssessmentPage({ params }: { params: { type: string } })
               <div className="space-y-6">
                 {Object.keys(weights).map((category) => (
                   <div key={category} className="space-y-2">
-                    <div className="flex justify-between">
-                      <Label>{category}</Label>
-                      <span className="font-medium">{weights[category]?.toFixed(1)}%</span>
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-base font-medium">{category}</Label>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleCategoryLock(category);
+                          }}
+                          title={lockedCategories[category] ? "Unlock category weight" : "Lock category weight"}
+                        >
+                          {lockedCategories[category] ? (
+                            <Lock className="h-3.5 w-3.5" />
+                          ) : (
+                            <Unlock className="h-3.5 w-3.5" />
+                          )}
+                        </Button>
+                      </div>
+                      <span className="font-medium">{weights[category].toFixed(1)}%</span>
+                    </div>
+                    <div className="mt-2">
+                      <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                        <span>Category weight</span>
+                        <span>{weights[category].toFixed(1)}%</span>
                     </div>
                     <Slider
-                      value={[weights[category] || 0]}
-                      min={5}
-                      max={50}
-                      step={0.1}
-                      onValueChange={(value) => {
-                        const newWeights = { ...weights };
-                        const oldValue = newWeights[category];
-                        const newValue = value[0];
-                        const diff = newValue - oldValue;
-                        
-                        // Update the weight for this category
-                        newWeights[category] = newValue;
-                        
-                        // Distribute the difference among other categories proportionally
-                        const otherCategories = Object.keys(newWeights).filter(cat => cat !== category);
-                        if (otherCategories.length > 0) {
-                          const totalOtherWeights = otherCategories.reduce((sum, cat) => sum + newWeights[cat], 0);
+                        value={[weights[category] || 0]}
+                        min={0}
+                        max={100}
+                        step={1}
+                        onValueChange={(value) => {
+                          const newValue = value[0];
+                          const oldValue = weights[category];
+                          const difference = newValue - oldValue;
                           
-                          if (totalOtherWeights > 0) {
+                          // Create a copy of the weights
+                          const updatedWeights = { ...weights };
+                          
+                          // Update weight for this category
+                          updatedWeights[category] = newValue;
+                          
+                          // Get all categories except the one being changed and those that are locked
+                          const otherCategories = Object.keys(updatedWeights)
+                            .filter(cat => cat !== category && !lockedCategories[cat]);
+                          
+                          // If all other categories are locked, show warning and only update current category
+                          if (otherCategories.length === 0) {
+                            toast({
+                              title: "Weight adjustment limited",
+                              description: "All other categories are locked. Unlock some to enable proper weight distribution.",
+                              variant: "warning",
+                            });
+                            
+                            setWeights(prev => ({
+                              ...prev,
+                              [category]: newValue
+                            }));
+                            return;
+                          }
+                          
+                          // Calculate total weight of other modifiable categories
+                          const totalOtherWeights = otherCategories.reduce((sum, cat) => sum + updatedWeights[cat], 0);
+                          
+                          // Distribute the difference proportionally among other modifiable categories
+                          if (totalOtherWeights > 0 && difference !== 0) {
+                            // Safety check - if the difference would make any categories go below 1%, adjust
+                            let adjustedDifference = difference;
+                            
                             otherCategories.forEach(cat => {
-                              const proportion = newWeights[cat] / totalOtherWeights;
-                              newWeights[cat] = Math.max(0, newWeights[cat] - (diff * proportion));
+                              const proportion = updatedWeights[cat] / totalOtherWeights;
+                              const potentialNewWeight = updatedWeights[cat] - (difference * proportion);
+                              if (potentialNewWeight < 1) {
+                                // If this would reduce the weight below 1%, adjust the difference
+                                const maxReduction = updatedWeights[cat] - 1;
+                                const proportionalMaxReduction = maxReduction / proportion;
+                                if (proportionalMaxReduction < Math.abs(adjustedDifference)) {
+                                  adjustedDifference = difference > 0 ? proportionalMaxReduction : -proportionalMaxReduction;
+                                }
+                              }
+                            });
+                            
+                            // Apply the adjusted difference
+                            otherCategories.forEach(cat => {
+                              const proportion = updatedWeights[cat] / totalOtherWeights;
+                              updatedWeights[cat] = Math.max(1, updatedWeights[cat] - (adjustedDifference * proportion));
                             });
                           }
-                        }
-                        
-                        // Ensure all weights sum to 100 by normalizing
-                        const sum = Object.values(newWeights).reduce((a, b) => a + b, 0);
-                        if (Math.abs(sum - 100) > 0.1) {
-                          Object.keys(newWeights).forEach(cat => {
-                            newWeights[cat] = (newWeights[cat] / sum) * 100;
-                          });
-                        }
-                        
-                        setWeights(newWeights);
-                        // Update in localStorage
-                        localStorage.setItem('assessment_weights', JSON.stringify(newWeights));
-                      }}
+                          
+                          // Normalize to ensure total is 100
+                          let total = Object.values(updatedWeights).reduce((sum, w) => sum + w, 0);
+                          
+                          if (Math.abs(total - 100) > 0.1) {
+                            // Get all locked categories (including the one we're adjusting)
+                            const lockedCats = Object.keys(updatedWeights)
+                              .filter(cat => lockedCategories[cat] || cat === category);
+                            
+                            // Calculate sum of locked weights
+                            const lockedSum = lockedCats.reduce((sum, cat) => sum + updatedWeights[cat], 0);
+                            
+                            // Calculate remaining weight for unlocked categories
+                            const remainingSum = 100 - lockedSum;
+                            
+                            if (remainingSum <= 0) {
+                              toast({
+                                title: "Weight adjustment failed",
+                                description: "Too many locked categories. Please unlock some to continue adjusting.",
+                                variant: "destructive",
+                              });
+                              return;
+                            }
+                            
+                            // Normalize only unlocked categories
+                            const unlockedSum = otherCategories.reduce((sum, cat) => sum + updatedWeights[cat], 0);
+                            const normalizationFactor = remainingSum / unlockedSum;
+                            
+                            otherCategories.forEach(cat => {
+                              updatedWeights[cat] = Math.round(updatedWeights[cat] * normalizationFactor * 10) / 10;
+                            });
+                          }
+                          
+                          // Final check - make sure the total is exactly 100%
+                          let finalTotal = Object.values(updatedWeights).reduce((sum, w) => sum + w, 0);
+                          if (Math.abs(finalTotal - 100) > 0.01) {
+                            // If we have unlocked categories, distribute the difference
+                            if (otherCategories.length > 0) {
+                              const difference = 100 - finalTotal;
+                              
+                              // Find the largest unlocked category to adjust
+                              const largestUnlockedCategory = otherCategories.reduce((a, b) => 
+                                updatedWeights[a] > updatedWeights[b] ? a : b
+                              );
+                              
+                              // Apply the difference to the largest category
+                              updatedWeights[largestUnlockedCategory] += difference;
+                              
+                              // Final sanity check to ensure we're exactly 100
+                              finalTotal = Object.values(updatedWeights).reduce((sum, w) => sum + w, 0);
+                              if (Math.abs(finalTotal - 100) > 0.001) {
+                                // If there's still a tiny difference due to floating point errors, force it to exactly 100
+                                const tinyDifference = 100 - finalTotal;
+                                updatedWeights[largestUnlockedCategory] += tinyDifference;
+                              }
+                            } else {
+                              // If all categories are locked except the current one, adjust the current category
+                              updatedWeights[category] = 100 - (finalTotal - updatedWeights[category]);
+                            }
+                          }
+                          
+                          // Update weights state
+                          setWeights(updatedWeights);
+                          
+                          // Also update subcategory weights proportionally
+                          const updatedSubWeights = { ...subcategoryWeights };
+                          
+                          for (const cat in updatedSubWeights) {
+                            if (cat === category || otherCategories.includes(cat)) {
+                              const subTotal = Object.values(updatedSubWeights[cat]).reduce((sum, w) => sum + w, 0);
+                              if (subTotal > 0) {
+                                const factor = updatedWeights[cat] / subTotal;
+                                for (const sub in updatedSubWeights[cat]) {
+                                  updatedSubWeights[cat][sub] *= factor;
+                                }
+                              }
+                            }
+                          }
+                          
+                          setSubcategoryWeights(updatedSubWeights);
+                          
+                          // Save to localStorage
+                          localStorage.setItem('assessment_weights', JSON.stringify(updatedWeights));
+                          localStorage.setItem('subcategory_weights', JSON.stringify(updatedSubWeights));
+                        }}
                       className="cursor-pointer"
+                        disabled={lockedCategories[category]}
                     />
-                    {category !== Object.keys(weights)[Object.keys(weights).length - 1] && (
-                      <Separator className="my-4" />
+                    </div>
+                    {category !== Object.keys(weights).pop() && (
+                    <Separator className="my-4" />
                     )}
                   </div>
                 ))}

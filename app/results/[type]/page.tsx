@@ -34,7 +34,6 @@ import { Badge } from "@/components/ui/badge";
 import { AssessmentLevelsVisual } from "@/components/assessment-levels-visual";
 import { AssessmentRecommendations } from "@/components/assessment-recommendations";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
-import { toast } from "sonner";
 
 interface AssessmentResult {
   assessmentType: string;
@@ -240,6 +239,13 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
     });
   };
 
+  // Fix for Badge variant error - replace "warning" with "secondary"
+  const getPriorityBadgeVariant = (index: number) => {
+    if (index < 3) return "destructive";
+    if (index < 6) return "secondary"; // Changed from "warning" to "secondary"
+    return "outline";
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-12 flex items-center justify-center">
@@ -269,15 +275,15 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
         {/* Premium header with gradient background */}
         <div className="absolute inset-0 bg-gradient-to-r from-blue-50 via-blue-100 to-blue-50 rounded-lg -z-10"></div>
         <div className="relative z-10 p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center">
-          <div>
+        <div>
             <h1 className="text-3xl font-bold tracking-tight mb-2 bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-blue-700">
               {assessmentType === 'quick' ? 'Quick Assessment Results' : 'Comprehensive Assessment Results'}
             </h1>
             <p className="text-muted-foreground">
               Detailed analysis of your AI readiness assessment
-            </p>
-          </div>
-          
+          </p>
+        </div>
+
           <div className="flex flex-col sm:flex-row gap-3 mt-4 md:mt-0">
             <Button 
               variant="outline" 
@@ -286,7 +292,7 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
             >
               <Download className="h-4 w-4" />
               Download Report
-            </Button>
+          </Button>
             
             <Button
               variant="default"
@@ -295,7 +301,7 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
             >
               <ArrowLeft className="h-4 w-4" />
               Retake Assessment
-            </Button>
+          </Button>
           </div>
         </div>
       </div>
@@ -414,13 +420,13 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
                   </svg>
                   Radar Analysis
                 </CardTitle>
-                <CardDescription>
+            <CardDescription>
                   Visual representation of category scores
-                </CardDescription>
-              </CardHeader>
+            </CardDescription>
+          </CardHeader>
               <CardContent className="flex justify-center pt-6">
                 <div className="h-[300px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%">
                     <RadarChart cx="50%" cy="50%" outerRadius="80%" data={chartData}>
                       <PolarGrid stroke="#e0f7ff" />
                       <PolarAngleAxis dataKey="category" tick={{ fill: '#5BA3C6', fontSize: 12 }} />
@@ -441,10 +447,10 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
                         }}
                       />
                     </RadarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
           </div>
 
           {/* Assessment Levels Visual */}
@@ -463,19 +469,19 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
 
         <TabsContent value="maturity" className="mt-6">
           <Card className="mb-8">
-            <CardHeader>
+          <CardHeader>
               <CardTitle>AI Maturity Assessment</CardTitle>
-              <CardDescription>
+            <CardDescription>
                 Detailed analysis of your organization's AI maturity level
-              </CardDescription>
-            </CardHeader>
+            </CardDescription>
+          </CardHeader>
             <CardContent>
               <div className="mb-8">
                 <h3 className="text-xl font-semibold mb-4">Overall Maturity</h3>
                 <div className="flex items-center mb-4">
-                  <div
+            <div
                     className="w-16 h-16 rounded-full flex items-center justify-center mr-4"
-                    style={{
+              style={{
                       background: `conic-gradient(${getColorForScore(result.overallScore)} ${result.overallScore / 100 * 360}deg, #e0f7ff 0)`
                     }}
                   >
@@ -633,26 +639,26 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
                       <span>Develop advanced AI talent and leadership capabilities</span>
                     </li>
                   </ul>
-                </div>
-                
-                <div className="text-center">
+            </div>
+
+            <div className="text-center">
                   <p className="text-gray-600 italic">
                     While your organization is AI-ready, continue to monitor and improve in any areas 
                     that scored below 85% to maintain your competitive advantage.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+              </p>
+            </div>
+          </CardContent>
+        </Card>
           ) : (
             <>
-              <Card className="mb-8">
-                <CardHeader>
+      <Card className="mb-8">
+        <CardHeader>
                   <CardTitle>Gap Analysis</CardTitle>
-                  <CardDescription>
+          <CardDescription>
                     Identify the areas with the largest gaps between current state and desired state
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
                   <div className="mb-6">
                     <p className="text-muted-foreground mb-4">
                       Gap analysis helps identify the difference between your current AI capabilities and where you need to be. 
@@ -683,10 +689,10 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
                               }%
                             </div>
                             <p className="text-sm text-muted-foreground">Average Gap</p>
-                          </div>
-                        </CardContent>
-                      </Card>
-                      
+          </div>
+        </CardContent>
+      </Card>
+
                       <Card className="bg-blue-50">
                         <CardContent className="pt-6">
                           <div className="text-center">
@@ -715,7 +721,7 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
                               {item.category}
                             </div>
                             <Badge 
-                              variant={index < 3 ? "destructive" : index < 6 ? "warning" : "outline"}
+                              variant={getPriorityBadgeVariant(index)}
                               className="ml-2"
                             >
                               Priority: {item.priority}
@@ -776,9 +782,9 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
                         No gap analysis data available.
                       </div>
                     )}
-                  </div>
-                </CardContent>
-              </Card>
+            </div>
+          </CardContent>
+        </Card>
 
               {/* AI Gap Analysis */}
               {!loading && result && (
@@ -793,13 +799,13 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
 
         <TabsContent value="detailed" className="mt-6">
           <Card className="mb-8">
-            <CardHeader>
+          <CardHeader>
               <CardTitle>Detailed Analysis</CardTitle>
-              <CardDescription>
+            <CardDescription>
                 In-depth breakdown of your assessment responses by category
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
               {result.answers && result.answers.length > 0 ? (
                 <>
                   <div className="mb-6">
@@ -856,8 +862,8 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
                                       {answer.options.map((option, optIndex) => (
                                         <Badge 
                                           key={optIndex}
-                                          variant={answer.selectedOption === option.value ? "default" : "outline"}
-                                          className={answer.selectedOption === option.value ? "" : "text-muted-foreground"}
+                                          variant={answer.selectedOption.toString() === option.value.toString() ? "default" : "outline"}
+                                          className={answer.selectedOption.toString() === option.value.toString() ? "" : "text-muted-foreground"}
                                         >
                                           {option.label} ({option.value})
                                         </Badge>
@@ -872,10 +878,7 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
                                           max={5} 
                                           className="w-full h-2"
                                           style={{
-                                            backgroundColor: '#f0f0f0',
-                                            '& > div': {
-                                              backgroundColor: getColor(categoryIndex)
-                                            }
+                                            backgroundColor: '#f0f0f0'
                                           }}
                                         />
                                         <span className="ml-2 min-w-[40px] text-right">{answer.score}/5</span>
@@ -934,10 +937,10 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
                   <Button variant="outline" onClick={() => router.push(`/assessment/${encodeURIComponent(assessmentType)}`)}>
                     Take a New Assessment
                   </Button>
-                </div>
+            </div>
               )}
-            </CardContent>
-          </Card>
+          </CardContent>
+        </Card>
         </TabsContent>
       </Tabs>
 

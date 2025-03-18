@@ -95,7 +95,7 @@ export default function Home() {
       
       <div id="features">
         <PremiumFeaturesSection />
-      </div>
+        </div>
       
       <PremiumTestimonials testimonials={testimonials} />
       
@@ -110,12 +110,12 @@ export default function Home() {
             </p>
             <div className="pt-4">
               <Link href="/assessment">
-                <Button 
-                  size="lg" 
-                  className="bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-md hover:shadow-lg transition-all duration-300 rounded-lg"
-                >
+              <Button 
+                size="lg" 
+                className="bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-md hover:shadow-lg transition-all duration-300 rounded-lg"
+              >
                   Start Free Assessment <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
+              </Button>
               </Link>
             </div>
           </div>
