@@ -63,7 +63,7 @@ export async function generateRecommendations(category: string, score: number) {
 
 export async function generateOverallSummary(overallScore: number, categoryScores: Record<string, number>) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const prompt = `As an AI readiness expert, provide a brief summary (2-3 sentences) of an organization's AI readiness based on:
     Overall Score: ${overallScore}%
