@@ -22,18 +22,13 @@ function normalizeUrl(path: string): string {
 export async function fetchQuestionnaire(assessmentType: string): Promise<Record<string, Record<string, string[]>>> {
   console.log(`Fetching questionnaire for: ${assessmentType}`);
   const encodedType = encodeURIComponent(assessmentType);
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-  console.log(`API Base URL: ${apiBaseUrl}`);   
-  
-  const url = `${apiBaseUrl}/questionnaire/${encodedType}`;
-  console.log(`Full request URL: ${url}`);
   
   try {
     // Set up a timeout for the request (15 seconds)
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
     
-    const response = await fetch(url, { signal: controller.signal });
+    const response = await fetch(`/api/questionnaire/${encodedType}`, { signal: controller.signal });
     clearTimeout(timeoutId);
     
     if (!response.ok) {
@@ -175,7 +170,7 @@ export async function submitAssessment(payload: AssessmentResponse): Promise<Ass
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
     
-    const response = await fetch(normalizeUrl("/calculate-results"), {
+    const response = await fetch("/api/calculate-results", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -223,7 +218,7 @@ export async function submitAssessment(payload: AssessmentResponse): Promise<Ass
     console.error("Error submitting assessment:", error);
     
     // Handle timeout specifically
-    if (error.name === 'AbortError') {
+    if (error instanceof Error && error.name === 'AbortError') {
       throw new Error('Request timed out. The server might be down or slow to respond.');
     }
     
