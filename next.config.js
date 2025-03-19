@@ -14,7 +14,7 @@ const nextConfig = {
   },
   // Handle API rewrites - Note: for production deployment these URLs should be updated
   async rewrites() {
-    const apiUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://103.18.20.205:8090';
+    const apiUrl = process.env.API_URL || 'http://103.18.20.205:8090';
     console.log('Using API URL for rewrites:', apiUrl);
     
     return [
@@ -25,6 +25,10 @@ const nextConfig = {
       {
         source: '/api/calculate-results',
         destination: `${apiUrl}/calculate-results`
+      },
+      {
+        source: '/api/questionnaires',
+        destination: `${apiUrl}/questionnaires`
       }
     ];
   }

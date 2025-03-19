@@ -23,7 +23,7 @@ export async function fetchQuestionnaire(assessmentType: string): Promise<Record
   console.log(`Fetching questionnaire for: ${assessmentType}`);
   const encodedType = encodeURIComponent(assessmentType);
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-  console.log(`API Base URL: ${apiBaseUrl}`);
+  console.log(`API Base URL: ${apiBaseUrl}`);   
   
   const url = `${apiBaseUrl}/questionnaire/${encodedType}`;
   console.log(`Full request URL: ${url}`);
@@ -139,7 +139,7 @@ export async function fetchQuestionnaire(assessmentType: string): Promise<Record
 export async function fetchAllQuestionnaires() {
   try {
     console.log("Fetching all questionnaires");
-    const response = await fetch(normalizeUrl("/questionnaires"));
+    const response = await fetch("/api/questionnaires");
     
     if (!response.ok) {
       const errorText = await response.text();
