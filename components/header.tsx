@@ -1,13 +1,42 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/mode-toggle";
-import { Activity } from "lucide-react";
+import { Activity, RefreshCw } from "lucide-react";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Header() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { toast } = useToast();
+  const [showResetConfirmation, setShowResetConfirmation] = useState(false);
+  
+  const handleReset = () => {
+    setShowResetConfirmation(true);
+  };
+
+  const confirmReset = () => {
+    // Clear all localStorage data
+    localStorage.clear();
+    
+    toast({
+      title: "Reset Complete",
+      description: "All assessment data has been cleared.",
+    });
+    
+    // Navigate to home page
+    router.push("/");
+    
+    // Close the modal
+    setShowResetConfirmation(false);
+  };
+
+  const cancelReset = () => {
+    setShowResetConfirmation(false);
+  };
   
   return (
     <header className="border-b">
@@ -43,11 +72,40 @@ export default function Header() {
             >
               About
             </Link>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleReset}
+              className="text-sm font-medium transition-colors hover:text-primary text-muted-foreground flex items-center gap-1"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Reset
+            </Button>
           </nav>
           
           <ModeToggle />
         </div>
       </div>
+      
+      {/* Reset confirmation dialog */}
+      {showResetConfirmation && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg max-w-md w-full">
+            <h3 className="text-xl font-semibold mb-4">Reset Confirmation</h3>
+            <p className="text-gray-600 dark:text-gray-300 mb-6">
+              Are you sure you want to reset? This will clear all assessment data and cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={cancelReset}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={confirmReset}>
+                Reset All Data
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

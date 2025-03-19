@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { ArrowRight, BarChart4, Brain, Database, Layers, Loader2, Shield, Users } from "lucide-react";
+import { ArrowRight, BarChart4, Brain, Database, Download, FileText, Layers, Loader2, Search, Shield, Users } from "lucide-react";
 import { 
   BarChart, 
   Bar, 
@@ -19,6 +19,8 @@ import {
   LineChart,
   Line
 } from "recharts";
+import { useToast } from "@/hooks/use-toast";
+import { generateDeepResearchReport } from "@/lib/openai";
 
 interface AssessmentResult {
   assessmentType: string;
@@ -96,9 +98,19 @@ const assessmentTypes = [
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [results, setResults] = useState<Record<string, AssessmentResult>>({});
   const [overallData, setOverallData] = useState<any[]>([]);
+  const [generatingReport, setGeneratingReport] = useState(false);
+  const [searchAnimationStep, setSearchAnimationStep] = useState(0);
+  const searchMessages = [
+    "Analyzing assessment data...",
+    "Scanning industry benchmarks...",
+    "Identifying improvement opportunities...",
+    "Formulating strategic recommendations...",
+    "Preparing comprehensive report..."
+  ];
   
   useEffect(() => {
     // Load all assessment results from localStorage
@@ -132,6 +144,21 @@ export default function DashboardPage() {
     setLoading(false);
   }, []);
 
+  useEffect(() => {
+    // Animation interval for report generation
+    let interval: NodeJS.Timeout;
+    
+    if (generatingReport) {
+      interval = setInterval(() => {
+        setSearchAnimationStep(prev => (prev + 1) % searchMessages.length);
+      }, 1500);
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [generatingReport, searchMessages.length]);
+
   const getColorForScore = (score: number) => {
     if (score < 30) return BLUE_COLORS[3]; // Light blue
     if (score < 60) return BLUE_COLORS[5]; // Medium blue
@@ -156,6 +183,59 @@ export default function DashboardPage() {
   const completedAssessments = Object.keys(results).length;
   const overallReadiness = calculateOverallReadiness();
 
+  const handleGenerateReport = async () => {
+    if (Object.keys(results).length === 0) {
+      toast({
+        title: "No Assessment Data",
+        description: "Complete at least one assessment before generating a report.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setGeneratingReport(true);
+    setSearchAnimationStep(0);
+    
+    toast({
+      title: "Generating Report",
+      description: "Please wait while we analyze your assessment data...",
+    });
+
+    try {
+      // Generate the report HTML
+      const reportHtml = await generateDeepResearchReport(results);
+      
+      // Create a blob from the HTML
+      const blob = new Blob([reportHtml], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      
+      // Create a link element and trigger download
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `AI_Readiness_DeepResearch_Report_${new Date().toISOString().split('T')[0]}.html`;
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Report Ready",
+        description: "Your Deep Research Report has been downloaded.",
+      });
+    } catch (error) {
+      console.error("Error generating report:", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate the report. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setGeneratingReport(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-12 flex items-center justify-center">
@@ -169,11 +249,46 @@ export default function DashboardPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">AI Readiness Dashboard</h1>
-        <p className="text-muted-foreground">
-          Track and analyze your organization's AI readiness across multiple dimensions
-        </p>
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">AI Readiness Dashboard</h1>
+          <p className="text-muted-foreground">
+            Track and analyze your organization's AI readiness across multiple dimensions
+          </p>
+        </div>
+        
+        {completedAssessments > 0 && (
+          <Button 
+            onClick={handleGenerateReport}
+            disabled={generatingReport}
+            className={`relative bg-gradient-to-r ${
+              generatingReport 
+              ? "from-blue-400 to-blue-600" 
+              : "from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900"
+            }`}
+            size="lg"
+          >
+            {generatingReport ? (
+              <>
+                <div className="mr-2 flex items-center">
+                  <div className="relative w-5 h-5">
+                    <Search className="h-5 w-5 absolute animate-pulse" />
+                    <div className="absolute top-1/2 left-1/2 w-8 h-8 -ml-4 -mt-4 border-2 border-blue-300 rounded-full animate-ping opacity-75"></div>
+                  </div>
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="text-sm font-semibold">Deep AI Research</span>
+                  <span className="text-xs opacity-90">{searchMessages[searchAnimationStep]}</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <FileText className="mr-2 h-5 w-5" />
+                Detailed Report
+              </>
+            )}
+          </Button>
+        )}
       </div>
       
       {completedAssessments === 0 ? (
@@ -229,14 +344,14 @@ export default function DashboardPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-4">
-                <div className="text-2xl font-bold">{completedAssessments}/6</div>
+                <div className="text-2xl font-bold">{completedAssessments}/7</div>
                 <p className="text-xs text-muted-foreground">
-                  {completedAssessments === 6 ? "All assessments completed" : `${6 - completedAssessments} remaining`}
+                  {completedAssessments === 7 ? "All assessments completed" : `${7 - completedAssessments} remaining`}
                 </p>
                 <div className="mt-4 h-2 w-full bg-blue-50 rounded-full">
                   <div 
                     className="h-2 rounded-full bg-blue-600" 
-                    style={{ width: `${(completedAssessments / 6) * 100}%` }}
+                    style={{ width: `${(completedAssessments / 7) * 100}%` }}
                   ></div>
                 </div>
               </CardContent>

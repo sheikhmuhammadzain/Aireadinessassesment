@@ -537,11 +537,11 @@ export default function AssessmentPage({ params }: { params: { type: string } })
           localStorage.setItem('current_assessment_index', nextIndex.toString());
           router.push(`/assessment/${encodeURIComponent(allAssessmentTypes[nextIndex])}`);
         } else {
-          // All done, go to results
+          // All done, go to dashboard instead of results
           localStorage.removeItem('doing_all_assessments');
           localStorage.removeItem('current_assessment_index');
           localStorage.removeItem('assessment_types');
-          router.push('/results');
+          router.push('/dashboard');
         }
       } else {
         // Single assessment, go directly to results

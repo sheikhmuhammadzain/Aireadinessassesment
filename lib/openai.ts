@@ -211,4 +211,225 @@ export async function generateRecommendations(category: string, score: number, g
     console.error("Error generating recommendations:", error);
     return `**Recommendations for ${category}**\n\n1. Establish a formal framework for ${category.toLowerCase()}\n2. Develop comprehensive training programs\n3. Implement regular assessments and feedback loops`;
   }
+}
+
+/**
+ * Generate a comprehensive AI readiness report based on all assessment results
+ * @param assessmentResults All assessment results
+ * @returns Promise with HTML formatted report
+ */
+export async function generateDeepResearchReport(assessmentResults: Record<string, any>) {
+  try {
+    // Create a data summary for the prompt
+    const categoriesData = Object.entries(assessmentResults).map(([type, result]) => {
+      return {
+        category: type,
+        overallScore: result.overallScore,
+        categoryScores: result.categoryScores
+      };
+    });
+
+    const overallReadiness = categoriesData.length > 0
+      ? Math.round(categoriesData.reduce((sum, cat) => sum + cat.overallScore, 0) / categoriesData.length)
+      : 0;
+
+    const prompt = `
+      Generate a comprehensive AI Readiness Deep Research Report based on the following assessment data:
+      
+      Overall AI Readiness Score: ${overallReadiness}%
+      
+      Assessment Results:
+      ${JSON.stringify(categoriesData, null, 2)}
+      
+      The report should include:
+      
+      1. Executive Summary
+         - Key findings and overall AI readiness posture
+         - Major strengths and weaknesses
+         - Strategic recommendations
+      
+      2. Assessment Methodology
+         - Methodology overview
+         - Assessment categories and their significance
+      
+      3. Detailed Analysis by Category
+         - For each category, provide:
+           - Current state assessment
+           - Detailed strengths and weaknesses
+           - Specific bottlenecks and limitations
+           - Industry benchmarking
+      
+      4. Gap Analysis
+         - Identification of significant capability gaps
+         - Risk assessment of these gaps
+         - Impact on AI adoption and business outcomes
+      
+      5. Implementation Roadmap
+         - Short-term actions (0-6 months)
+         - Medium-term initiatives (6-18 months)
+         - Long-term transformation (18+ months)
+         - Key performance indicators for measuring progress
+      
+      6. Technology and Infrastructure Recommendations
+         - Specific tools and platforms recommended
+         - Integration considerations
+         - Scalability planning
+      
+      7. Organizational and Cultural Considerations
+         - Required organizational changes
+         - Skills development strategy
+         - Change management approach
+      
+      Format the report as a professional HTML document with proper headings, paragraphs, lists, and tables where appropriate.
+      Include a table of contents at the beginning. Make it visually organized and easy to read.
+    `;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: "You are an elite AI strategy consultant who specializes in creating comprehensive, actionable AI readiness reports for organizations. Your reports combine strategic insight with practical implementation guidance."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      max_tokens: 4000
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      throw new Error("No content in OpenAI response");
+    }
+
+    // Prepare the HTML document with basic styling
+    const htmlReport = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>AI Readiness Deep Research Report</title>
+      <style>
+        body {
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          line-height: 1.6;
+          color: #333;
+          max-width: 1200px;
+          margin: 0 auto;
+          padding: 20px;
+        }
+        h1 {
+          color: #2C6F9B;
+          border-bottom: 2px solid #8ECAE6;
+          padding-bottom: 10px;
+        }
+        h2 {
+          color: #2C6F9B;
+          border-bottom: 1px solid #8ECAE6;
+          padding-bottom: 5px;
+          margin-top: 30px;
+        }
+        h3 {
+          color: #4389B0;
+          margin-top: 25px;
+        }
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 20px 0;
+        }
+        th, td {
+          padding: 12px;
+          border: 1px solid #ddd;
+          text-align: left;
+        }
+        th {
+          background-color: #f2f9ff;
+          font-weight: bold;
+        }
+        tr:nth-child(even) {
+          background-color: #f9f9f9;
+        }
+        .toc {
+          background-color: #f2f9ff;
+          padding: 20px;
+          border-radius: 5px;
+          margin-bottom: 30px;
+        }
+        .toc ul {
+          list-style-type: none;
+          padding-left: 0;
+        }
+        .toc ul ul {
+          padding-left: 20px;
+        }
+        .toc a {
+          text-decoration: none;
+          color: #2C6F9B;
+        }
+        .toc a:hover {
+          text-decoration: underline;
+        }
+        .executive-summary {
+          background-color: #f0f7ff;
+          padding: 20px;
+          border-left: 4px solid #2C6F9B;
+          margin: 20px 0;
+        }
+        .strength {
+          color: #228B22;
+        }
+        .weakness {
+          color: #B22222;
+        }
+        .roadmap {
+          border-left: 4px solid #4389B0;
+          padding-left: 15px;
+        }
+        footer {
+          margin-top: 40px;
+          padding-top: 20px;
+          border-top: 1px solid #ddd;
+          text-align: center;
+          font-size: 0.9em;
+          color: #666;
+        }
+      </style>
+    </head>
+    <body>
+      <header>
+        <h1>AI Readiness Deep Research Report</h1>
+        <p>Generated on ${new Date().toLocaleDateString()}</p>
+      </header>
+      
+      ${content}
+      
+      <footer>
+        <p>© ${new Date().getFullYear()} AI Readiness Assessment Platform | Generated with AI-powered analysis</p>
+      </footer>
+    </body>
+    </html>
+    `;
+
+    return htmlReport;
+  } catch (error) {
+    console.error("Error generating comprehensive report:", error);
+    return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <title>Error Generating Report</title>
+    </head>
+    <body>
+      <h1>Error Generating Report</h1>
+      <p>We encountered an error while generating your AI readiness report. Please try again later.</p>
+      <p>Error details: ${error instanceof Error ? error.message : 'Unknown error'}</p>
+    </body>
+    </html>
+    `;
+  }
 } 
