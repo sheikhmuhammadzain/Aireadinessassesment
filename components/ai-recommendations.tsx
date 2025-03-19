@@ -4,12 +4,17 @@ import { Separator } from "@/components/ui/separator";
 import { Loader2 } from "lucide-react";
 import { generateRecommendations, generateOverallSummary } from "@/lib/gemini";
 
+interface RecommendationDetail {
+  title: string;
+  details: string;
+}
+
 interface CategoryRecommendation {
   category: string;
   score: number;
   priority: string;
   color: string;
-  recommendations: string[];
+  recommendations: RecommendationDetail[];
   loading: boolean;
 }
 
@@ -54,22 +59,46 @@ export function AIRecommendations({
     initialRecs.forEach((rec, index) => {
       generateRecommendations(rec.category, rec.score)
         .then(aiRecs => {
-          // Handle the response: parse if it's a string with backticks
-          let parsedRecs: string[];
+          // If the response is already in the expected format (array of objects with title and details)
+          if (Array.isArray(aiRecs) && aiRecs.length > 0 && 
+              typeof aiRecs[0] === 'object' && 'title' in aiRecs[0] && 'details' in aiRecs[0]) {
+            
+            setRecommendations(prev => {
+              const updated = [...prev];
+              updated[index] = {
+                ...updated[index],
+                recommendations: aiRecs,
+                loading: false
+              };
+              onRecommendationsGenerated?.(updated);
+              return updated;
+            });
+            return;
+          }
+          
+          // For backward compatibility with string format
+          let parsedRecs: RecommendationDetail[] = [];
+
           if (typeof aiRecs === "string") {
             // Remove `````` markers and parse the JSON content
             const cleanedRecs = (aiRecs as string).replace(/``````/g, "").trim();
-            try {
-              parsedRecs = JSON.parse(cleanedRecs);
-            } catch (error) {
-              console.error(`Failed to parse recommendations for ${rec.category}:`, error);
-              parsedRecs = [cleanedRecs]; // Fallback: treat as a single recommendation
-            }
-          } else if (Array.isArray(aiRecs)) {
-            parsedRecs = aiRecs as string[]; // Assume it's already an array of strings
+            const lines = cleanedRecs.split('\n').filter(line => line.trim().length > 0);
+            
+            parsedRecs = lines.map(line => ({
+              title: line,
+              details: `Detailed guidance for implementing "${line}" in your organization.`
+            }));
+          } else if (Array.isArray(aiRecs) && typeof aiRecs[0] === 'string') {
+            parsedRecs = (aiRecs as string[]).map(rec => ({
+              title: rec,
+              details: `Detailed guidance for implementing "${rec}" in your organization.`
+            }));
           } else {
             console.error(`Unexpected type for recommendations: ${typeof aiRecs}`);
-            parsedRecs = ["Unable to parse recommendations."];
+            parsedRecs = [{
+              title: "Unable to parse recommendations",
+              details: "The AI-generated recommendations could not be properly formatted."
+            }];
           }
 
           setRecommendations(prev => {
@@ -89,7 +118,10 @@ export function AIRecommendations({
             const updated = [...prev];
             updated[index] = {
               ...updated[index],
-              recommendations: ["Unable to generate recommendations due to an error."],
+              recommendations: [{
+                title: "Unable to generate recommendations",
+                details: "An error occurred while generating AI recommendations."
+              }],
               loading: false
             };
             onRecommendationsGenerated?.(updated);
@@ -137,19 +169,20 @@ export function AIRecommendations({
                 </div>
               </div>
               
-              <div className="space-y-2 mb-4">
+              <div className="space-y-3 mb-4">
                 {item.loading ? (
                   <div className="flex items-center justify-center py-4">
                     <Loader2 className="h-6 w-6 animate-spin" />
                   </div>
                 ) : (
-                  <ul className="list-disc pl-5 space-y-2 text-sm">
+                  <div className="space-y-4">
                     {item.recommendations.map((rec, recIndex) => (
-                      <li key={recIndex} className="text-muted-foreground">
-                        {rec}
-                      </li>
+                      <div key={recIndex} className="bg-gray-50 rounded-lg p-4">
+                        <h4 className="font-medium text-sm mb-2">{rec.title}</h4>
+                        <p className="text-sm text-muted-foreground">{rec.details}</p>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 )}
               </div>
               
