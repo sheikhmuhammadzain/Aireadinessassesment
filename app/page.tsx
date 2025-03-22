@@ -51,8 +51,8 @@ export default function Home() {
       
       <div id="features">
         <PremiumFeaturesSection />
-      </div>
-      
+        </div>
+
       <section className="py-16 relative bg-gradient-to-b from-transparent to-background/80">
         <div className="container mx-auto px-4">
           <div className="max-w-2xl mx-auto text-center space-y-6">

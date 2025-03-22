@@ -948,7 +948,7 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
                 <path d="M16 21h5v-5"></path>
               </svg>
               Reset
-            </Button>
+          </Button>
 
             <div className="relative">
               <Button 
@@ -958,7 +958,7 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
               >
                 <Download className="h-4 w-4" />
                 Download Report
-              </Button>
+          </Button>
               
               {showDownloadOptions && (
                 <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white z-10 border">
@@ -992,11 +992,11 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
                       </svg>
                       HTML Format
                     </button>
-                  </div>
+        </div>
                 </div>
               )}
-            </div>
-            
+      </div>
+
             <Button
               variant="default"
               className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800"
@@ -1049,10 +1049,10 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
                   </svg>
                   Overall Assessment
                 </CardTitle>
-                <CardDescription>
+            <CardDescription>
                   Your organization's AI readiness score and breakdown
-                </CardDescription>
-              </CardHeader>
+            </CardDescription>
+          </CardHeader>
               <CardContent className="pt-6">
                 <div className="flex flex-col items-center mb-8">
                   <div className="relative">
@@ -1210,15 +1210,15 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
                   >
                     <div className="w-12 h-12 bg-background rounded-full flex items-center justify-center">
                       <div className="text-lg font-bold">{Math.round(result.overallScore)}%</div>
-                    </div>
-                  </div>
+                </div>
+              </div>
                   <div>
                     <div className="text-2xl font-bold">
                       {result.overallScore <= 30 ? "AI Dormant" : 
                        result.overallScore <= 60 ? "AI Aware" : 
                        result.overallScore <= 85 ? "AI Rise" : 
                        "AI Ready"}
-                    </div>
+            </div>
                     <div className="text-muted-foreground">
                       {result.overallScore <= 30 ? "Early stages of AI adoption" : 
                        result.overallScore <= 60 ? "Beginning AI implementation" : 
@@ -1227,9 +1227,9 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
                     </div>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+          </CardContent>
+        </Card>
 
           {/* Visual Assessment Levels */}
           <AssessmentLevelsVisual overallScore={result.overallScore} />
@@ -1241,14 +1241,14 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
           />
 
           {/* Category Maturity Levels */}
-          <Card className="mb-8">
-            <CardHeader>
+      <Card className="mb-8">
+        <CardHeader>
               <CardTitle>Category Maturity Levels</CardTitle>
-              <CardDescription>
+          <CardDescription>
                 Breakdown of maturity levels across different categories
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
               <div className="space-y-6">
                 {Object.entries(result.categoryScores).map(([category, score]) => {
                   const maturityLevel = score <= 30 ? "AI Dormant" : 
@@ -1295,9 +1295,9 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
                     </div>
                   );
                 })}
-              </div>
-            </CardContent>
-          </Card>
+          </div>
+        </CardContent>
+      </Card>
         </TabsContent>
 
         <TabsContent value="gap-analysis" className="mt-6">
@@ -1375,13 +1375,13 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
           ) : (
             <>
       <Card className="mb-8">
-        <CardHeader>
+          <CardHeader>
                   <CardTitle>Gap Analysis</CardTitle>
-          <CardDescription>
+            <CardDescription>
                     Identify the areas with the largest gaps between current state and desired state
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
                   <div className="mb-6">
                     <p className="text-muted-foreground mb-4">
                       Gap analysis helps identify the difference between your current AI capabilities and where you need to be. 
@@ -1627,14 +1627,14 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
                                           `You're doing well in this area. Continue to refine and optimize your approach.`
                                         }
                                       </div>
-                                    </div>
-                                  </CardContent>
-                                </Card>
+            </div>
+          </CardContent>
+        </Card>
                             ))}
                             {(!result.answers || result.answers.filter(answer => answer.category === category).length === 0) && (
                               <div className="p-4 text-center text-muted-foreground">
                                 No detailed answers available for this category.
-                              </div>
+      </div>
                             )}
                           </div>
                         </AccordionContent>
@@ -1677,5 +1677,5 @@ export default function ResultsPage({ params }: { params: { type: string } }) {
         />
       )}
     </div>
-    );
-  }
+  );
+}

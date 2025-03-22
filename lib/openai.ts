@@ -225,7 +225,10 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
       return {
         category: type,
         overallScore: result.overallScore,
-        categoryScores: result.categoryScores
+        categoryScores: result.categoryScores,
+        qValues: result.qValues || {},
+        adjustedWeights: result.adjustedWeights || {},
+        userWeights: result.userWeights || {}
       };
     });
 
@@ -249,18 +252,20 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
          - Strategic recommendations
       
       2. Assessment Methodology
-         - Methodology overview
+         - Methodology overview including score calculation and normalization
          - Assessment categories and their significance
+         - Explanation of Q-values and adjusted weights used in scoring
       
       3. Detailed Analysis by Category
          - For each category, provide:
-           - Current state assessment
+           - Current state assessment with exact score percentage
            - Detailed strengths and weaknesses
            - Specific bottlenecks and limitations
            - Industry benchmarking
+           - Impact of Q-values and weights on the overall assessment
       
       4. Gap Analysis
-         - Identification of significant capability gaps
+         - Identification of significant capability gaps for each category
          - Risk assessment of these gaps
          - Impact on AI adoption and business outcomes
       
@@ -279,9 +284,17 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
          - Required organizational changes
          - Skills development strategy
          - Change management approach
+         
+      8. Detailed Score Breakdown
+         - Table showing each category with its raw score, weight, and contribution to overall score
+         - Explanation of Q-values and their impact on the final assessment
+         - Visual representation of scores (describe charts as text that would be shown)
+      
+      Throughout the report, maintain a highly professional tone. Consistently reference exact scores, weights, 
+      and Q-values. For each category, explicitly state the score percentage and how it compares to benchmarks.
       
       Format the report as a professional HTML document with proper headings, paragraphs, lists, and tables where appropriate.
-      Include a table of contents at the beginning. Make it visually organized and easy to read.
+      Use clear section headings and subheadings. Include a table of contents at the beginning. Make it visually organized and easy to read.
     `;
 
     const response = await openai.chat.completions.create({
@@ -289,7 +302,7 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
       messages: [
         {
           role: "system",
-          content: "You are an elite AI strategy consultant who specializes in creating comprehensive, actionable AI readiness reports for organizations. Your reports combine strategic insight with practical implementation guidance."
+          content: "You are an elite AI strategy consultant who specializes in creating comprehensive, actionable AI readiness reports for organizations. Your reports combine strategic insight with practical implementation guidance, always referencing specific data points, scores, and metrics from the assessment."
         },
         {
           role: "user",
@@ -304,14 +317,25 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
       throw new Error("No content in OpenAI response");
     }
 
-    // Prepare the HTML document with basic styling
+    // Get company name from localStorage if available
+    const companyName = typeof window !== 'undefined' ? 
+      localStorage.getItem('companyName') || 'Your Company' : 'Your Company';
+    
+    // Format current date in a readable format
+    const currentDate = new Date().toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+
+    // Prepare the HTML document with professional styling
     const htmlReport = `
     <!DOCTYPE html>
     <html lang="en">
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>AI Readiness Deep Research Report</title>
+      <title>AI Readiness Assessment Report</title>
       <style>
         body {
           font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -320,96 +344,324 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
           max-width: 1200px;
           margin: 0 auto;
           padding: 20px;
+          background-color: #f9f9f9;
         }
-        h1 {
-          color: #2C6F9B;
-          border-bottom: 2px solid #8ECAE6;
-          padding-bottom: 10px;
+        .report-container {
+          background-color: white;
+          box-shadow: 0 0 10px rgba(0,0,0,0.1);
+          padding: 40px;
+          border-radius: 8px;
         }
-        h2 {
-          color: #2C6F9B;
-          border-bottom: 1px solid #8ECAE6;
-          padding-bottom: 5px;
+        .header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 30px;
+          border-bottom: 1px solid #e0e0e0;
+          padding-bottom: 20px;
+        }
+        .logo-container {
+          text-align: right;
+        }
+        .logo-text {
+          font-size: 24px;
+          font-weight: bold;
+          color: #38bdf8;
+          margin: 0;
+        }
+        .logo-subtitle {
+          font-size: 12px;
+          color: #0369a1;
+          margin: 0;
+        }
+        .report-title {
+          font-size: 32px;
+          color: #333;
+          margin: 0 0 15px 0;
+          font-weight: bold;
+        }
+        .report-subtitle {
+          font-size: 18px;
+          color: #666;
+          margin: 0 0 20px 0;
+        }
+        .report-meta {
           margin-top: 30px;
         }
+        .meta-item {
+          margin-bottom: 10px;
+        }
+        .meta-label {
+          font-weight: bold;
+          display: inline-block;
+          width: 130px;
+        }
+        h1 {
+          color: #0369a1;
+          border-bottom: 2px solid #38bdf8;
+          padding-bottom: 10px;
+          font-size: 28px;
+          margin-top: 40px;
+        }
+        h2 {
+          color: #0369a1;
+          border-bottom: 1px solid #bae6fd;
+          padding-bottom: 5px;
+          margin-top: 30px;
+          font-size: 22px;
+        }
         h3 {
-          color: #4389B0;
+          color: #0284c7;
           margin-top: 25px;
+          font-size: 18px;
         }
         table {
           width: 100%;
           border-collapse: collapse;
           margin: 20px 0;
+          box-shadow: 0 0 5px rgba(0,0,0,0.05);
         }
         th, td {
-          padding: 12px;
-          border: 1px solid #ddd;
+          padding: 12px 15px;
+          border: 1px solid #e0e0e0;
           text-align: left;
         }
         th {
-          background-color: #f2f9ff;
+          background-color: #f0f9ff;
           font-weight: bold;
+          color: #0284c7;
         }
         tr:nth-child(even) {
-          background-color: #f9f9f9;
+          background-color: #f9fafb;
         }
         .toc {
-          background-color: #f2f9ff;
-          padding: 20px;
-          border-radius: 5px;
-          margin-bottom: 30px;
+          background-color: #f0f9ff;
+          padding: 20px 30px;
+          border-radius: 8px;
+          margin: 30px 0;
+          box-shadow: 0 0 5px rgba(0,0,0,0.05);
+        }
+        .toc-title {
+          color: #0369a1;
+          margin-top: 0;
+          margin-bottom: 15px;
+          font-size: 20px;
         }
         .toc ul {
           list-style-type: none;
           padding-left: 0;
+          margin: 0;
         }
         .toc ul ul {
           padding-left: 20px;
         }
         .toc a {
           text-decoration: none;
-          color: #2C6F9B;
+          color: #0284c7;
+          line-height: 1.8;
         }
         .toc a:hover {
           text-decoration: underline;
         }
         .executive-summary {
-          background-color: #f0f7ff;
+          background-color: #f0f9ff;
+          padding: 25px;
+          border-left: 4px solid #38bdf8;
+          margin: 25px 0;
+          border-radius: 0 8px 8px 0;
+        }
+        .overall-score {
+          text-align: center;
+          margin: 40px 0;
+          padding: 30px;
+          background-color: #f0f9ff;
+          border-radius: 8px;
+          box-shadow: 0 0 10px rgba(0,0,0,0.05);
+        }
+        .score-value {
+          font-size: 60px;
+          font-weight: bold;
+          color: #0369a1;
+          margin: 0;
+        }
+        .score-label {
+          font-size: 18px;
+          color: #64748b;
+          margin: 10px 0 0 0;
+        }
+        .category-scores {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 20px;
+          margin: 30px 0;
+        }
+        .category-score-card {
+          flex: 1 0 calc(50% - 20px);
+          min-width: 250px;
+          background-color: white;
+          border-radius: 8px;
           padding: 20px;
-          border-left: 4px solid #2C6F9B;
-          margin: 20px 0;
+          box-shadow: 0 0 5px rgba(0,0,0,0.1);
+        }
+        .category-score-card h3 {
+          margin-top: 0;
+          color: #0284c7;
+          border-bottom: 1px solid #e0e0e0;
+          padding-bottom: 10px;
+        }
+        .category-score {
+          font-size: 24px;
+          font-weight: bold;
+          margin: 15px 0;
+        }
+        .progress-container {
+          background-color: #e0e0e0;
+          border-radius: 5px;
+          height: 10px;
+          width: 100%;
+          margin: 10px 0;
+        }
+        .progress-bar {
+          height: 10px;
+          border-radius: 5px;
         }
         .strength {
-          color: #228B22;
+          color: #15803d;
+          margin-bottom: 5px;
         }
         .weakness {
-          color: #B22222;
+          color: #b91c1c;
+          margin-bottom: 5px;
         }
         .roadmap {
-          border-left: 4px solid #4389B0;
-          padding-left: 15px;
+          border-left: 4px solid #38bdf8;
+          padding-left: 20px;
+          margin: 20px 0;
+        }
+        .roadmap h3 {
+          color: #0284c7;
+          margin-bottom: 15px;
+        }
+        .roadmap ul {
+          padding-left: 20px;
+        }
+        .roadmap li {
+          margin-bottom: 10px;
+        }
+        .data-table {
+          width: 100%;
+          margin: 25px 0;
+        }
+        .data-table th {
+          background-color: #0284c7;
+          color: white;
+        }
+        .data-table tr:hover {
+          background-color: #f0f9ff;
         }
         footer {
-          margin-top: 40px;
+          margin-top: 50px;
           padding-top: 20px;
-          border-top: 1px solid #ddd;
+          border-top: 1px solid #e0e0e0;
           text-align: center;
           font-size: 0.9em;
-          color: #666;
+          color: #64748b;
+        }
+        .divider {
+          height: 1px;
+          background-color: #e0e0e0;
+          margin: 40px 0;
+        }
+        .detailed-scores {
+          margin: 30px 0;
+        }
+        .q-value-explanation {
+          background-color: #f8fafc;
+          padding: 15px;
+          border-radius: 5px;
+          margin: 20px 0;
+          font-style: italic;
+          color: #64748b;
         }
       </style>
     </head>
     <body>
-      <header>
-        <h1>AI Readiness Deep Research Report</h1>
-        <p>Generated on ${new Date().toLocaleDateString()}</p>
-      </header>
+      <div class="report-container">
+        <div class="header">
+          <div>
+            <h1 class="report-title">AI Readiness Assessment Report</h1>
+            <div class="report-meta">
+              <div class="meta-item"><span class="meta-label">Assessment Type:</span> ${categoriesData[0]?.category || "Comprehensive Assessment"}</div>
+              <div class="meta-item"><span class="meta-label">Date:</span> ${currentDate}</div>
+              <div class="meta-item"><span class="meta-label">Prepared for:</span> ${companyName}</div>
+            </div>
+          </div>
+          
+          <div class="logo-container">
+            <p class="logo-text">CYBERGEN</p>
+            <p class="logo-subtitle">One Team</p>
+          </div>
+        </div>
+        
+        <div class="overall-score">
+          <p class="score-value">${overallReadiness}%</p>
+          <p class="score-label">Overall AI Readiness Score</p>
+        </div>
+        
+        <div class="category-scores">
+          ${categoriesData.map(cat => `
+            <div class="category-score-card">
+              <h3>${cat.category}</h3>
+              <div class="category-score">${Math.round(cat.overallScore)}%</div>
+              <div class="progress-container">
+                <div class="progress-bar" style="width: ${Math.round(cat.overallScore)}%; background-color: ${getColorForScore(cat.overallScore)};"></div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        
+        ${content}
+        
+        <div class="divider"></div>
+        
+        <div class="detailed-scores">
+          <h2 id="detailed-scores">Detailed Scoring Information</h2>
+          
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th>Raw Score</th>
+                <th>User Weight</th>
+                <th>Q Value</th>
+                <th>Adjusted Weight</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${categoriesData.flatMap(cat => 
+                Object.entries(cat.categoryScores || {}).map(([subCategory, score]) => `
+                  <tr>
+                    <td>${subCategory}</td>
+                    <td>${(score as number).toFixed(2)}%</td>
+                    <td>${(cat.userWeights?.[subCategory] || 0).toFixed(2)}%</td>
+                    <td>${(cat.qValues?.[subCategory] || 0).toFixed(3)}</td>
+                    <td>${(cat.adjustedWeights?.[subCategory] || 0).toFixed(2)}%</td>
+                  </tr>
+                `).join('')
+              )}
+            </tbody>
+          </table>
+          
+          <div class="q-value-explanation">
+            <p><strong>About Q Values:</strong> Q values represent the learned importance of each category through reinforcement learning algorithms. Higher Q values indicate categories that have greater impact on overall AI readiness based on the assessment data.</p>
+            <p><strong>About Adjusted Weights:</strong> The original user-defined weights are adjusted through a softmax function that considers both Q values and category scores to optimize the assessment's accuracy and relevance to your organization.</p>
+          </div>
+        </div>
       
-      ${content}
-      
-      <footer>
-        <p>© ${new Date().getFullYear()} AI Readiness Assessment Platform | Generated with AI-powered analysis</p>
-      </footer>
+        <footer>
+          <p>© ${new Date().getFullYear()} Cybergen | AI Readiness Assessment Platform | Generated with AI-powered analysis</p>
+        </footer>
+      </div>
     </body>
     </html>
     `;
@@ -423,6 +675,19 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
     <head>
       <meta charset="UTF-8">
       <title>Error Generating Report</title>
+      <style>
+        body {
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          line-height: 1.6;
+          color: #333;
+          max-width: 800px;
+          margin: 0 auto;
+          padding: 20px;
+        }
+        h1 {
+          color: #b91c1c;
+        }
+      </style>
     </head>
     <body>
       <h1>Error Generating Report</h1>
@@ -432,4 +697,15 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
     </html>
     `;
   }
+}
+
+/**
+ * Helper function to get color based on score
+ */
+function getColorForScore(score: number): string {
+  if (score < 30) return "#ef4444"; // Red
+  if (score < 50) return "#f97316"; // Orange
+  if (score < 70) return "#eab308"; // Yellow
+  if (score < 85) return "#84cc16"; // Light green
+  return "#22c55e"; // Green
 } 

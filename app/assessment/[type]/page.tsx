@@ -36,7 +36,7 @@ type Responses = {
 type ResponsesBySubcategory = {
   [category: string]: {
     [subcategory: string]: {
-      question: string;
+  question: string;
       answer: number;
     }[];
   };
@@ -46,7 +46,7 @@ export default function AssessmentPage({ params }: { params: { type: string } })
   const assessmentType = decodeURIComponent(params.type);
   const router = useRouter();
   const { toast } = useToast();
-
+  
   const [step, setStep] = useState<'company-info' | 'weight-adjustment' | 'questions'>('questions');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -86,7 +86,7 @@ export default function AssessmentPage({ params }: { params: { type: string } })
 
   // State for tracking locked categories
   const [lockedCategories, setLockedCategories] = useState<Record<string, boolean>>({});
-
+  
   useEffect(() => {
     // Check if we're doing all assessments
     const doingAll = localStorage.getItem('doing_all_assessments') === 'true';
@@ -149,7 +149,7 @@ export default function AssessmentPage({ params }: { params: { type: string } })
 
     let answeredCount = 0;
     let totalCount = 0;
-
+    
     for (const category in questions) {
       for (const question of questions[category]) {
         totalCount++;
@@ -158,7 +158,7 @@ export default function AssessmentPage({ params }: { params: { type: string } })
         }
       }
     }
-
+    
     const progressPercentage = totalCount > 0 ? (answeredCount / totalCount) * 100 : 0;
     setProgress(progressPercentage);
   }, [questions]);
@@ -361,7 +361,7 @@ export default function AssessmentPage({ params }: { params: { type: string } })
   const handleNext = () => {
     // Check if all questions in current category are answered
     const unansweredQuestions = questions[currentCategory].filter(q => q.answer === null);
-
+    
     if (unansweredQuestions.length > 0) {
       toast({
         title: "Warning",
@@ -370,7 +370,7 @@ export default function AssessmentPage({ params }: { params: { type: string } })
       });
       return;
     }
-
+    
     if (categoryIndex < categories.length - 1) {
       setCategoryIndex(categoryIndex + 1);
       setCurrentCategory(categories[categoryIndex + 1]);
@@ -498,11 +498,11 @@ export default function AssessmentPage({ params }: { params: { type: string } })
         const categoryWeight = normalizedWeights[category];
 
         return {
-          category,
-          responses: questionList.map(q => ({
-            question: q.question,
-            answer: q.answer as number
-          })),
+        category,
+        responses: questionList.map(q => ({
+          question: q.question,
+          answer: q.answer as number
+        })),
           weight: categoryWeight,
           subcategoryResponses: Object.entries(subcategoryWeights[category] || {}).map(([subcategory, weight]) => ({
             subcategory,
@@ -511,7 +511,7 @@ export default function AssessmentPage({ params }: { params: { type: string } })
           }))
         };
       });
-
+      
       const payload = {
         assessmentType,
         categoryResponses
@@ -545,7 +545,7 @@ export default function AssessmentPage({ params }: { params: { type: string } })
         }
       } else {
         // Single assessment, go directly to results
-        router.push(`/results/${encodeURIComponent(assessmentType)}`);
+      router.push(`/results/${encodeURIComponent(assessmentType)}`);
       }
     } catch (error) {
       // Clear the timeout as we already have an error
@@ -688,20 +688,20 @@ export default function AssessmentPage({ params }: { params: { type: string } })
             </div>
           </div>
         )}
-
+        
         <div className="mb-2 flex justify-between text-sm">
           <span>Progress</span>
           <span>{Math.round(progress)}%</span>
         </div>
         <Progress value={progress} className="h-2" />
       </div>
-
+      
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full mb-6">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="questions">Questions</TabsTrigger>
           <TabsTrigger value="weights">Subcategory Weights</TabsTrigger>
         </TabsList>
-
+        
         <TabsContent value="questions">
           <Card className="mb-8">
             <CardHeader>
@@ -710,15 +710,15 @@ export default function AssessmentPage({ params }: { params: { type: string } })
                 Category {categoryIndex + 1} of {categories.length}
               </CardDescription>
             </CardHeader>
-
+            
             <CardContent>
               <div className="space-y-8">
                 {questions[currentCategory]?.map((q, index) => (
                   <div key={index} className="space-y-4">
                     <div className="font-medium">{q.question}</div>
-
-                    <RadioGroup
-                      value={q.answer?.toString() || ""}
+                    
+                    <RadioGroup 
+                      value={q.answer?.toString() || ""} 
                       onValueChange={(value) => handleAnswerChange(index, parseInt(value))}
                       className="flex flex-col sm:flex-row sm:space-x-4 space-y-2 sm:space-y-0"
                     >
@@ -726,15 +726,15 @@ export default function AssessmentPage({ params }: { params: { type: string } })
                         <div key={value} className="flex items-center space-x-2">
                           <RadioGroupItem value={value.toString()} id={`q${index}-${value}`} />
                           <Label htmlFor={`q${index}-${value}`} className="cursor-pointer">
-                            {value === 1 ? "Strongly Disagree" :
-                              value === 2 ? "Disagree" :
-                                value === 3 ? "Agree" :
-                                  "Strongly Agree"}
+                            {value === 1 ? "Strongly Disagree" : 
+                             value === 2 ? "Disagree" : 
+                             value === 3 ? "Agree" : 
+                             "Strongly Agree"}
                           </Label>
                         </div>
                       ))}
                     </RadioGroup>
-
+                    
                     {index < questions[currentCategory].length - 1 && (
                       <Separator className="my-4" />
                     )}
@@ -744,7 +744,7 @@ export default function AssessmentPage({ params }: { params: { type: string } })
             </CardContent>
           </Card>
         </TabsContent>
-
+        
         <TabsContent value="weights">
           <Card className="mb-8">
             <CardHeader>
@@ -769,7 +769,7 @@ export default function AssessmentPage({ params }: { params: { type: string } })
                 Set the importance of each category in your assessment (total: 100%)
               </CardDescription>
             </CardHeader>
-
+            
             <CardContent>
               <div className="space-y-6">
                 {Object.keys(weights).map((category) => (
@@ -800,8 +800,8 @@ export default function AssessmentPage({ params }: { params: { type: string } })
                       <div className="flex justify-between text-xs text-muted-foreground mb-1">
                         <span>Category weight</span>
                         <span>{weights[category].toFixed(1)}%</span>
-                      </div>
-                      <Slider
+                    </div>
+                    <Slider
                         value={[weights[category] || 0]}
                         min={0}
                         max={100}
@@ -948,12 +948,12 @@ export default function AssessmentPage({ params }: { params: { type: string } })
                           localStorage.setItem('assessment_weights', JSON.stringify(updatedWeights));
                           localStorage.setItem('subcategory_weights', JSON.stringify(updatedSubWeights));
                         }}
-                        className="cursor-pointer"
+                      className="cursor-pointer"
                         disabled={lockedCategories[category]}
-                      />
+                    />
                     </div>
                     {category !== Object.keys(weights).pop() && (
-                      <Separator className="my-4" />
+                    <Separator className="my-4" />
                     )}
                   </div>
                 ))}
@@ -962,18 +962,18 @@ export default function AssessmentPage({ params }: { params: { type: string } })
           </Card>
         </TabsContent>
       </Tabs>
-
+      
       <div className="flex justify-between">
-        <Button
-          variant="outline"
+        <Button 
+          variant="outline" 
           onClick={handlePrevious}
           disabled={categoryIndex === 0}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           Previous
         </Button>
-
-        <Button
+        
+        <Button 
           onClick={handleNext}
           disabled={submitting}
           className="relative"
