@@ -237,7 +237,7 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
       : 0;
 
     const prompt = `
-      Generate a comprehensive AI Readiness Deep Research Report based on the following assessment data:
+      Generate a comprehensive AI Readiness Deep Research Report (at least 3000 words in length) based on the following assessment data:
       
       Overall AI Readiness Score: ${overallReadiness}%
       
@@ -246,52 +246,71 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
       
       The report should include:
       
-      1. Executive Summary
-         - Key findings and overall AI readiness posture
-         - Major strengths and weaknesses
-         - Strategic recommendations
+      1. Executive Summary (500+ words)
+         - Comprehensive key findings and detailed overall AI readiness posture
+         - In-depth analysis of major strengths and weaknesses
+         - Prioritized strategic recommendations with implementation timelines
+         - Business impact assessment of current AI readiness state
       
-      2. Assessment Methodology
-         - Methodology overview including score calculation and normalization
-         - Assessment categories and their significance
-         - Explanation of Q-values and adjusted weights used in scoring
+      2. Assessment Methodology (300+ words)
+         - Detailed methodology overview including score calculation and normalization algorithms
+         - Comprehensive breakdown of assessment categories and their significance to business outcomes
+         - Technical explanation of Q-values and adjusted weights used in scoring
+         - Validation methodology and confidence levels
+         - Limitations of the assessment approach and how to interpret results
       
       3. Detailed Analysis by Category
-         - For each category, provide:
+         - For each category, provide an extensive section with:
            - Current state assessment with exact score percentage
-           - Detailed strengths and weaknesses
-           - Specific bottlenecks and limitations
-           - Industry benchmarking
-           - Impact of Q-values and weights on the overall assessment
+           - At least 3-4 detailed strengths with examples
+           - At least 3-4 detailed weaknesses with concrete examples and consequences
+           - Specific bottlenecks and limitations with technical details
+           - Comprehensive industry benchmarking including competitor comparisons
+           - Detailed analysis of the impact of Q-values and weights on the overall assessment
+           - Potential future trajectory of this category without intervention
       
-      4. Gap Analysis
-         - Identification of significant capability gaps for each category
-         - Risk assessment of these gaps
-         - Impact on AI adoption and business outcomes
+      4. Gap Analysis (500+ words)
+         - Detailed identification of significant capability gaps for each category
+         - Comprehensive risk assessment of these gaps with probability and impact ratings
+         - Quantifiable impact on AI adoption and business outcomes
+         - Competitive disadvantages resulting from identified gaps
+         - Regulatory and compliance implications of gaps
       
-      5. Implementation Roadmap
-         - Short-term actions (0-6 months)
-         - Medium-term initiatives (6-18 months)
-         - Long-term transformation (18+ months)
-         - Key performance indicators for measuring progress
+      5. Implementation Roadmap (500+ words)
+         - Detailed short-term actions (0-6 months) with specific tools, platforms, and methodologies
+         - Comprehensive medium-term initiatives (6-18 months) with resource requirements
+         - Strategic long-term transformation (18+ months) with expected organizational outcomes
+         - Extensive key performance indicators for measuring progress at each stage
+         - Cost-benefit analysis for major initiatives
+         - Risk mitigation strategies for implementation
       
-      6. Technology and Infrastructure Recommendations
-         - Specific tools and platforms recommended
-         - Integration considerations
-         - Scalability planning
+      6. Technology and Infrastructure Recommendations (400+ words)
+         - Specific enterprise-grade tools and platforms recommended with version details
+         - Comprehensive integration considerations with existing systems
+         - Detailed scalability planning with capacity recommendations
+         - Cost estimates and ROI projections for recommended technologies
+         - Technical architecture recommendations with diagrams (described in text)
       
-      7. Organizational and Cultural Considerations
-         - Required organizational changes
-         - Skills development strategy
-         - Change management approach
-         
-      8. Detailed Score Breakdown
-         - Table showing each category with its raw score, weight, and contribution to overall score
-         - Explanation of Q-values and their impact on the final assessment
+      7. Organizational and Cultural Considerations (400+ words)
+         - Required organizational changes with detailed org chart implications
+         - Comprehensive skills development strategy with training programs and timelines
+         - Detailed change management approach with stakeholder analysis
+         - Cultural transformation roadmap with specific milestones
+         - Leadership development requirements
+         - Performance management adaptations for AI-driven operations
+      
+      8. Detailed Score Breakdown (200+ words)
+         - Comprehensive table showing each category with its raw score, weight, and contribution to overall score
+         - Detailed explanation of Q-values and their algorithmic impact on the final assessment
+         - Statistical analysis of score distribution and significance
          - Visual representation of scores (describe charts as text that would be shown)
+         - Confidence intervals and margin of error analysis
       
       Throughout the report, maintain a highly professional tone. Consistently reference exact scores, weights, 
       and Q-values. For each category, explicitly state the score percentage and how it compares to benchmarks.
+      
+      Ensure that the total report content contains at least 3000 words with comprehensive coverage of each topic.
+      Each section should be thoroughly detailed with specific, actionable insights rather than general statements.
       
       Format the report as a professional HTML document with proper headings, paragraphs, lists, and tables where appropriate.
       Use clear section headings and subheadings. Include a table of contents at the beginning. Make it visually organized and easy to read.
@@ -309,7 +328,7 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
           content: prompt
         }
       ],
-      max_tokens: 4000
+      max_tokens: 8000
     });
 
     const content = response.choices[0]?.message?.content;
