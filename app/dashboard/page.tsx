@@ -21,6 +21,9 @@ import {
 } from "recharts";
 import { useToast } from "@/hooks/use-toast";
 import { generateDeepResearchReport } from "@/lib/openai";
+import { AssessmentLevelsVisual } from "@/components/assessment-levels-visual";
+import { ProtectedRoute } from "@/components/protected-route";
+import { useAuth, ROLE_TO_PILLAR } from "@/lib/auth-context";
 
 interface AssessmentResult {
   assessmentType: string;
@@ -97,8 +100,19 @@ const assessmentTypes = [
 ];
 
 export default function DashboardPage() {
+  // Wrap the existing content with ProtectedRoute
+  return (
+    <ProtectedRoute>
+      <DashboardContent />
+    </ProtectedRoute>
+  );
+}
+
+// Extract the content to a separate component
+function DashboardContent() {
   const router = useRouter();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [results, setResults] = useState<Record<string, AssessmentResult>>({});
   const [overallData, setOverallData] = useState<any[]>([]);
@@ -255,6 +269,11 @@ export default function DashboardPage() {
           <p className="text-muted-foreground">
             Track and analyze your organization's AI readiness across multiple dimensions
           </p>
+          {user && (
+            <p className="text-sm text-blue-600 mt-1">
+              Logged in as: {user.name} ({user.role === 'admin' ? 'Administrator' : ROLE_TO_PILLAR[user.role]})
+            </p>
+          )}
         </div>
         
         {completedAssessments > 0 && (

@@ -7,11 +7,14 @@ import { ModeToggle } from "@/components/mode-toggle";
 import { Activity, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { UserAccountMenu } from "@/components/user-account-menu";
+import { useAuth } from "@/lib/auth-context";
 
 export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const { toast } = useToast();
+  const { isAuthenticated } = useAuth();
   const [showResetConfirmation, setShowResetConfirmation] = useState(false);
   
   const handleReset = () => {
@@ -19,8 +22,14 @@ export default function Header() {
   };
 
   const confirmReset = () => {
-    // Clear all localStorage data
+    // Clear all localStorage data except user data
+    const userData = localStorage.getItem('user');
     localStorage.clear();
+    
+    // Restore user data if it existed
+    if (userData) {
+      localStorage.setItem('user', userData);
+    }
     
     toast({
       title: "Reset Complete",
@@ -72,18 +81,23 @@ export default function Header() {
             >
               About
             </Link>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleReset}
-              className="text-sm font-medium transition-colors hover:text-primary text-muted-foreground flex items-center gap-1"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Reset
-            </Button>
+            {isAuthenticated && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleReset}
+                className="text-sm font-medium transition-colors hover:text-primary text-muted-foreground flex items-center gap-1"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Reset
+              </Button>
+            )}
           </nav>
           
-          <ModeToggle />
+          <div className="flex items-center gap-3">
+            <ModeToggle />
+            <UserAccountMenu />
+          </div>
         </div>
       </div>
       

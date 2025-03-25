@@ -4,11 +4,13 @@ import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Info, Loader2, BarChart3, Lock, Unlock } from "lucide-react";
+import { Info, Loader2, BarChart3, Lock, Unlock, AlertTriangle, ShieldAlert } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { CategoryWeights } from "@/types";
 import { PieChart } from "./PieChart";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth-context";
+import { Badge } from "@/components/ui/badge";
 
 interface WeightAdjustmentProps {
   weights: CategoryWeights;
@@ -26,6 +28,7 @@ export function WeightAdjustment({
   loading = false
 }: WeightAdjustmentProps) {
   const { toast } = useToast();
+  const { user, canEditPillar } = useAuth();
   const [localWeights, setLocalWeights] = useState<CategoryWeights>(weights);
   const [totalWeight, setTotalWeight] = useState(100);
   const [lockedCategories, setLockedCategories] = useState<Record<string, boolean>>({});
@@ -50,6 +53,16 @@ export function WeightAdjustment({
 
   // Toggle lock for a category
   const toggleCategoryLock = (category: string) => {
+    // Check if user has permission to modify this category
+    if (!canEditPillar(category)) {
+      toast({
+        title: "Permission Denied",
+        description: `You don't have permission to modify ${category}. Only ${user?.role === 'admin' ? 'admin' : category} specialists can modify this pillar.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setLockedCategories(prev => {
       const updated = { ...prev };
       // Toggle the lock status
@@ -63,6 +76,16 @@ export function WeightAdjustment({
   };
 
   const handleWeightChange = (category: string, value: number[]) => {
+    // Check if user has permission to modify this category
+    if (!canEditPillar(category)) {
+      toast({
+        title: "Permission Denied",
+        description: `You don't have permission to modify ${category}. Only ${user?.role === 'admin' ? 'admin' : category} specialists can modify this pillar.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
     const newValue = value[0];
     const oldValue = localWeights[category];
     const diff = newValue - oldValue;
@@ -195,6 +218,36 @@ export function WeightAdjustment({
     value: localWeights[category]
   }));
 
+  // Check if the user is authenticated
+  const isUserAuthenticated = !!user;
+
+  // Display login prompt if not authenticated
+  if (!isUserAuthenticated) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-xl">Pillar Weights</CardTitle>
+            <CardDescription>
+              Login is required to adjust assessment weights
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col items-center py-6">
+            <ShieldAlert className="h-16 w-16 text-muted-foreground mb-4" />
+            <p className="text-center mb-4">
+              You need to be logged in to customize pillar weights.
+            </p>
+            <Button
+              onClick={() => window.location.href = '/login'}
+            >
+              Login to Adjust Weights
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Card>
@@ -221,55 +274,76 @@ export function WeightAdjustment({
           <CardDescription>
             Define how important each Pillar is to your assessment (total: {totalWeight.toFixed(1)}%)
           </CardDescription>
+          {user && user.role !== 'admin' && (
+            <div className="mt-2 flex items-center gap-2 text-sm text-amber-600 bg-amber-50 p-2 rounded-md border border-amber-200">
+              <AlertTriangle className="h-4 w-4" />
+              <p>You can only adjust the <strong>{user.role.replace('ai_', 'AI ')}</strong> pillar weights.</p>
+            </div>
+          )}
         </CardHeader>
         
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-6">
-              {categories.map((category) => (
-                <div key={category} className="space-y-2 p-3 border rounded-lg bg-card">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <Label className="font-medium">{category}</Label>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => toggleCategoryLock(category)}
-                        className="flex items-center space-x-1 text-xs"
-                      >
-                        {lockedCategories[category] ? (
-                          <>
-                            <Lock className="h-4 w-4 text-red-500" />
-                            <span>Locked</span>
-                          </>
+              {categories.map((category) => {
+                const canEdit = canEditPillar(category);
+                const isPillarLockedByRole = !canEdit;
+                
+                return (
+                  <div 
+                    key={category} 
+                    className={`space-y-2 p-3 border rounded-lg ${isPillarLockedByRole ? 'bg-gray-50 border-gray-200' : 'bg-card'}`}
+                  >
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <Label className="font-medium">{category}</Label>
+                        {isPillarLockedByRole ? (
+                          <Badge variant="outline" className="text-gray-500 bg-gray-100">
+                            <Lock className="h-3 w-3 mr-1" /> 
+                            No Access
+                          </Badge>
                         ) : (
-                          <>
-                            <Unlock className="h-4 w-4 text-green-500" />
-                            <span>Unlocked</span>
-                          </>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => toggleCategoryLock(category)}
+                            className="flex items-center space-x-1 text-xs"
+                          >
+                            {lockedCategories[category] ? (
+                              <>
+                                <Lock className="h-4 w-4 text-red-500" />
+                                <span>Locked</span>
+                              </>
+                            ) : (
+                              <>
+                                <Unlock className="h-4 w-4 text-green-500" />
+                                <span>Unlocked</span>
+                              </>
+                            )}
+                          </Button>
                         )}
-                      </Button>
+                      </div>
+                      <div className="text-right">
+                        {recommendedWeights && (
+                          <div className="text-xs text-muted-foreground">
+                            Recommended: {recommendedWeights[category].toFixed(1)}%
+                          </div>
+                        )}
+                        <div className="font-medium">{localWeights[category].toFixed(1)}%</div>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      {recommendedWeights && (
-                        <div className="text-xs text-muted-foreground">
-                          Recommended: {recommendedWeights[category].toFixed(1)}%
-                        </div>
-                      )}
-                      <div className="font-medium">{localWeights[category].toFixed(1)}%</div>
-                    </div>
+                    <Slider
+                      value={[localWeights[category]]}
+                      min={5}
+                      max={50}
+                      step={0.1}
+                      onValueChange={(value) => handleWeightChange(category, value)}
+                      className={isPillarLockedByRole || lockedCategories[category] ? "opacity-60" : "cursor-pointer"}
+                      disabled={isPillarLockedByRole || lockedCategories[category]}
+                    />
                   </div>
-                  <Slider
-                    value={[localWeights[category]]}
-                    min={5}
-                    max={50}
-                    step={0.1}
-                    onValueChange={(value) => handleWeightChange(category, value)}
-                    className={lockedCategories[category] ? "opacity-60" : "cursor-pointer"}
-                    disabled={lockedCategories[category]}
-                  />
-                </div>
-              ))}
+                );
+              })}
             </div>
             
             <div className="flex flex-col items-center justify-center">
@@ -289,6 +363,7 @@ export function WeightAdjustment({
               variant="outline" 
               onClick={resetToRecommended}
               className="w-full sm:w-auto"
+              disabled={user?.role !== 'admin'} // Only admin can reset to recommended weights
             >
               Reset to Recommended
             </Button>

@@ -22,6 +22,7 @@ import { WeightAdjustment } from "@/components/WeightAdjustment";
 import { CompanyInfo, CategoryWeights } from "@/types";
 import { fetchAllQuestionnaires, getRecommendedWeights } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { ProtectedRoute } from "@/components/protected-route";
 
 const assessmentTypes = [
   {
@@ -69,6 +70,14 @@ const assessmentTypes = [
 ];
 
 export default function AssessmentPage() {
+  return (
+    <ProtectedRoute>
+      <AssessmentContent />
+    </ProtectedRoute>
+  );
+}
+
+function AssessmentContent() {
   const router = useRouter();
   const { toast } = useToast();
   

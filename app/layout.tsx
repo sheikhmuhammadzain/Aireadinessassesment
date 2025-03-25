@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import Header from "@/components/header";
 import Footer from "@/components/footer";
 import Head from 'next/head';
+import { AuthProvider } from "@/lib/auth-context";
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -31,12 +32,14 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <div className="flex flex-col min-h-screen">
-            <Header />
-            <main className="flex-1">{children}</main>
-            <Footer />
-          </div>
-          <Toaster />
+          <AuthProvider>
+            <div className="flex flex-col min-h-screen">
+              <Header />
+              <main className="flex-1">{children}</main>
+              <Footer />
+            </div>
+            <Toaster />
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>
