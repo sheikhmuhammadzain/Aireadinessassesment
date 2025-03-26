@@ -106,9 +106,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Login function
   const login = async (email: string, password: string): Promise<boolean> => {
-    // This is a dummy implementation - in a real app, you'd make an API call
-    // For simplicity, we'll check against our predefined users and accept any password
-    const foundUser = PREDEFINED_USERS.find(u => u.email.toLowerCase() === email.toLowerCase());
+    // Get users from localStorage or use predefined users
+    const storedUsers = localStorage.getItem('users');
+    const users = storedUsers ? JSON.parse(storedUsers) : PREDEFINED_USERS;
+    
+    // Find user by email (case-insensitive)
+    const foundUser = users.find((u: User) => u.email.toLowerCase() === email.toLowerCase());
     
     if (foundUser) {
       setUser(foundUser);
@@ -127,16 +130,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('user');
   };
 
-  // Signup function (dummy implementation)
+  // Signup function
   const signup = async (email: string, name: string, password: string, role: UserRole): Promise<boolean> => {
+    // Get existing users
+    const storedUsers = localStorage.getItem('users');
+    const users = storedUsers ? JSON.parse(storedUsers) : PREDEFINED_USERS;
+    
     // Check if email already exists
-    const emailExists = PREDEFINED_USERS.some(u => u.email.toLowerCase() === email.toLowerCase());
+    const emailExists = users.some((u: User) => u.email.toLowerCase() === email.toLowerCase());
     
     if (emailExists) {
       return false;
     }
     
-    // Create new user with dummy ID
+    // Create new user
     const newUser: User = {
       id: `custom_${Date.now()}`,
       email,
@@ -144,7 +151,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role
     };
     
-    // Store locally
+    // Add to users list and save
+    const updatedUsers = [...users, newUser];
+    localStorage.setItem('users', JSON.stringify(updatedUsers));
+    
+    // Set as current user
     setUser(newUser);
     setIsAuthenticated(true);
     localStorage.setItem('user', JSON.stringify(newUser));
