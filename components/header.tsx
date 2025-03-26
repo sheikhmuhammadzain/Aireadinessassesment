@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/mode-toggle";
-import { Activity, RefreshCw, Shield } from "lucide-react";
+import { Activity, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { UserAccountMenu } from "@/components/user-account-menu";
@@ -14,7 +14,7 @@ export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const { toast } = useToast();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [showResetConfirmation, setShowResetConfirmation] = useState(false);
   
   const handleReset = () => {
@@ -91,17 +91,6 @@ export default function Header() {
                 <RefreshCw className="h-4 w-4" />
                 Reset
               </Button>
-            )}
-            {user?.role === "admin" && (
-              <Link 
-                href="/admin" 
-                className={`text-sm font-medium transition-colors hover:text-primary flex items-center gap-1 ${
-                  pathname === "/admin" ? "text-primary" : "text-muted-foreground"
-                }`}
-              >
-                <Shield className="h-4 w-4" />
-                Admin Panel
-              </Link>
             )}
           </nav>
           
