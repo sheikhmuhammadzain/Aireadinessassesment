@@ -28,6 +28,9 @@ export function UserAccountMenu() {
     );
   }
 
+  // Check if user is admin
+  const isAdmin = user.role === "admin";
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -48,6 +51,17 @@ export function UserAccountMenu() {
             <Shield className="mr-2 h-4 w-4" />
             <span>Role: {user.role === "admin" ? "Administrator" : ROLE_TO_PILLAR[user.role]}</span>
           </DropdownMenuItem>
+          
+          {/* Admin panel link */}
+          {isAdmin && (
+            <DropdownMenuItem 
+              className="cursor-pointer"
+              onClick={() => router.push("/admin")}
+            >
+              <Shield className="mr-2 h-4 w-4 text-primary" />
+              <span>Admin Panel</span>
+            </DropdownMenuItem>
+          )}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem 

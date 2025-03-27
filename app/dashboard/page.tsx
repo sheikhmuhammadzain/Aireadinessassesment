@@ -303,7 +303,10 @@ function DashboardContent() {
             ) : (
               <>
                 <FileText className="mr-2 h-5 w-5" />
-                Detailed Report
+                <div className="flex flex-col items-start">
+                  <span className="text-sm font-semibold">Comprehensive Report</span>
+                  <span className="text-xs opacity-90">Includes all weights, scores & recommendations</span>
+                </div>
               </>
             )}
           </Button>

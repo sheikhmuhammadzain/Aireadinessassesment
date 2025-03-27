@@ -228,7 +228,8 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
         categoryScores: result.categoryScores,
         qValues: result.qValues || {},
         adjustedWeights: result.adjustedWeights || {},
-        userWeights: result.userWeights || {}
+        userWeights: result.userWeights || {},
+        softmaxWeights: result.softmaxWeights || {}
       };
     });
 
@@ -237,7 +238,7 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
       : 0;
 
     const prompt = `
-      Generate a comprehensive AI Readiness Deep Research Report (at least 3000 words in length) based on the following assessment data:
+      Generate a comprehensive AI Readiness Deep Research Report (at least 3500 words in length) based on the following assessment data:
       
       Overall AI Readiness Score: ${overallReadiness}%
       
@@ -252,10 +253,11 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
          - Prioritized strategic recommendations with implementation timelines
          - Business impact assessment of current AI readiness state
       
-      2. Assessment Methodology (300+ words)
+      2. Assessment Methodology (400+ words)
          - Detailed methodology overview including score calculation and normalization algorithms
          - Comprehensive breakdown of assessment categories and their significance to business outcomes
-         - Technical explanation of Q-values and adjusted weights used in scoring
+         - Explicit technical explanation of Q-values and their significance with numerical examples from the results
+         - Detailed description of all weight adjustment methods (user weights, softmax weights, adjusted weights)
          - Validation methodology and confidence levels
          - Limitations of the assessment approach and how to interpret results
       
@@ -268,6 +270,7 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
            - Comprehensive industry benchmarking including competitor comparisons
            - Detailed analysis of the impact of Q-values and weights on the overall assessment
            - Potential future trajectory of this category without intervention
+           - Make sure to explicitly reference the specific Q-values and weights for each category
       
       4. Gap Analysis (500+ words)
          - Detailed identification of significant capability gaps for each category
@@ -299,9 +302,10 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
          - Leadership development requirements
          - Performance management adaptations for AI-driven operations
       
-      8. Detailed Score Breakdown (200+ words)
-         - Comprehensive table showing each category with its raw score, weight, and contribution to overall score
+      8. Detailed Score Breakdown and Weights Analysis (300+ words)
+         - Comprehensive table showing each category with its raw score, user weight, q-value, softmax weight, adjusted weight and contribution to overall score
          - Detailed explanation of Q-values and their algorithmic impact on the final assessment
+         - Thorough explanation of how user weights differ from adjusted weights with clear examples from the data
          - Statistical analysis of score distribution and significance
          - Visual representation of scores (describe charts as text that would be shown)
          - Confidence intervals and margin of error analysis
@@ -309,11 +313,14 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
       Throughout the report, maintain a highly professional tone. Consistently reference exact scores, weights, 
       and Q-values. For each category, explicitly state the score percentage and how it compares to benchmarks.
       
-      Ensure that the total report content contains at least 3000 words with comprehensive coverage of each topic.
+      Ensure that the total report content contains at least 3500 words with comprehensive coverage of each topic.
       Each section should be thoroughly detailed with specific, actionable insights rather than general statements.
       
       Format the report as a professional HTML document with proper headings, paragraphs, lists, and tables where appropriate.
       Use clear section headings and subheadings. Include a table of contents at the beginning. Make it visually organized and easy to read.
+      
+      IMPORTANT: Ensure that ALL data fields provided in the assessment results (including ALL Q-values, user weights, adjusted weights, softmax weights) 
+      are explicitly referenced and analyzed in the report. Do not leave any data points unmentioned or unanalyzed.
     `;
 
     const response = await openai.chat.completions.create({
@@ -321,14 +328,14 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
       messages: [
         {
           role: "system",
-          content: "You are an elite AI strategy consultant who specializes in creating comprehensive, actionable AI readiness reports for organizations. Your reports combine strategic insight with practical implementation guidance, always referencing specific data points, scores, and metrics from the assessment."
+          content: "You are an elite AI strategy consultant who specializes in creating comprehensive, actionable AI readiness reports for organizations. Your reports combine strategic insight with practical implementation guidance, always referencing specific data points, scores, metrics, and mathematical weights from the assessment. You must include all data points in your analysis, especially q-values, user weights, adjusted weights, and softmax weights for every category and subcategory."
         },
         {
           role: "user",
           content: prompt
         }
       ],
-      max_tokens: 8000
+      max_tokens: 12000
     });
 
     const content = response.choices[0]?.message?.content;
@@ -570,6 +577,7 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
         .data-table {
           width: 100%;
           margin: 25px 0;
+          font-size: 14px;
         }
         .data-table th {
           background-color: #0284c7;
@@ -601,6 +609,41 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
           margin: 20px 0;
           font-style: italic;
           color: #64748b;
+        }
+        .weight-explanation {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 20px;
+          margin: 30px 0;
+        }
+        .weight-card {
+          flex: 1 0 calc(50% - 20px);
+          min-width: 250px;
+          background-color: #f8fafc;
+          border-radius: 8px;
+          padding: 15px;
+          box-shadow: 0 0 5px rgba(0,0,0,0.05);
+        }
+        .weight-card h4 {
+          margin-top: 0;
+          color: #0284c7;
+          border-bottom: 1px solid #e0e0e0;
+          padding-bottom: 5px;
+          margin-bottom: 10px;
+        }
+        .highlight-box {
+          background-color: #ecfdf5;
+          border-left: 4px solid #10b981;
+          padding: 20px;
+          margin: 20px 0;
+          border-radius: 0 8px 8px 0;
+        }
+        .highlight-title {
+          font-weight: bold;
+          color: #065f46;
+          margin-top: 0;
+          margin-bottom: 10px;
+          font-size: 16px;
         }
       </style>
     </head>
@@ -646,34 +689,90 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
         <div class="detailed-scores">
           <h2 id="detailed-scores">Detailed Scoring Information</h2>
           
+          ${Object.values(categoriesData).some(cat => Object.values(cat.userWeights || {}).every(w => w === 0)) ? `
+          <div class="highlight-box" style="background-color: #f0f7ff; border-left-color: #38bdf8;">
+            <p class="highlight-title" style="color: #0369a1;">Note About Weights</p>
+            <p>Some categories had all zero weights in the original assessment. For these categories, equal weights have been automatically calculated for all subcategories to provide a more meaningful analysis.</p>
+          </div>
+          ` : ''}
+          
           <table class="data-table">
             <thead>
               <tr>
                 <th>Category</th>
+                <th>Subcategory</th>
                 <th>Raw Score</th>
-                <th>User Weight</th>
+                <th>User Weight (%)</th>
                 <th>Q Value</th>
-                <th>Adjusted Weight</th>
+                <th>Softmax Weight (%)</th>
+                <th>Adjusted Weight (%)</th>
+                <th>Weighted Score</th>
               </tr>
             </thead>
             <tbody>
-              ${categoriesData.flatMap(cat => 
-                Object.entries(cat.categoryScores || {}).map(([subCategory, score]) => `
-                  <tr>
-                    <td>${subCategory}</td>
-                    <td>${(score as number).toFixed(2)}%</td>
-                    <td>${(cat.userWeights?.[subCategory] || 0).toFixed(2)}%</td>
-                    <td>${(cat.qValues?.[subCategory] || 0).toFixed(3)}</td>
-                    <td>${(cat.adjustedWeights?.[subCategory] || 0).toFixed(2)}%</td>
-                  </tr>
-                `).join('')
-              )}
+              ${categoriesData.flatMap(cat => {
+                // Check if all user weights are zero for this category
+                const allWeightsZero = Object.values(cat.userWeights || {}).every(w => w === 0);
+                const subCategoryCount = Object.keys(cat.categoryScores || {}).length;
+                const defaultWeight = subCategoryCount > 0 ? (100 / subCategoryCount) : 0;
+                
+                return Object.entries(cat.categoryScores || {}).map(([subCategory, score]) => {
+                  // Use default weight if all weights are zero
+                  const userWeight = allWeightsZero ? defaultWeight : (cat.userWeights?.[subCategory] || 0);
+                  const qValue = cat.qValues?.[subCategory] || 0;
+                  const softmaxWeight = cat.softmaxWeights?.[subCategory] || 0;
+                  const adjustedWeight = allWeightsZero ? defaultWeight : (cat.adjustedWeights?.[subCategory] || 0);
+                  const weightedScore = ((score as number) * adjustedWeight) / 100;
+                  
+                  return `
+                    <tr>
+                      <td>${cat.category}</td>
+                      <td>${subCategory}</td>
+                      <td>${(score as number).toFixed(2)}%</td>
+                      <td>${userWeight.toFixed(2)}</td>
+                      <td>${qValue.toFixed(4)}</td>
+                      <td>${softmaxWeight.toFixed(2)}</td>
+                      <td>${adjustedWeight.toFixed(2)}</td>
+                      <td>${weightedScore.toFixed(2)}</td>
+                    </tr>
+                  `;
+                });
+              }).join('')}
             </tbody>
           </table>
           
-          <div class="q-value-explanation">
-            <p><strong>About Q Values:</strong> Q values represent the learned importance of each category through reinforcement learning algorithms. Higher Q values indicate categories that have greater impact on overall AI readiness based on the assessment data.</p>
-            <p><strong>About Adjusted Weights:</strong> The original user-defined weights are adjusted through a softmax function that considers both Q values and category scores to optimize the assessment's accuracy and relevance to your organization.</p>
+          <div class="weight-explanation">
+            <div class="weight-card">
+              <h4>User Weights</h4>
+              <p>These are the original weights specified for each category, representing the initial assessment of relative importance. User weights sum to 100% within each assessment category.</p>
+            </div>
+            
+            <div class="weight-card">
+              <h4>Q Values</h4>
+              <p>Q values represent the learned importance of each category through reinforcement learning algorithms. Higher Q values indicate categories that have greater impact on overall AI readiness based on assessment data.</p>
+            </div>
+            
+            <div class="weight-card">
+              <h4>Softmax Weights</h4>
+              <p>Softmax weights are derived by applying a softmax function to the Q values, which normalizes them into a probability distribution. This helps highlight the relative importance between categories.</p>
+            </div>
+            
+            <div class="weight-card">
+              <h4>Adjusted Weights</h4>
+              <p>The final weights used in scoring, combining both user weights and learned importance (Q values). These are optimized to reflect both strategic priorities and empirical significance.</p>
+            </div>
+          </div>
+          
+          <div class="highlight-box">
+            <p class="highlight-title">Weight Calculation Methodology</p>
+            <p>The assessment uses a sophisticated multi-stage weighting system that combines human expertise (user weights) with machine learning (Q values) to create optimized adjusted weights:</p>
+            <ol>
+              <li><strong>User weights</strong> are collected during the assessment setup</li>
+              <li><strong>Q values</strong> are calculated through reinforcement learning based on assessment patterns</li>
+              <li><strong>Softmax transformation</strong> is applied to normalize Q values into a probability distribution</li>
+              <li><strong>Adjusted weights</strong> are computed by blending user weights with softmax weights</li>
+              <li>The final score is calculated using these adjusted weights to provide a more accurate representation of AI readiness</li>
+            </ol>
           </div>
         </div>
       
@@ -719,12 +818,11 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
 }
 
 /**
- * Helper function to get color based on score
+ * Utility function to get color based on score
  */
 function getColorForScore(score: number): string {
-  if (score < 30) return "#ef4444"; // Red
-  if (score < 50) return "#f97316"; // Orange
-  if (score < 70) return "#eab308"; // Yellow
-  if (score < 85) return "#84cc16"; // Light green
-  return "#22c55e"; // Green
+  if (score < 30) return '#73BFDC'; // Medium blue
+  if (score < 60) return '#4389B0'; // Deeper blue
+  if (score < 80) return '#2C6F9B'; // Rich blue
+  return '#0A4570'; // Darkest blue
 } 

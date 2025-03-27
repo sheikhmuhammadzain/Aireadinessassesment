@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/mode-toggle";
-import { Activity, RefreshCw } from "lucide-react";
+import { Activity, RefreshCw, Shield } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { UserAccountMenu } from "@/components/user-account-menu";
@@ -14,7 +14,7 @@ export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const { toast } = useToast();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [showResetConfirmation, setShowResetConfirmation] = useState(false);
   
   const handleReset = () => {
@@ -46,6 +46,9 @@ export default function Header() {
   const cancelReset = () => {
     setShowResetConfirmation(false);
   };
+  
+  // Check if the current user is admin
+  const isAdmin = isAuthenticated && user?.role === "admin";
   
   return (
     <header className="border-b">
@@ -81,6 +84,18 @@ export default function Header() {
             >
               About
             </Link>
+            {/* Admin link - only visible for admin users */}
+            {isAdmin && (
+              <Link 
+                href="/admin" 
+                className={`text-sm font-medium transition-colors hover:text-primary flex items-center gap-1 ${
+                  pathname === "/admin" ? "text-primary" : "text-muted-foreground"
+                }`}
+              >
+                <Shield className="h-4 w-4" />
+                Admin
+              </Link>
+            )}
             {isAuthenticated && (
               <Button
                 variant="ghost"
