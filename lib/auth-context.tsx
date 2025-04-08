@@ -84,6 +84,7 @@ interface AuthContextType {
   logout: () => void;
   signup: (email: string, name: string, password: string, role: UserRole) => Promise<boolean>;
   isAuthenticated: boolean;
+  isLoading: boolean;
   canEditPillar: (pillar: string) => boolean;
 }
 
@@ -94,14 +95,23 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Load user from localStorage on mount
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
-      setIsAuthenticated(true);
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+        setIsAuthenticated(true);
+      } catch (error) {
+        // Handle JSON parse error
+        console.error("Failed to parse user from localStorage:", error);
+        localStorage.removeItem('user'); // Remove invalid data
+      }
     }
+    setIsLoading(false); // Mark loading as complete regardless of result
   }, []);
 
   // Login function
@@ -171,6 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logout, 
         signup, 
         isAuthenticated,
+        isLoading,
         canEditPillar
       }}
     >

@@ -16,8 +16,13 @@ import { useAuth } from "@/lib/auth-context";
 import { ROLE_TO_PILLAR } from "@/lib/auth-context";
 
 export function UserAccountMenu() {
-  const { user, logout, isAuthenticated } = useAuth();
+  const { user, logout, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
+
+  // Don't show anything while loading auth state
+  if (isLoading) {
+    return null; // Or return a loading spinner if preferred
+  }
 
   if (!isAuthenticated || !user) {
     return (

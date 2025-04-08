@@ -16,7 +16,8 @@ import { toast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { CompanyInfoForm } from "@/components/CompanyInfoForm";
-import { SubcategoryWeightAdjustment } from "@/components/SubcategoryWeightAdjustment";
+import { WeightAdjuster } from "@/components/WeightAdjuster";
+import { CategoryWeightAdjuster } from "@/components/CategoryWeightAdjuster";
 import { 
   CompanyInfo, 
   CategoryWeights, 
@@ -474,22 +475,21 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
     }
   };
 
-  // CORRECTED: Parent handler just updates state and saves - uses useCallback to prevent re-renders
+  // Parent handler - directly updates state and saves
   const handleSubcategoryWeightsChange = useCallback((newWeights: SubcategoryWeights) => {
-    // Use setTimeout to avoid state updates during render
-    setTimeout(() => {
-      setSubcategoryWeights(newWeights);
-      const derivedCategoryWeights = convertSubcategoryToCategory(newWeights);
+    // Update state immediately - no setTimeout
+    setSubcategoryWeights(newWeights);
+    const derivedCategoryWeights = convertSubcategoryToCategory(newWeights);
     setWeights(derivedCategoryWeights);
-      try {
-        localStorage.setItem('subcategory_weights', JSON.stringify(newWeights));
-    localStorage.setItem('assessment_weights', JSON.stringify(derivedCategoryWeights));
-      } catch (error) {
-        console.error("Error saving weights to localStorage:", error);
-        toast({ title: "Storage Error", description: "Could not save weight changes locally.", variant: "destructive" });
-      }
-    }, 0);
-  }, [setSubcategoryWeights, setWeights, toast]);
+    
+    try {
+      localStorage.setItem('subcategory_weights', JSON.stringify(newWeights));
+      localStorage.setItem('assessment_weights', JSON.stringify(derivedCategoryWeights));
+    } catch (error) {
+      console.error("Error saving weights to localStorage:", error);
+      toast({ title: "Storage Error", description: "Could not save weight changes locally.", variant: "destructive" });
+    }
+  }, [toast]); // Only toast as a dependency
 
   const handleWeightsSubmit = () => {
     // Weights are saved live via handleSubcategoryWeightsChange.
@@ -696,7 +696,7 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
           <p className="text-center text-muted-foreground mb-8">
             Review and adjust the importance of each category and subcategory. Total must equal 100% per category group implicitly.
           </p>
-          <SubcategoryWeightAdjustment
+          <WeightAdjuster
             weights={subcategoryWeights}
             recommendedWeights={recommendedSubcategoryWeights}
             onWeightsChange={handleSubcategoryWeightsChange} // CORRECTED handler
@@ -808,14 +808,16 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
 
         {/* Weights Tab */}
         {activeTab === "weights" && (
-          <SubcategoryWeightAdjustment
-             weights={subcategoryWeights}
-             onWeightsChange={handleSubcategoryWeightsChange}
-             lockedCategories={lockedCategories}
-            onToggleLock={toggleCategoryLock}
-             categories={categories} 
-            recommendedWeights={recommendedSubcategoryWeights}
-          />
+          <div className="space-y-8">
+            {/* Category-level weight adjuster */}
+            <CategoryWeightAdjuster
+              weights={weights}
+              onWeightsChange={(newWeights) => {
+                setWeights(newWeights);
+                localStorage.setItem('assessment_weights', JSON.stringify(newWeights));
+              }}
+            />
+          </div>
         )}
       </div>
       
