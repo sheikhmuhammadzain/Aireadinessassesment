@@ -10,10 +10,104 @@ if (!apiKey) {
 
 const genAI = new GoogleGenerativeAI(apiKey);
 
+// Define queue item interface
+interface QueueItem {
+  modelName: string;
+  prompt: string;
+  resolve: (value: string) => void;
+  reject: (reason?: any) => void;
+  retryCount?: number;
+}
+
+// Track API requests to prevent rate limiting
+const requestQueue: QueueItem[] = [];
+let isProcessingQueue = false;
+let lastRequestTime = 0;
+const MIN_REQUEST_INTERVAL = 1000; // Minimum 1 second between requests
+
+// Function to process the request queue
+async function processQueue(): Promise<void> {
+  if (isProcessingQueue || requestQueue.length === 0) return;
+  
+  isProcessingQueue = true;
+  
+  try {
+    // Process the next request in the queue
+    const nextRequest = requestQueue.shift();
+    if (!nextRequest) return; // Should never happen due to the length check above, but TypeScript needs this
+    
+    const { modelName, prompt, resolve, reject, retryCount = 0 } = nextRequest;
+    
+    // Enforce rate limiting - wait if needed
+    const now = Date.now();
+    const timeElapsed = now - lastRequestTime;
+    if (timeElapsed < MIN_REQUEST_INTERVAL) {
+      await new Promise(r => setTimeout(r, MIN_REQUEST_INTERVAL - timeElapsed));
+    }
+    
+    // Make the API request
+    try {
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(prompt);
+      lastRequestTime = Date.now();
+      resolve(result.response.text().trim());
+    } catch (error: unknown) {
+      console.warn(`Gemini API request failed (attempt ${retryCount + 1}):`, error);
+      
+      // Check if it's a rate limit error (429) and retry if appropriate
+      if (
+        retryCount < 3 && 
+        error instanceof Error &&
+        error.toString().includes('429') && 
+        error.toString().includes('quota')
+      ) {
+        // Calculate exponential backoff delay (1s, 2s, 4s)
+        const retryDelay = Math.pow(2, retryCount) * 1000;
+        console.log(`Rate limit hit. Retrying in ${retryDelay}ms...`);
+        
+        // Add back to queue with incremented retry count
+        requestQueue.unshift({
+          modelName,
+          prompt,
+          resolve,
+          reject,
+          retryCount: retryCount + 1
+        });
+        
+        // Wait before processing next item
+        await new Promise(r => setTimeout(r, retryDelay));
+      } else {
+        // Max retries exceeded or different error
+        reject(error);
+      }
+    }
+  } catch (error) {
+    console.error("Error in queue processing:", error);
+  } finally {
+    isProcessingQueue = false;
+    
+    // Continue processing queue if more items exist
+    if (requestQueue.length > 0) {
+      setTimeout(processQueue, MIN_REQUEST_INTERVAL);
+    }
+  }
+}
+
+// Helper function to queue a Gemini API request
+function queueGeminiRequest(modelName: string, prompt: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    // Add request to queue
+    requestQueue.push({ modelName, prompt, resolve, reject });
+    
+    // Start processing if not already in progress
+    if (!isProcessingQueue) {
+      processQueue();
+    }
+  });
+}
+
 export async function generateRecommendations(category: string, score: number) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-
     const prompt = `As an AI readiness expert, provide 4 specific, actionable, and detailed recommendations for improving the "${category}" category where the current score is ${score}%. 
 
 The recommendations should be:
@@ -39,13 +133,12 @@ Details: [2-3 sentences with detailed, actionable guidance]
 
 And so on for all 4 recommendations...`;
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text().trim();
+    // Use the queuing mechanism
+    const text = await queueGeminiRequest("gemini-2.0-flash-lite", prompt);
 
     // Parse the recommendations
     const recommendations = [];
-    const blocks = text.split(/\n\s*\n/); // Split by empty lines
+    const blocks = text.split(/\n\s*\n/);
     
     for (const block of blocks) {
       const titleMatch = block.match(/Title:\s*(.*?)(?:\n|$)/i);
@@ -92,8 +185,6 @@ And so on for all 4 recommendations...`;
 
 export async function generateOverallSummary(overallScore: number, categoryScores: Record<string, number>) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-
     const prompt = `As an AI readiness expert, provide a comprehensive analysis (3-5 sentences) of an organization's AI readiness based on:
     Overall Score: ${overallScore}%
     Category Scores: ${JSON.stringify(categoryScores)}
@@ -107,9 +198,9 @@ export async function generateOverallSummary(overallScore: number, categoryScore
     Keep the tone professional, constructive, and forward-looking.
     Provide ONLY the summary text, with no additional formatting or prefixes.`;
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return response.text().trim();
+    // Use the queuing mechanism
+    const text = await queueGeminiRequest("gemini-2.0-flash", prompt);
+    return text;
   } catch (error) {
     console.error('Error generating summary:', error);
     // Fallback summary if API fails

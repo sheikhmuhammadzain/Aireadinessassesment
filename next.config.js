@@ -2,35 +2,76 @@
 const nextConfig = {
   // Ignore ESLint errors during build
   eslint: {
+    dirs: ['app', 'components', 'lib', 'types'],
     ignoreDuringBuilds: true,
   },
   // Ignore TypeScript errors during build
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   // Disable image optimization
   images: { 
-    unoptimized: true 
+    unoptimized: true,
+    domains: ['avatars.githubusercontent.com'],
   },
-  // Handle API rewrites - Note: for production deployment these URLs should be updated
-  async rewrites() {
-    const apiUrl = process.env.API_URL || 'http://103.18.20.205:8080';
-    console.log('Using API URL for rewrites:', apiUrl);
+  // Enable React Fast Refresh
+  reactStrictMode: true,
+  // Improve compilation times
+  compiler: {
+    // Remove console logs in production
+    removeConsole: process.env.NODE_ENV === "production",
+  },
+  // Add webpack optimizations
+  webpack: (config, { dev, isServer }) => {
+    // Only apply optimizations for client-side builds in production
+    if (!dev && !isServer) {
+      // Use TerserPlugin default settings
+      config.optimization.minimize = true;
+      
+      // Use persistent caching
+      config.cache = {
+        type: 'filesystem',
+        buildDependencies: {
+          config: [__filename]
+        }
+      };
+      
+      // Split chunks more aggressively
+      config.optimization.splitChunks = {
+        chunks: 'all',
+        maxInitialRequests: 25,
+        minSize: 20000
+      };
+    }
     
-    return [
-      {
-        source: '/api/questionnaire/:slug*',
-        destination: `${apiUrl}/questionnaire/:slug*`
-      },
-      {
-        source: '/api/calculate-results',
-        destination: `${apiUrl}/calculate-results`
-      },
-      {
-        source: '/api/questionnaires',
-        destination: `${apiUrl}/questionnaires`
-      }
-    ];
+    return config;
+  },
+  // Handle API rewrites - Using the new working API URL
+  async rewrites() {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || 'http://localhost:8090';
+    
+    console.log(`Using API URL: ${apiUrl} for rewrites configuration`);
+    
+    return {
+      fallback: [
+        {
+          source: '/api/questionnaire/:path*',
+          destination: '/api/questionnaire/:path*',
+        },
+        {
+          source: '/api/assessment/:path*',
+          destination: '/api/assessment/:path*',
+        },
+        {
+          source: '/api/company/:path*',
+          destination: '/api/company/:path*',
+        },
+        {
+          source: '/api/results/:path*',
+          destination: '/api/results/:path*',
+        },
+      ],
+    };
   }
 };
 

@@ -4,17 +4,26 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/mode-toggle";
-import { Activity, RefreshCw, Shield } from "lucide-react";
+import { Activity, RefreshCw, Shield, User, LogOut, Menu } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { UserAccountMenu } from "@/components/user-account-menu";
 import { useAuth } from "@/lib/auth-context";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 
 export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const { toast } = useToast();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, logout } = useAuth();
   const [showResetConfirmation, setShowResetConfirmation] = useState(false);
   
   const handleReset = () => {
@@ -49,70 +58,155 @@ export default function Header() {
   
   // Check if the current user is admin
   const isAdmin = isAuthenticated && user?.role === "admin";
+
+  const handleLogout = async () => {
+    await logout();
+    router.push("/login");
+  };
+
+  const handleResetAssessments = () => {
+    // Set a flag to indicate that weights should be reset
+    localStorage.setItem('reset_weights', 'true');
+    
+    // Clear all assessment-related data
+    localStorage.removeItem('subcategory_weights');
+    localStorage.removeItem('assessment_weights');
+    localStorage.removeItem('locked_categories');
+    localStorage.removeItem('company_info');
+    
+    toast({
+      title: "Assessment weights reset",
+      description: "Your assessment weights and data have been reset to default values.",
+    });
+    
+    // Refresh the current page to apply changes
+    window.location.reload();
+  };
   
   return (
-    <header className="border-b">
-      <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2">
-          <Activity className="h-6 w-6" />
-          <span className="font-bold text-xl">AI Readiness</span>
+    <header className="sticky top-0 z-40 w-full border-b bg-background">
+      <div className="container flex h-16 items-center">
+        <div className="flex gap-6 md:gap-10">
+          <Link href="/" className="flex items-center space-x-2">
+            <span className="hidden font-bold sm:inline-block">
+              AI Readiness
+            </span>
         </Link>
-        
-        <div className="flex items-center gap-4">
-          <nav className="hidden md:flex items-center gap-6">
+          <nav className="hidden gap-6 md:flex">
             <Link 
               href="/" 
-              className={`text-sm font-medium transition-colors hover:text-primary ${
-                pathname === "/" ? "text-primary" : "text-muted-foreground"
-              }`}
+              className={cn(
+                "flex items-center text-sm font-medium text-muted-foreground",
+                pathname === "/" && "text-foreground"
+              )}
             >
               Home
             </Link>
             <Link 
               href="/dashboard" 
-              className={`text-sm font-medium transition-colors hover:text-primary ${
-                pathname === "/dashboard" ? "text-primary" : "text-muted-foreground"
-              }`}
+              className={cn(
+                "flex items-center text-sm font-medium text-muted-foreground",
+                pathname === "/dashboard" && "text-foreground"
+              )}
             >
               Dashboard
             </Link>
+            <Link
+              href="/assessment"
+              className={cn(
+                "flex items-center text-sm font-medium text-muted-foreground",
+                pathname?.startsWith("/assessment") && "text-foreground"
+              )}
+            >
+              Assessment
+            </Link>
             <Link 
               href="/about" 
-              className={`text-sm font-medium transition-colors hover:text-primary ${
-                pathname === "/about" ? "text-primary" : "text-muted-foreground"
-              }`}
+              className={cn(
+                "flex items-center text-sm font-medium text-muted-foreground",
+                pathname === "/about" && "text-foreground"
+              )}
             >
               About
             </Link>
-            {/* Admin link - only visible for admin users */}
             {isAdmin && (
-              <Link 
-                href="/admin" 
-                className={`text-sm font-medium transition-colors hover:text-primary flex items-center gap-1 ${
-                  pathname === "/admin" ? "text-primary" : "text-muted-foreground"
-                }`}
+              <Link
+                href="/admin"
+                className={cn(
+                  "flex items-center text-sm font-medium text-muted-foreground",
+                  pathname?.startsWith("/admin") && "text-foreground"
+                )}
               >
-                <Shield className="h-4 w-4" />
                 Admin
               </Link>
             )}
-            {isAuthenticated && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleReset}
-                className="text-sm font-medium transition-colors hover:text-primary text-muted-foreground flex items-center gap-1"
-              >
-                <RefreshCw className="h-4 w-4" />
-                Reset
-              </Button>
-            )}
           </nav>
-          
+        </div>
+        <div className="flex flex-1 items-center justify-end space-x-4">
+          <nav className="flex items-center space-x-2">
           <div className="flex items-center gap-3">
             <ModeToggle />
-            <UserAccountMenu />
+              {isAuthenticated ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="rounded-full">
+                      <User className="h-5 w-5" />
+                      <span className="sr-only">User menu</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleResetAssessments} className="cursor-pointer">
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Reset Assessment Data
+                    </DropdownMenuItem>
+                    {isAdmin && (
+                      <DropdownMenuItem onClick={() => router.push('/admin')} className="cursor-pointer">
+                        Admin Panel
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
+                      <LogOut className="mr-2 h-4 w-4" />
+                      Logout
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <Button asChild size="sm">
+                  <Link href="/login">Login</Link>
+                </Button>
+              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild className="block md:hidden">
+                  <Button variant="ghost" size="icon">
+                    <Menu className="h-5 w-5" />
+                    <span className="sr-only">Toggle menu</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <Link href="/">Home</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard">Dashboard</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/assessment">Assessment</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/about">About</Link>
+                  </DropdownMenuItem>
+                  {isAdmin && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin">Admin</Link>
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
           </div>
+          </nav>
         </div>
       </div>
       

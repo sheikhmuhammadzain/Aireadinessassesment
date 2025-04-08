@@ -1,7 +1,51 @@
 import { AssessmentResponse, AssessmentResult, CompanyInfo, CategoryWeights, SubcategoryWeights } from "@/types";
 
-// Remove trailing slash if present to avoid double slash issues
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/$/, "");
+// Update API base URL at the top of the file
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://10.229.220.15:8070";
+
+// Simple in-memory cache for API responses
+const apiCache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_DURATION = 1000 * 60 * 5; // 5 minutes cache duration
+const pendingRequests = new Map();
+
+/**
+ * Improved wrapper for API calls with caching and request deduplication
+ */
+async function cachedApiCall<T>(cacheKey: string, apiFn: () => Promise<T>): Promise<T> {
+  const now = Date.now();
+  const cached = apiCache.get(cacheKey);
+  
+  // Return cached response if still valid
+  if (cached && now - cached.timestamp < CACHE_DURATION) {
+    return cached.data as T;
+  }
+  
+  // Check if we already have this request in flight
+  if (pendingRequests.has(cacheKey)) {
+    return pendingRequests.get(cacheKey);
+  }
+  
+  // Create new request and store the promise
+  const requestPromise = (async () => {
+    try {
+      const data = await apiFn();
+      apiCache.set(cacheKey, { data, timestamp: now });
+      pendingRequests.delete(cacheKey);
+      return data;
+    } catch (error) {
+      pendingRequests.delete(cacheKey);
+      // If error occurs and we have a stale cache, return that instead of failing
+      if (cached) {
+        console.warn(`Error fetching fresh data for ${cacheKey}, using stale cache`);
+        return cached.data as T;
+      }
+      throw error;
+    }
+  })();
+  
+  pendingRequests.set(cacheKey, requestPromise);
+  return requestPromise;
+}
 
 /**
  * Normalize URL to prevent double slash issues
@@ -15,116 +59,54 @@ function normalizeUrl(path: string): string {
 }
 
 /**
- * Fetch questionnaire for a specific assessment type
- * @param assessmentType The type of assessment
+ * Fetch a questionnaire by slug
+ * @param slug Questionnaire slug
  * @returns Promise with questionnaire data
  */
-export async function fetchQuestionnaire(assessmentType: string): Promise<Record<string, Record<string, string[]>>> {
-  console.log(`Fetching questionnaire for: ${assessmentType}`);
-  const encodedType = encodeURIComponent(assessmentType);
-  
-  try {
-    // Set up a timeout for the request (15 seconds)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
-    
-    const response = await fetch(`/api/questionnaire/${encodedType}`, { signal: controller.signal });
-    clearTimeout(timeoutId);
-    
-    if (!response.ok) {
-      console.error(`API Error: ${response.status} ${response.statusText}`);
-      throw new Error(`Error fetching questionnaire: ${response.status} ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-    console.log(`Questionnaire data received for ${assessmentType}:`, data);
-    
-    // Simplify the data handling - the format appears to be directly usable
-    if (data && typeof data === 'object') {
-      // Check if the data structure already has arrays of questions for each category
-      if (Object.values(data).some(value => Array.isArray(value))) {
-        // Data is already in the right format, we just need to wrap it with the assessment type
-        return { [assessmentType]: data };
+export async function fetchQuestionnaire(slug: string) {
+  return cachedApiCall(`questionnaire_${slug}`, async () => {
+    try {
+      console.log(`Fetching questionnaire from ${API_BASE_URL}/questionnaire/${encodeURIComponent(slug)}`);
+      
+      // Using fetch with better timeout handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      
+      const response = await fetch(`/api/questionnaire/${encodeURIComponent(slug)}`, {
+        signal: controller.signal,
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        console.error(`API Error: Status ${response.status} ${response.statusText}`);
+        throw new Error(`Error fetching questionnaire: ${response.status} ${response.statusText}`);
       }
       
-      // If we reach here, the data format wasn't what we expected
-      console.warn(`Using fallback data structure for ${assessmentType}`);
+      const data = await response.json();
+      console.log(`Successfully fetched questionnaire data:`, data);
+      
+      // Fix data structure - if the response is not in the expected format with slug as the key
+      // For example, if we expect { "AI Culture": {...} } but receive { subcategory1: [...], subcategory2: [...] }
+      if (data && typeof data === 'object' && !data[slug]) {
+        // Wrap the response in the expected format
+        return { [slug]: data };
+      }
+      
+      return data;
+    } catch (error) {
+      console.error(`Error fetching questionnaire ${slug}:`, error);
+      // Provide more detailed error information
+      if (error instanceof Error) {
+        throw new Error(`Error fetching questionnaire: ${error.message}`);
+      }
+      throw error;
     }
-    
-    // Use fallback data based on assessment type
-    if (assessmentType === "AI Culture") {
-      const fallbackData = {
-        "AI Leadership & Vision": [
-          "Does the organization have a clear AI strategy?",
-          "Is there an AI champions program in your organization?",
-          "Do you integrate AI into day-to-day organizational workflows?"
-        ],
-        "AI Experimentation & Innovation": [
-          "Are AI pilots and innovation hubs encouraged?",
-          "Do you celebrate AI project milestones publicly?",
-          "Do you have a platform for sharing AI-related innovations?",
-          "Is there a culture of experimentation for AI adoption?"
-        ],
-        "Cross-Functional AI Collaboration": [
-          "Are employees receiving AI upskilling?",
-          "Do you have cross-functional AI teams?",
-          "Is there a knowledge-sharing platform for AI insights?",
-          "Do you have AI champions across different departments?"
-        ],
-        "AI Adoption Mindset": [
-          "Is there resistance to AI adoption in your organization?",
-          "Do employees understand the value of AI in their roles?",
-          "Is there a fear of job displacement due to AI?",
-          "Do you have change management strategies for AI adoption?"
-        ]
-      };
-      return { [assessmentType]: fallbackData };
-    } else if (assessmentType === "AI Governance") {
-      const fallbackData = {
-        "AI Roles & Responsibilities": [
-          "Do you have policies for ethical AI development?",
-          "Are all stakeholders educated on AI governance policies?",
-          "Do you have regular AI governance board meetings?",
-          "Is algorithmic accountability explicitly assigned?"
-        ],
-        "Regulatory Compliance": [
-          "Does your AI system comply with GDPR, EU AI Act, ISO 42001, or other laws?",
-          "Are your AI policies updated with changing regulations?",
-          "Do you evaluate third-party AI tools for compliance risks?",
-          "Do you adhere to AI transparency standards globally?",
-          "Is your organization part of any AI governance consortiums?",
-          "Do you engage in forums to influence AI policymaking?"
-        ],
-        "Bias & Fairness Mitigation": [
-          "Do you actively monitor and reduce bias in AI models?",
-          "Is there a mechanism to validate fairness in AI outcomes?",
-          "Do you have bias mitigation mechanisms for deployed AI models?",
-          "Are your governance measures tailored for AI's unique challenges?"
-        ],
-        "AI Transparency & Explainability": [
-          "Are AI decisions interpretable, auditable, and well-documented?",
-          "Are your AI algorithms subject to peer review before deployment?",
-          "Do you maintain an audit trail for AI decisions?",
-          "Do you employ explainable AI techniques to enhance transparency?",
-          "How mature is your AI governance framework?"
-        ],
-        "AI Risk Management": [
-          "Do you have a structured AI risk assessment framework?",
-          "Are external audits conducted on AI systems?",
-          "Is there a whistleblowing mechanism for unethical AI use?",
-          "How regularly are your AI governance policies reviewed?"
-        ]
-      };
-      return { [assessmentType]: fallbackData };
-    }
-    
-    // If the data we received is valid, use it
-    return { [assessmentType]: data };
-    
-  } catch (error) {
-    console.error(`Error fetching questionnaire for ${assessmentType}:`, error);
-    throw error;
-  }
+  });
 }
 
 /**
@@ -132,20 +114,40 @@ export async function fetchQuestionnaire(assessmentType: string): Promise<Record
  * @returns Promise with all questionnaires data
  */
 export async function fetchAllQuestionnaires() {
-  try {
-    console.log("Fetching all questionnaires");
-    const response = await fetch("/api/questionnaires");
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to fetch questionnaires: ${response.status} ${response.statusText} - ${errorText}`);
+  return cachedApiCall('all_questionnaires', async () => {
+    try {
+      console.log("Fetching all questionnaires");
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      
+      const response = await fetch("/api/questionnaires", {
+        signal: controller.signal,
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        console.error(`API Error: Status ${response.status} ${response.statusText}`);
+        throw new Error(`Failed to fetch questionnaires: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log(`Successfully fetched all questionnaires`);
+      return data;
+    } catch (error) {
+      console.error("Error fetching questionnaires:", error);
+      // Provide more detailed error information
+      if (error instanceof Error) {
+        throw new Error(`Error fetching questionnaires: ${error.message}`);
+      }
+      throw error;
     }
-    
-    return response.json();
-  } catch (error) {
-    console.error("Error fetching questionnaires:", error);
-    throw error;
-  }
+  });
 }
 
 /**
@@ -157,14 +159,18 @@ export async function submitAssessment(payload: AssessmentResponse): Promise<Ass
   try {
     console.log(`Submitting assessment for: ${payload.assessmentType}`);
     
-    // Log the payload to help with debugging
-    console.log(`Assessment payload structure:`, 
-      JSON.stringify({
-        assessmentType: payload.assessmentType,
-        categoryCount: payload.categoryResponses.length,
-        hasSubcategoryInfo: !!payload.categoryResponses[0]?.subcategoryResponses
-      })
-    );
+    // Log the payload structure to help with debugging
+    console.log('Assessment payload structure:', {
+      assessmentType: payload.assessmentType,
+      categoryCount: payload.categoryResponses?.length || 0,
+      hasSubcategoryInfo: payload.categoryResponses?.[0]?.subcategoryResponses ? true : false,
+      categories: payload.categoryResponses?.map(c => c.category) || []
+    });
+    
+    // Validate payload structure before submitting
+    if (!payload.assessmentType || !payload.categoryResponses || payload.categoryResponses.length === 0) {
+      throw new Error('Invalid assessment payload - missing required fields');
+    }
     
     // Add a timeout to prevent hanging requests
     const controller = new AbortController();
@@ -184,18 +190,23 @@ export async function submitAssessment(payload: AssessmentResponse): Promise<Ass
 
     if (!response.ok) {
       let errorMessage = `Error ${response.status}: ${response.statusText}`;
+      let errorDetail = '';
+      
       try {
         const errorData = await response.json();
-        errorMessage = errorData.detail || errorMessage;
+        errorDetail = JSON.stringify(errorData);
+        errorMessage = errorData.error || errorData.detail || errorMessage;
       } catch (e) {
         // If we can't parse JSON, try to get text
         try {
           const errorText = await response.text();
-          if (errorText) errorMessage = errorText;
+          if (errorText) errorDetail = errorText;
         } catch (textError) {
           // If text extraction fails, stick with the status message
         }
       }
+      
+      console.error(`API error: ${errorMessage}`, errorDetail);
       throw new Error(`Failed to submit assessment: ${errorMessage}`);
     }
 
@@ -362,4 +373,31 @@ export async function getRecommendations(assessmentType: string, category: strin
       ]
     };
   }
+}
+
+/**
+ * Prefetch and normalize questionnaire data for common assessment types
+ * This helps ensure data is ready when needed and in the correct format
+ */
+export function prefetchCommonQuestionnaires() {
+  const commonTypes = ['AI Culture', 'AI Governance', 'AI Infrastructure', 'AI Strategy', 'AI Data', 'AI Talent'];
+  
+  console.log('Prefetching common questionnaire data');
+  
+  commonTypes.forEach(type => {
+    fetchQuestionnaire(type)
+      .then(data => {
+        console.log(`Successfully prefetched ${type} questionnaire data`);
+        // Optionally store in a global cache or localStorage for immediate access
+        try {
+          // Store preprocessed data structure in localStorage
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(`prefetched_questionnaire_${type}`, JSON.stringify(data));
+          }
+        } catch (err) {
+          console.warn(`Could not cache ${type} in localStorage:`, err);
+        }
+      })
+      .catch(err => console.warn(`Prefetch failed for ${type}:`, err));
+  });
 } 

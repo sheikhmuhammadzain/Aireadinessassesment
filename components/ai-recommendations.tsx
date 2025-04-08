@@ -27,6 +27,7 @@ interface Props {
   categoryScores: Record<string, number>;
   onSummaryGenerated?: (summary: string) => void;
   onRecommendationsGenerated?: (recommendations: CategoryRecommendation[]) => void;
+  onError?: (error: any) => void;
 }
 
 export function AIRecommendations({
@@ -34,9 +35,11 @@ export function AIRecommendations({
   overallScore,
   categoryScores,
   onSummaryGenerated,
-  onRecommendationsGenerated
+  onRecommendationsGenerated,
+  onError
 }: Props) {
   const [recommendations, setRecommendations] = useState<CategoryRecommendation[]>([]);
+  const [isLoadingFromCache, setIsLoadingFromCache] = useState(true);
 
   useEffect(() => {
     // Initialize recommendations with loading state
@@ -50,86 +53,158 @@ export function AIRecommendations({
     }));
     setRecommendations(initialRecs);
 
-    // Generate AI summary
-    generateOverallSummary(overallScore, categoryScores)
-      .then(summary => onSummaryGenerated?.(summary))
-      .catch(console.error);
+    // Try to load from cache first
+    const assessmentType = typeof window !== 'undefined' ? 
+      localStorage.getItem('currentAssessmentType') || 'assessment' : 'assessment';
+    const cachedOverallSummary = localStorage.getItem(`ai_summary_${assessmentType}`);
+    const cachedRecommendations = localStorage.getItem(`ai_recommendations_${assessmentType}`);
+    
+    let shouldFetchFromAPI = true;
+    
+    // Check if we have valid cached data
+    if (cachedOverallSummary && cachedRecommendations) {
+      try {
+        const parsedRecommendations = JSON.parse(cachedRecommendations);
+        
+        // Verify the cached data matches the current categories
+        const hasSameCategories = categories.every(cat => 
+          parsedRecommendations.some(rec => 
+            rec.category === cat.category && Math.abs(rec.score - cat.score) < 0.5
+          )
+        );
+        
+        if (hasSameCategories) {
+          // Use cached data
+          setRecommendations(parsedRecommendations);
+          onSummaryGenerated?.(cachedOverallSummary);
+          onRecommendationsGenerated?.(parsedRecommendations);
+          shouldFetchFromAPI = false;
+          setIsLoadingFromCache(false);
+        }
+      } catch (error) {
+        console.error("Error parsing cached recommendations:", error);
+        // Continue with API fetch on error
+      }
+    }
 
-    // Generate recommendations for each category
-    initialRecs.forEach((rec, index) => {
-      generateRecommendations(rec.category, rec.score)
-        .then(aiRecs => {
-          // If the response is already in the expected format (array of objects with title and details)
-          if (Array.isArray(aiRecs) && aiRecs.length > 0 && 
-              typeof aiRecs[0] === 'object' && 'title' in aiRecs[0] && 'details' in aiRecs[0]) {
-            
-            setRecommendations(prev => {
-              const updated = [...prev];
-              updated[index] = {
-                ...updated[index],
-                recommendations: aiRecs,
-                loading: false
-              };
-              onRecommendationsGenerated?.(updated);
-              return updated;
-            });
-            return;
+    // Only fetch from API if no valid cache was found
+    if (shouldFetchFromAPI) {
+      // Generate AI summary - only make one call
+      generateOverallSummary(overallScore, categoryScores)
+        .then(summary => {
+          onSummaryGenerated?.(summary);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(`ai_summary_${assessmentType}`, summary);
           }
-          
-          // For backward compatibility with string format
-          let parsedRecs: RecommendationDetail[] = [];
-
-          if (typeof aiRecs === "string") {
-            // Remove `````` markers and parse the JSON content
-            const cleanedRecs = (aiRecs as string).replace(/``````/g, "").trim();
-            const lines = cleanedRecs.split('\n').filter(line => line.trim().length > 0);
-            
-            parsedRecs = lines.map(line => ({
-              title: line,
-              details: `Detailed guidance for implementing "${line}" in your organization.`
-            }));
-          } else if (Array.isArray(aiRecs) && typeof aiRecs[0] === 'string') {
-            parsedRecs = (aiRecs as string[]).map(rec => ({
-              title: rec,
-              details: `Detailed guidance for implementing "${rec}" in your organization.`
-            }));
-          } else {
-            console.error(`Unexpected type for recommendations: ${typeof aiRecs}`);
-            parsedRecs = [{
-              title: "Unable to parse recommendations",
-              details: "The AI-generated recommendations could not be properly formatted."
-            }];
-          }
-
-          setRecommendations(prev => {
-            const updated = [...prev];
-            updated[index] = {
-              ...updated[index],
-              recommendations: parsedRecs,
-              loading: false
-            };
-            onRecommendationsGenerated?.(updated);
-            return updated;
-          });
         })
         .catch(error => {
-          console.error(`Error generating recommendations for ${rec.category}:`, error);
-          setRecommendations(prev => {
-            const updated = [...prev];
-            updated[index] = {
-              ...updated[index],
-              recommendations: [{
-                title: "Unable to generate recommendations",
-                details: "An error occurred while generating AI recommendations."
-              }],
-              loading: false
-            };
-            onRecommendationsGenerated?.(updated);
-            return updated;
-          });
-        });
-    });
-  }, [categories, overallScore, categoryScores, onSummaryGenerated, onRecommendationsGenerated]);
+          console.error("Error generating summary:", error);
+          onError?.(error);
+        })
+        .finally(() => setIsLoadingFromCache(false));
+
+      // Generate recommendations for each category - with delay between calls to avoid rate limiting
+      let delay = 0;
+      let errorCount = 0;
+      
+      initialRecs.forEach((rec, index) => {
+        setTimeout(() => {
+          generateRecommendations(rec.category, rec.score)
+            .then(aiRecs => {
+              // Process recommendations as before...
+              // If the response is already in the expected format (array of objects with title and details)
+              if (Array.isArray(aiRecs) && aiRecs.length > 0 && 
+                  typeof aiRecs[0] === 'object' && 'title' in aiRecs[0] && 'details' in aiRecs[0]) {
+                
+                setRecommendations(prev => {
+                  const updated = [...prev];
+                  updated[index] = {
+                    ...updated[index],
+                    recommendations: aiRecs,
+                    loading: false
+                  };
+                  
+                  // Store the updated recommendations in cache
+                  if (typeof window !== 'undefined') {
+                    localStorage.setItem(`ai_recommendations_${assessmentType}`, JSON.stringify(updated));
+                  }
+                  
+                  onRecommendationsGenerated?.(updated);
+                  return updated;
+                });
+                return;
+              }
+              
+              // For backward compatibility with string format
+              let parsedRecs: RecommendationDetail[] = [];
+
+              if (typeof aiRecs === "string") {
+                // Remove `````` markers and parse the JSON content
+                const cleanedRecs = (aiRecs as string).replace(/``````/g, "").trim();
+                const lines = cleanedRecs.split('\n').filter(line => line.trim().length > 0);
+                
+                parsedRecs = lines.map(line => ({
+                  title: line,
+                  details: `Detailed guidance for implementing "${line}" in your organization.`
+                }));
+              } else if (Array.isArray(aiRecs) && typeof aiRecs[0] === 'string') {
+                parsedRecs = (aiRecs as string[]).map(rec => ({
+                  title: rec,
+                  details: `Detailed guidance for implementing "${rec}" in your organization.`
+                }));
+              } else {
+                console.error(`Unexpected type for recommendations: ${typeof aiRecs}`);
+                parsedRecs = [{
+                  title: "Unable to parse recommendations",
+                  details: "The AI-generated recommendations could not be properly formatted."
+                }];
+              }
+
+              setRecommendations(prev => {
+                const updated = [...prev];
+                updated[index] = {
+                  ...updated[index],
+                  recommendations: parsedRecs,
+                  loading: false
+                };
+                
+                // Store the updated recommendations in cache
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem(`ai_recommendations_${assessmentType}`, JSON.stringify(updated));
+                }
+                
+                onRecommendationsGenerated?.(updated);
+                return updated;
+              });
+            })
+            .catch(error => {
+              console.error(`Error generating recommendations for ${rec.category}:`, error);
+              errorCount++;
+              
+              if (errorCount > initialRecs.length / 2) {
+                onError?.(new Error("Multiple API failures detected"));
+              }
+              
+              setRecommendations(prev => {
+                const updated = [...prev];
+                updated[index] = {
+                  ...updated[index],
+                  recommendations: [{
+                    title: "Unable to generate recommendations",
+                    details: "An error occurred while generating AI recommendations."
+                  }],
+                  loading: false
+                };
+                onRecommendationsGenerated?.(updated);
+                return updated;
+              });
+            });
+        }, delay);
+        // Add a 2-second delay between each API call to avoid rate limiting
+        delay += 2000;
+      });
+    }
+  }, [categories, overallScore, categoryScores, onSummaryGenerated, onRecommendationsGenerated, onError]);
 
   const getPriority = (score: number) => {
     if (score < 30) return "Critical Priority";
@@ -150,7 +225,9 @@ export function AIRecommendations({
       <CardHeader>
         <CardTitle>AI-Generated Recommendations</CardTitle>
         <CardDescription>
-          Personalized recommendations generated by AI based on your assessment results
+          {isLoadingFromCache 
+            ? "Loading recommendations from cache..." 
+            : "Personalized recommendations based on your assessment results"}
         </CardDescription>
       </CardHeader>
       <CardContent>

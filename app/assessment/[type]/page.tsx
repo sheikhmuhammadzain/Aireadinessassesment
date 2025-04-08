@@ -1,7 +1,9 @@
+// AssessmentPage.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, use, useCallback } from "react"; // Added 'use' and useCallback
 import { useRouter } from "next/navigation";
+import NextDynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -10,172 +12,267 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, ArrowRight, CheckCircle, Loader2, Info, Lock, Unlock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { CompanyInfoForm } from "@/components/CompanyInfoForm";
-// Assuming WeightAdjustment might still be used elsewhere, keeping import
-// import { WeightAdjustment } from "@/components/WeightAdjustment"; 
 import { SubcategoryWeightAdjustment } from "@/components/SubcategoryWeightAdjustment";
-import { CompanyInfo, Weights, SubcategoryWeights, AssessmentResponse, CategoryResponse } from "@/types";
-import { fetchQuestionnaire, submitAssessment, getRecommendedWeights } from "@/lib/api"; // Ensure getRecommendedWeights is defined/used if needed
+import { 
+  CompanyInfo, 
+  CategoryWeights, 
+  SubcategoryWeights, 
+  AssessmentResponse, 
+  CategoryResponse
+} from "@/types";
+import { fetchQuestionnaire, submitAssessment, getRecommendedWeights } from "@/lib/api";
 import { Slider } from "@/components/ui/slider";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"; // If used in sub-components
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ProtectedRoute } from "@/components/protected-route";
 import { useAuth } from "@/lib/auth-context";
-import { toast } from "@/components/ui/use-toast";
 
-// Keep force-dynamic if needed for serverless functions / edge runtime data fetching consistency
-export const dynamic = "force-dynamic"; 
+// Force dynamic to ensure data is always fresh
+export const dynamicConfig = "force-dynamic";
 
-// Type definitions (keep as is)
-type Responses = { [key: string]: string; };
-type ResponsesBySubcategory = {
-  [category: string]: {
-    [subcategory: string]: {
+// --- Type Definitions ---
+// Interface for questions state within a category
+interface QuestionItem {
       question: string;
-      answer: number;
-    }[];
-  };
-};
+  answer: number | null; // Allow null for unanswered
+}
+// Type for the overall questions state object
+type CategoryQuestions = Record<string, QuestionItem[]>;
+
+// Reusing existing types...
 
 interface AssessmentSubmission {
   assessmentType: string;
   companyInfo: CompanyInfo;
   userId: string;
+  // Updated categoryResponses to match backend expectations if different
+  // If backend expects simpler structure, adjust here. Assuming detailed for now.
   categoryResponses: {
     category: string;
-    answers: number[];
+      weight: number; // Add category weight
+      responses: { question: string; answer: number }[]; // Simplified answer structure
+      // Add subcategory details if needed by backend
+      subcategoryResponses?: {
+          subcategory: string;
+          weight: number;
+          // Map relevant questions/answers here if backend needs it per subcategory
+      }[];
   }[];
-  finalWeights: Weights;
+  finalWeights: CategoryWeights; // Use renamed type
   finalSubcategoryWeights: SubcategoryWeights;
 }
 
-// Main Page Component
-export default function AssessmentPage({ params }: { params: { type: string } }) {
+
+// --- Main Page Component ---
+export default function AssessmentPage({ params }: { params: Promise<{ type: string }> }) {
+  // Unwrap params using React.use
+  const unwrappedParams = use(params);
+
   return (
     <ProtectedRoute>
-      <AssessmentTypeContent params={params} />
+      {/* Pass type directly */}
+      <AssessmentTypeContent type={unwrappedParams.type} />
     </ProtectedRoute>
   );
 }
 
-// Core Content Component
-function AssessmentTypeContent({ params }: { params: { type: string } }): JSX.Element {
-  const assessmentType = decodeURIComponent(params.type);
+// --- Core Content Component ---
+function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
+  const assessmentType = decodeURIComponent(type);
   const router = useRouter();
-  const { toast } = useToast();
+  const { toast } = useToast(); // Directly use toast from the hook
   const { user, canEditPillar } = useAuth();
   
-  // State Variables
-  const [step, setStep] = useState<'company-info' | 'weight-adjustment' | 'questions'>('questions'); // Default might need adjustment based on logic
-  const [loading, setLoading] = useState(true); // Loading state for initial data fetch
-  const [submitting, setSubmitting] = useState(false); // Submission loading state
-  const [questionnaire, setQuestionnaire] = useState<Record<string, Record<string, string[]>>>({});
+  // --- State Variables ---
+  const [step, setStep] = useState<'company-info' | 'weight-adjustment' | 'questions'>('company-info'); // Start with company info
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [questionnaire, setQuestionnaire] = useState<Record<string, Record<string, any>>>({}); // Structure from fetch
   const [categories, setCategories] = useState<string[]>([]);
   const [categoryIndex, setCategoryIndex] = useState(0);
   const [currentCategory, setCurrentCategory] = useState<string>("");
-  const [questions, setQuestions] = useState<CategoryQuestions>({});
+  const [questions, setQuestions] = useState<CategoryQuestions>({}); // Use defined type
   const [loadingError, setLoadingError] = useState<string | null>(null);
 
-  const [weights, setWeights] = useState<Weights>({}); // Initialize empty, populated later
-  const [recommendedWeights, setRecommendedWeights] = useState<CategoryWeights | undefined>(undefined);
-  const [subcategoryWeights, setSubcategoryWeights] = useState<SubcategoryWeights>({}); // Initialize empty
+  const [weights, setWeights] = useState<CategoryWeights>({}); // Renamed type
+  const [recommendedWeights, setRecommendedWeights] = useState<CategoryWeights | undefined>(undefined); // Renamed type
+  const [subcategoryWeights, setSubcategoryWeights] = useState<SubcategoryWeights>({});
   const [recommendedSubcategoryWeights, setRecommendedSubcategoryWeights] = useState<SubcategoryWeights | undefined>(undefined);
 
   const [progress, setProgress] = useState(0);
-  const [activeTab, setActiveTab] = useState<string>("questions"); // Default tab
+  const [activeTab, setActiveTab] = useState<string>("questions");
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
   const [isDoingAllAssessments, setIsDoingAllAssessments] = useState(false);
   const [allAssessmentTypes, setAllAssessmentTypes] = useState<string[]>([]);
   const [currentAssessmentIndex, setCurrentAssessmentIndex] = useState(0);
-  const [lockedCategories, setLockedCategories] = useState<Record<string, boolean>>({});
+  const [lockedCategories, setLockedCategories] = useState<Record<string, boolean>>({}); // Key: `${category}-${subcategory}`
+
+  // --- Helper Function: Rounding ---
+  const roundToOneDecimal = (num: number): number => {
+    return parseFloat(num.toFixed(1));
+  };
+
+  // --- Helper Function: Initialize Default Weights ---
+  const initializeDefaultSubcategoryWeights = (data: Record<string, any>): SubcategoryWeights => {
+    const categories = Object.keys(data);
+    if (categories.length === 0) return {};
+
+    const subWeights: SubcategoryWeights = {};
+
+    // Initialize weights for each category and its subcategories
+    categories.forEach(category => {
+      subWeights[category] = {};
+      const categoryData = data[category];
+      
+      // Determine subcategories: could be keys of an object, or the category name itself
+      let subcategories: string[] = [];
+      if (typeof categoryData === 'object' && !Array.isArray(categoryData) && categoryData !== null) {
+        subcategories = Object.keys(categoryData);
+      } else if (Array.isArray(categoryData)) {
+        // If it's an array of questions, use the category name as the only subcategory
+        subcategories = [category];
+      }
+      
+      if (subcategories.length === 0) return;
+      
+      // Distribute 100% evenly among subcategories within THIS category
+      const equalWeight = Math.floor((100 / subcategories.length) * 10) / 10; // Round to 1 decimal
+      
+      // First assign the equal weight to all subcategories
+      subcategories.forEach(subcat => {
+        subWeights[category][subcat] = equalWeight;
+      });
+      
+      // Calculate the actual total (might be slightly off due to rounding)
+      const total = Object.values(subWeights[category]).reduce((sum, weight) => sum + weight, 0);
+      
+      // If the total isn't exactly 100, adjust the last subcategory
+      if (Math.abs(total - 100) > 0.01) {
+        const lastSubcat = subcategories[subcategories.length - 1];
+        subWeights[category][lastSubcat] = Number((subWeights[category][lastSubcat] + (100 - total)).toFixed(1));
+      }
+    });
+
+    return subWeights;
+  };
+
+  // --- Helper Function: Convert Subcategory Weights to Category Weights ---
+  const convertSubcategoryToCategory = (subWeights: SubcategoryWeights): CategoryWeights => {
+    const catWeights: CategoryWeights = {};
+    const categoryCount = Object.keys(subWeights).length;
+    
+    if (categoryCount === 0) return {};
+    
+    // Each category gets an equal share of the total 100%
+    const equalCategoryWeight = Math.floor((100 / categoryCount) * 10) / 10;
+    
+    // Assign equal weights to all categories
+    Object.keys(subWeights).forEach(category => {
+      catWeights[category] = equalCategoryWeight;
+    });
+    
+    // Calculate the actual total (might be slightly off due to rounding)
+    const total = Object.values(catWeights).reduce((sum, weight) => sum + weight, 0);
+    
+    // If the total isn't exactly 100, adjust the last category
+    if (Math.abs(total - 100) > 0.01 && categoryCount > 0) {
+      const lastCategory = Object.keys(catWeights)[categoryCount - 1];
+      catWeights[lastCategory] = Number((catWeights[lastCategory] + (100 - total)).toFixed(1));
+    }
+    
+    return catWeights;
+  };
 
   // --- Effects ---
 
-  // Initial Load Effect (Determine Step, Load Data)
+  // Initial Load Effect
   useEffect(() => {
     console.log("Assessment Type:", assessmentType);
-    setLoading(true); // Start loading indicator
-    setLoadingError(null); // Reset errors
+    setLoading(true);
+    setLoadingError(null);
+    setCategoryIndex(0); // Reset index on type change
+    setCurrentCategory(""); // Reset category on type change
 
+    // Multi-assessment setup
     const doingAll = localStorage.getItem('doing_all_assessments') === 'true';
     setIsDoingAllAssessments(doingAll);
-
     if (doingAll) {
-      const assessmentTypesStr = localStorage.getItem('assessment_types');
-      const currentIndexStr = localStorage.getItem('current_assessment_index');
-      if (assessmentTypesStr && currentIndexStr) {
+      const typesStr = localStorage.getItem('assessment_types');
+      const indexStr = localStorage.getItem('current_assessment_index');
         try {
-          setAllAssessmentTypes(JSON.parse(assessmentTypesStr));
-          setCurrentAssessmentIndex(parseInt(currentIndexStr, 10));
+        if (!typesStr || !indexStr) throw new Error("Missing multi-assessment state");
+        setAllAssessmentTypes(JSON.parse(typesStr));
+        setCurrentAssessmentIndex(parseInt(indexStr, 10));
         } catch (e) {
-          console.error("Error parsing multi-assessment state from localStorage", e);
-          // Fallback to single assessment mode if localStorage is corrupt
+        console.error("Error parsing multi-assessment state, disabling.", e);
           setIsDoingAllAssessments(false);
+        // Clean up potentially corrupt storage
           localStorage.removeItem('doing_all_assessments');
           localStorage.removeItem('assessment_types');
           localStorage.removeItem('current_assessment_index');
-        }
-      } else {
-        // If state is missing, disable multi-assessment mode
-        setIsDoingAllAssessments(false);
       }
     }
 
+    // Load state from localStorage
     const storedCompanyInfo = localStorage.getItem('company_info');
-    const storedSubcategoryWeights = localStorage.getItem('subcategory_weights'); // Use generic key for now
-    const storedLockedCategories = localStorage.getItem('locked_categories');
+    const storedSubWeights = localStorage.getItem('subcategory_weights'); // Key specific to subweights
+    const storedLocks = localStorage.getItem('locked_categories');
 
-    if (storedLockedCategories) {
-      try {
-        setLockedCategories(JSON.parse(storedLockedCategories));
-      } catch (error) {
-        console.error("Error parsing stored locked categories:", error);
-        setLockedCategories({});
-      }
-    } else {
-       setLockedCategories({}); // Ensure it's initialized if not in storage
-    }
+    let initialSubWeights: SubcategoryWeights = {};
+    let initialLocks: Record<string, boolean> = {};
+    let initialCompanyInfo: CompanyInfo | null = null;
+    let determinedStep: 'company-info' | 'weight-adjustment' | 'questions' = 'company-info';
 
-    if (storedCompanyInfo) {
-      try {
-        const parsedInfo = JSON.parse(storedCompanyInfo);
-        setCompanyInfo(parsedInfo);
+    try {
+      if (storedLocks) initialLocks = JSON.parse(storedLocks);
+    } catch (e) { console.error("Failed to parse stored locks", e); }
+    setLockedCategories(initialLocks);
 
-        if (storedSubcategoryWeights) {
-          try {
-            const parsedWeights = JSON.parse(storedSubcategoryWeights);
-            setSubcategoryWeights(parsedWeights);
-            setWeights(convertSubcategoryToCategory(parsedWeights));
-            // Company info and weights exist, go fetch questions
-            fetchQuestionnaires(); // This will set loading to false on completion/error
-            setStep('questions'); // Tentatively set to questions
-          } catch (error) {
-            console.error("Error parsing stored weights:", error);
-            // Corrupt weights, might need re-adjustment
-            setStep('weight-adjustment');
-            fetchRecommendedWeights(parsedInfo); // Fetch recommendations again
-            setLoading(false); // Stop loading as we are showing weight adjustment
-          }
+    try {
+      if (storedCompanyInfo) initialCompanyInfo = JSON.parse(storedCompanyInfo);
+    } catch (e) { console.error("Failed to parse stored company info", e); }
+    setCompanyInfo(initialCompanyInfo);
+
+    try {
+      if (storedSubWeights) initialSubWeights = JSON.parse(storedSubWeights);
+    } catch (e) { console.error("Failed to parse stored sub weights", e); }
+    // Don't set state yet, depends on company info presence
+
+    // Determine starting step based on loaded data
+    if (initialCompanyInfo) {
+      if (Object.keys(initialSubWeights).length > 0) {
+        // Has info and weights -> go to questions (will fetch them)
+        setSubcategoryWeights(initialSubWeights);
+        setWeights(convertSubcategoryToCategory(initialSubWeights));
+        determinedStep = 'questions';
+        fetchQuestionnaires(); // Fetch questions now
         } else {
-          // Company info exists, but no weights - go to weight adjustment
-          setStep('weight-adjustment');
-          fetchRecommendedWeights(parsedInfo); // Fetch recommendations
-          setLoading(false); // Stop loading
-        }
-      } catch (error) {
-        console.error("Error parsing stored company info:", error);
-        // Corrupt company info, start from scratch
-        setStep('company-info');
-        setLoading(false); // Stop loading
+        // Has info, no weights -> go to weight adjustment (will fetch recommendations)
+        determinedStep = 'weight-adjustment';
+        fetchRecommendedWeights(initialCompanyInfo); // Fetch recommendations
       }
     } else {
-      // No company info, start from the beginning
-      setStep('company-info');
-      setLoading(false); // Stop loading
+      // No company info -> start there
+      determinedStep = 'company-info';
+      setLoading(false); // No initial data fetching needed for this step
     }
-    // setLoading(false) is handled within the branches or by fetchQuestionnaires
-  }, [assessmentType]); // Rerun only when assessment type changes
+
+    console.log("Determined initial step:", determinedStep);
+    setStep(determinedStep);
+
+    // Add this near the initial load effect
+    const shouldResetWeights = localStorage.getItem('reset_weights') === 'true';
+    
+    if (shouldResetWeights) {
+      console.log("Resetting weights as requested");
+      clearAssessmentData();
+      localStorage.removeItem('reset_weights'); // Clear the flag
+      // Will continue to normal initialization without stored weights
+    }
+  }, [assessmentType]); // Dependency: only assessmentType
 
   // Progress Calculation Effect
   useEffect(() => {
@@ -183,430 +280,262 @@ function AssessmentTypeContent({ params }: { params: { type: string } }): JSX.El
       setProgress(0);
       return;
     }
-
     let answeredCount = 0;
     let totalCount = 0;
-    
-    Object.values(questions).forEach(categoryQuestions => {
-      if (Array.isArray(categoryQuestions)) {
-          categoryQuestions.forEach(question => {
+    Object.values(questions).forEach(categoryQList => {
+      categoryQList.forEach(q => {
             totalCount++;
-            if (question.answer !== null && question.answer !== undefined) { // Check for null or undefined
+        if (q.answer !== null) { // Check only for null
               answeredCount++;
             }
           });
-      }
     });
-    
-    const progressPercentage = totalCount > 0 ? (answeredCount / totalCount) * 100 : 0;
-    setProgress(progressPercentage);
-  }, [questions]); // Rerun whenever questions state (answers) changes
+    setProgress(totalCount > 0 ? (answeredCount / totalCount) * 100 : 0);
+  }, [questions]); // Rerun when questions (including answers) change
 
   // Authorization Check Effect
   useEffect(() => {
-    if (user && user.role !== 'admin') {
-      // User exists and is not an admin, check pillar access
-      if (!canEditPillar(assessmentType)) {
+    if (user && user.role !== 'admin' && !canEditPillar(assessmentType)) {
         toast({
           title: "Access Restricted",
-          description: `You don't have permission to access the ${assessmentType} assessment. Redirecting...`,
+        description: `You don't have permission for the ${assessmentType} assessment.`,
           variant: "destructive",
         });
-        // Redirect to a safe page, maybe the dashboard or selection page
-        router.replace("/assessment"); // Use replace to avoid history entry
+      router.replace("/assessment");
       }
-    }
-    // No else needed: if user is null, ProtectedRoute handles it. If user is admin, they have access.
   }, [user, assessmentType, canEditPillar, router, toast]);
 
-  // --- Data Fetching ---
 
+  // --- Data Fetching Functions ---
+
+  // Add a function to clear assessment weights when resetting
+  const clearAssessmentData = () => {
+    localStorage.removeItem('subcategory_weights');
+    localStorage.removeItem('assessment_weights');
+    localStorage.removeItem('locked_categories');
+  };
+
+  // Modify the fetchQuestionnaires function to initialize weights properly
   const fetchQuestionnaires = async () => {
-    // Don't fetch if already loaded or currently fetching
     if (Object.keys(questionnaire).length > 0 && !loadingError) {
-      console.log("Questionnaire data already seems loaded.");
-      setLoading(false); // Ensure loading is false if we skip fetch
+      console.log("Questionnaire seems already loaded.");
+      setLoading(false); // Make sure loading is off
       return;
     }
-
     setLoading(true);
     setLoadingError(null);
     console.log(`Fetching questionnaire for: ${assessmentType}`);
-
     try {
       const data = await fetchQuestionnaire(assessmentType);
-      console.log(`Successfully fetched questionnaire data:`, data);
+      console.log(`Raw questionnaire data fetched:`, data);
 
-      if (!data || !data[assessmentType]) {
-        throw new Error(`Invalid data structure received: missing "${assessmentType}" key or data is null.`);
+      const assessmentData = data?.[assessmentType];
+      if (!assessmentData || typeof assessmentData !== 'object') {
+        throw new Error(`Invalid or missing questionnaire data structure for type "${assessmentType}".`);
       }
 
-      const questionnaireData = data[assessmentType];
-      const categoryList = Object.keys(questionnaireData);
-      console.log(`Categories found:`, categoryList);
-
+      const categoryList = Object.keys(assessmentData);
       if (categoryList.length === 0) {
-        throw new Error(`No categories found for assessment type "${assessmentType}".`);
+        throw new Error(`No categories/subcategories found for assessment type "${assessmentType}".`);
       }
 
-      setQuestionnaire(data);
+      setQuestionnaire({ [assessmentType]: assessmentData }); // Store raw structure
+      setCategories(categoryList);
+      setCurrentCategory(categoryList[0]); // Set first category
+      setCategoryIndex(0);
 
-      // Initialize questions state structure
-      const initialQuestions: CategoryQuestions = {};
-      categoryList.forEach(category => {
-        initialQuestions[category] = [];
-        const categoryData = questionnaireData[category];
-        
-        if (Array.isArray(categoryData)) {
-          // If categoryData is an array, treat it as direct questions
-          categoryData.forEach((q: string) => {
-            initialQuestions[category].push({ question: q, answer: null });
+      // Initialize questions state based on fetched structure
+      const initialQuestionsState: CategoryQuestions = {};
+      categoryList.forEach(cat => {
+        initialQuestionsState[cat] = [];
+        const categoryContent = assessmentData[cat];
+        if (Array.isArray(categoryContent)) { // Direct questions under category
+          categoryContent.forEach((qText: string) => {
+            initialQuestionsState[cat].push({ question: qText, answer: null });
           });
-        } else if (typeof categoryData === 'object' && categoryData !== null) {
-          // If categoryData is an object, it contains subcategories
-          Object.values(categoryData).forEach((questionsArray) => {
-            if (Array.isArray(questionsArray)) {
-              questionsArray.forEach((q: string) => {
-                initialQuestions[category].push({ question: q, answer: null });
+        } else if (typeof categoryContent === 'object' && categoryContent !== null) { // Subcategories with questions
+          Object.values(categoryContent).forEach((subcatQuestions: any) => {
+            if (Array.isArray(subcatQuestions)) {
+              subcatQuestions.forEach((qText: string) => {
+                initialQuestionsState[cat].push({ question: qText, answer: null });
               });
             }
           });
         }
       });
+      setQuestions(initialQuestionsState);
+      console.log("Initialized questions state:", initialQuestionsState);
 
-      console.log("Processed initial questions structure:", initialQuestions);
-      setQuestions(initialQuestions);
-      setCategories(categoryList);
-      setCurrentCategory(categoryList[0]);
-      setCategoryIndex(0);
-
-      // Initialize weights if they weren't loaded from storage
-      if (Object.keys(subcategoryWeights).length === 0) {
-        console.log("Initializing default weights as none were found in storage.");
-        const initialSubWeights = initializeDefaultSubcategoryWeights(questionnaireData);
-        setSubcategoryWeights(initialSubWeights);
-        setWeights(convertSubcategoryToCategory(initialSubWeights));
-        localStorage.setItem('subcategory_weights', JSON.stringify(initialSubWeights));
-        localStorage.setItem('assessment_weights', JSON.stringify(convertSubcategoryToCategory(initialSubWeights)));
+      // Check if we have stored weights, and if not, initialize from scratch
+      const storedSubWeights = localStorage.getItem('subcategory_weights');
+      let shouldInitializeWeights = false;
+      
+      try {
+        if (storedSubWeights) {
+          const parsedWeights = JSON.parse(storedSubWeights);
+          // Verify the stored weights match the current assessment's categories
+          const hasMissingCategories = categoryList.some(cat => !parsedWeights[cat]);
+          shouldInitializeWeights = hasMissingCategories;
+          
+          if (!shouldInitializeWeights) {
+            console.log("Using stored weights as they match the current assessment");
+            setSubcategoryWeights(parsedWeights);
+            setWeights(convertSubcategoryToCategory(parsedWeights));
+          }
+        } else {
+          shouldInitializeWeights = true;
+        }
+      } catch (e) {
+        console.error("Error parsing stored weights, will initialize new ones:", e);
+        shouldInitializeWeights = true;
+      }
+      
+      // Initialize weights ONLY if they need to be initialized
+      if (shouldInitializeWeights) {
+        console.log("Initializing fresh weights as none were valid for this assessment");
+        const initialSubW = initializeDefaultSubcategoryWeights(assessmentData);
+        setSubcategoryWeights(initialSubW);
+        setWeights(convertSubcategoryToCategory(initialSubW));
+        localStorage.setItem('subcategory_weights', JSON.stringify(initialSubW));
+        localStorage.setItem('assessment_weights', JSON.stringify(convertSubcategoryToCategory(initialSubW)));
       }
 
-      setStep('questions');
+      setStep('questions'); // Ensure we are on the questions step
+      setActiveTab('questions'); // Ensure questions tab is active
       setLoading(false);
-
     } catch (error) {
-      console.error("Error fetching questionnaire:", error);
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred while loading questions.";
-      setLoadingError(errorMessage);
-      toast({
-        title: "Error Loading Assessment",
-        description: errorMessage + " Please try refreshing the page or contact support.",
-        variant: "destructive",
-      });
+      console.error("Error fetching/processing questionnaire:", error);
+      const msg = error instanceof Error ? error.message : "Unknown error loading questions.";
+      setLoadingError(msg);
+      toast({ title: "Error Loading Questions", description: msg, variant: "destructive" });
+      setQuestions({}); setCategories([]); setCurrentCategory(""); // Reset state on error
       setLoading(false);
-      setQuestions({});
-      setCategories([]);
-      setCurrentCategory("");
     }
   };
 
   const fetchRecommendedWeights = async (info: CompanyInfo) => {
+    // This function now primarily sets up recommended weights and initializes
+    // the actual weights state if needed, then moves to the adjustment step.
     setLoading(true);
     try {
-      console.log("Fetching recommended weights based on:", info);
-      const predefinedWeights: Weights = {
-        "AI Governance": 25, "AI Culture": 15, "AI Infrastructure": 20,
-        "AI Strategy": 15, "AI Data": 10, "AI Talent": 10, "AI Security": 5
-      };
-      console.log("Using predefined weights:", predefinedWeights);
-
+      console.log("Setting up recommended weights based on:", info);
+      // TODO: Replace this with actual API call if backend provides recommendations
+      // Simulating fetching structure and calculating default equal weights as "recommendation"
       const questionnaireStructure = await fetchQuestionnaire(assessmentType);
-      if (!questionnaireStructure || !questionnaireStructure[assessmentType]) {
-        throw new Error("Could not fetch questionnaire structure needed for weight distribution.");
+      if (!questionnaireStructure?.[assessmentType]) {
+          throw new Error("Could not fetch questionnaire structure for weight setup.");
       }
       const assessmentData = questionnaireStructure[assessmentType];
-      const actualCategories = Object.keys(assessmentData);
 
-      const recSubWeights: SubcategoryWeights = {};
-      let totalAssignedWeight = 0;
+      const recSubWeights = initializeDefaultSubcategoryWeights(assessmentData);
+      const recCatWeights = convertSubcategoryToCategory(recSubWeights);
 
-      actualCategories.forEach(category => {
-        recSubWeights[category] = {};
-        const categoryWeight = predefinedWeights[category] ?? (100 / actualCategories.length);
-        
-        const subcategories = (typeof assessmentData[category] === 'object' && !Array.isArray(assessmentData[category]))
-          ? Object.keys(assessmentData[category])
-          : [category];
-        
-        const numSubcategories = subcategories.length;
-        if (numSubcategories > 0) {
-          const weightPerSub = categoryWeight / numSubcategories;
-          subcategories.forEach(subcat => {
-            recSubWeights[category][subcat] = parseFloat(weightPerSub.toFixed(1));
-          });
-        } else {
-          recSubWeights[category][category] = categoryWeight;
-        }
-        totalAssignedWeight += categoryWeight;
-      });
-
-      if (Math.abs(totalAssignedWeight - 100) > 0.1) {
-        console.warn("Normalizing recommended weights. Initial total:", totalAssignedWeight);
-        const factor = 100 / totalAssignedWeight;
-        for (const cat in recSubWeights) {
-          for (const subcat in recSubWeights[cat]) {
-            recSubWeights[cat][subcat] = parseFloat((recSubWeights[cat][subcat] * factor).toFixed(1));
-          }
-        }
-        const normalizedCategoryWeights = convertSubcategoryToCategory(recSubWeights);
-        setWeights(normalizedCategoryWeights);
-        setRecommendedWeights(normalizedCategoryWeights);
-      } else {
-        setWeights(convertSubcategoryToCategory(recSubWeights));
-        setRecommendedWeights(convertSubcategoryToCategory(recSubWeights));
-      }
-      
+      console.log("Using default distribution as 'recommended':", recSubWeights);
       setRecommendedSubcategoryWeights(recSubWeights);
+      setRecommendedWeights(recCatWeights);
+
+      // Set the *actual* working weights to these recommendations initially
       setSubcategoryWeights(recSubWeights);
+      setWeights(recCatWeights);
+
+      // Save these initial weights to localStorage
       localStorage.setItem('subcategory_weights', JSON.stringify(recSubWeights));
-      localStorage.setItem('assessment_weights', JSON.stringify(convertSubcategoryToCategory(recSubWeights)));
-      console.log("Recommended subcategory weights set:", recSubWeights);
+      localStorage.setItem('assessment_weights', JSON.stringify(recCatWeights));
 
-      setStep('weight-adjustment');
-      setLoading(false);
+      setStep('weight-adjustment'); // Move to the adjustment step
 
-    } catch (err: unknown) {
+    } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
-      console.error("Error fetching/setting recommended weights:", error);
-      toast({
-        title: "Weight Recommendation Error",
-        description: error.message || "Could not get weight recommendations. Using default equal weights.",
-        variant: "destructive",
-      });
-      try {
-        const questionnaireStructure = await fetchQuestionnaire(assessmentType);
-        if (questionnaireStructure && questionnaireStructure[assessmentType]) {
-          const initialSubWeights = initializeDefaultSubcategoryWeights(questionnaireStructure[assessmentType]);
-          setSubcategoryWeights(initialSubWeights);
-          setWeights(convertSubcategoryToCategory(initialSubWeights));
-          localStorage.setItem('subcategory_weights', JSON.stringify(initialSubWeights));
-          localStorage.setItem('assessment_weights', JSON.stringify(convertSubcategoryToCategory(initialSubWeights)));
-        } else {
-          setWeights({});
-          setSubcategoryWeights({});
-        }
-      } catch (fetchError) {
-        console.error("Fallback weight initialization failed:", fetchError);
-        setWeights({});
-        setSubcategoryWeights({});
+      console.error("Error setting up recommended weights:", error);
+      toast({ title: "Weight Setup Error", description: error.message, variant: "destructive" });
+      // Fallback: try initializing truly default weights without structure fetch if possible
+      setRecommendedSubcategoryWeights({}); setRecommendedWeights({});
+      setSubcategoryWeights({}); setWeights({});
+      setStep('weight-adjustment'); // Still go to adjustment, but might be empty
       } finally {
-        setStep('weight-adjustment');
         setLoading(false);
-      }
     }
   };
 
-  // --- Helper Functions ---
-
-  const convertSubcategoryToCategory = (subWeights: SubcategoryWeights): CategoryWeights => {
-    const catWeights: CategoryWeights = {};
-    for (const category in subWeights) {
-      catWeights[category] = Object.values(subWeights[category] || {}).reduce((sum, weight) => sum + (weight || 0), 0);
-      catWeights[category] = parseFloat(catWeights[category].toFixed(1));
-    }
-    return catWeights;
-  };
-
-  const initializeDefaultSubcategoryWeights = (data: Record<string, any>): SubcategoryWeights => {
-    const categories = Object.keys(data);
-    const categoryCount = categories.length;
-    if (categoryCount === 0) return {};
-
-    const equalCategoryWeight = 100 / categoryCount;
-    const subWeights: SubcategoryWeights = {};
-
-    categories.forEach(category => {
-      subWeights[category] = {};
-      const categoryData = data[category];
-      const subcategories = (typeof categoryData === 'object' && !Array.isArray(categoryData) && categoryData !== null)
-        ? Object.keys(categoryData)
-        : [category];
-      const subcategoryCount = subcategories.length;
-
-      if (subcategoryCount > 0) {
-        const equalSubWeight = equalCategoryWeight / subcategoryCount;
-        subcategories.forEach(subcat => {
-          subWeights[category][subcat] = parseFloat(equalSubWeight.toFixed(1));
-        });
-      } else {
-        subWeights[category][category] = parseFloat(equalCategoryWeight.toFixed(1));
-      }
-    });
-
-    return subWeights;
-  };
-
-  // Update the toast variant type
-  const showToast = (title: string, description: string, variant: "default" | "destructive" = "default") => {
-    toast({
-      title,
-      description,
-      variant,
-    });
-  };
-
-  // Update the prepareSubcategoryResponses function
-  const prepareSubcategoryResponses = (): ResponsesBySubcategory => {
-    const responsesBySub: ResponsesBySubcategory = {};
-    if (!questionnaire || !questionnaire[assessmentType] || !questions) {
-      console.error("Cannot prepare subcategory responses: Missing questionnaire or questions data.");
-      return {};
-    }
-
-    const assessmentData = questionnaire[assessmentType];
-
-    for (const category in assessmentData) {
-      if (!assessmentData.hasOwnProperty(category)) continue;
-      if (!responsesBySub[category]) responsesBySub[category] = {};
-
-      const categoryQuestions = questions[category] || [];
-      let questionIndexOffset = 0;
-
-      const categoryStructure = assessmentData[category];
-
-      // Handle both array and object structures
-      if (Array.isArray(categoryStructure)) {
-        // If categoryStructure is an array, treat it as direct questions
-        const subcategoryName = category;
-        responsesBySub[category][subcategoryName] = categoryQuestions.map(q => ({
-          question: q.question,
-          answer: q.answer === null || q.answer === undefined ? 0 : q.answer
-        }));
-      } else if (typeof categoryStructure === 'object' && categoryStructure !== null) {
-        // If categoryStructure is an object, it contains subcategories
-        Object.entries(categoryStructure).forEach(([subcategory, questionsArray]) => {
-          if (Array.isArray(questionsArray)) {
-            const numQuestionsInSub = questionsArray.length;
-            const endIndex = questionIndexOffset + numQuestionsInSub;
-            
-            const subResponses = categoryQuestions.slice(questionIndexOffset, endIndex).map(q => ({
-              question: q.question,
-              answer: q.answer === null || q.answer === undefined ? 0 : q.answer
-            }));
-
-            responsesBySub[category][subcategory] = subResponses;
-            questionIndexOffset = endIndex;
-          }
-        });
-      }
-    }
-    return responsesBySub;
-  };
 
   // --- Event Handlers ---
 
   const handleCompanyInfoSubmit = async (info: CompanyInfo) => {
     setCompanyInfo(info);
-    setLoading(true); // Show loading while processing/fetching weights
-
+    setLoading(true);
     try {
       localStorage.setItem('company_info', JSON.stringify(info));
-      await fetchRecommendedWeights(info); // Fetch weights and move to next step
-      // setLoading(false) and setStep are handled within fetchRecommendedWeights
+      await fetchRecommendedWeights(info); // Fetches recommendations, sets initial weights, moves step
     } catch (error) {
       console.error("Error processing company info submission:", error);
-      toast({
-        title: "Error",
-        description: "Failed to process company profile. Please try again.",
-        variant: "destructive",
-      });
-      setLoading(false); // Ensure loading stops on error
-      setStep('company-info'); // Stay on company info step on error
+      toast({ title: "Error", description: "Failed to process company profile.", variant: "destructive" });
+      setLoading(false);
+      setStep('company-info'); // Stay on this step on error
     }
   };
 
-  const handleWeightsChange = (newWeights: CategoryWeights) => {
-     // This might not be directly used if only SubcategoryWeightAdjustment is present
-     console.log("Category weights changed (likely derived from subcategory):", newWeights);
-     setWeights(newWeights);
-     // Note: Persisting should happen in handleSubcategoryWeightsChange or on submit/save
-  };
-
-  const handleSubcategoryWeightsChange = (newWeights: SubcategoryWeights) => {
-    // Create a copy of the new weights to modify
-    const updatedWeights = { ...newWeights };
-    
-    // Process each category
-    Object.keys(updatedWeights).forEach(category => {
-      const categoryWeights = updatedWeights[category];
-      const subcategories = Object.keys(categoryWeights);
-      const lockedSubcategories = subcategories.filter(sub => lockedCategories[`${category}-${sub}`]);
-      const unlockedSubcategories = subcategories.filter(sub => !lockedCategories[`${category}-${sub}`]);
-      
-      // Calculate total weight of locked subcategories
-      const lockedTotal = lockedSubcategories.reduce((sum, sub) => sum + (categoryWeights[sub] || 0), 0);
-      
-      // If there are unlocked subcategories, distribute remaining weight among them
-      if (unlockedSubcategories.length > 0) {
-        const remainingWeight = 100 - lockedTotal;
-        const weightPerUnlocked = remainingWeight / unlockedSubcategories.length;
-        
-        // Distribute remaining weight equally among unlocked subcategories
-        unlockedSubcategories.forEach(sub => {
-          categoryWeights[sub] = parseFloat(weightPerUnlocked.toFixed(1));
-        });
-      }
-      
-      // Ensure total is exactly 100
-      const total = Object.values(categoryWeights).reduce((sum, w) => sum + w, 0);
-      if (Math.abs(total - 100) > 0.1) {
-        const factor = 100 / total;
-        Object.keys(categoryWeights).forEach(sub => {
-          categoryWeights[sub] = parseFloat((categoryWeights[sub] * factor).toFixed(1));
-        });
-      }
-    });
-
-    setSubcategoryWeights(updatedWeights);
-    const derivedCategoryWeights = convertSubcategoryToCategory(updatedWeights);
+  // CORRECTED: Parent handler just updates state and saves - uses useCallback to prevent re-renders
+  const handleSubcategoryWeightsChange = useCallback((newWeights: SubcategoryWeights) => {
+    // Use setTimeout to avoid state updates during render
+    setTimeout(() => {
+      setSubcategoryWeights(newWeights);
+      const derivedCategoryWeights = convertSubcategoryToCategory(newWeights);
     setWeights(derivedCategoryWeights);
-    
-    // Save changes to localStorage
-    localStorage.setItem('subcategory_weights', JSON.stringify(updatedWeights));
+      try {
+        localStorage.setItem('subcategory_weights', JSON.stringify(newWeights));
     localStorage.setItem('assessment_weights', JSON.stringify(derivedCategoryWeights));
-  };
+      } catch (error) {
+        console.error("Error saving weights to localStorage:", error);
+        toast({ title: "Storage Error", description: "Could not save weight changes locally.", variant: "destructive" });
+      }
+    }, 0);
+  }, [setSubcategoryWeights, setWeights, toast]);
 
   const handleWeightsSubmit = () => {
-    // Save final weights (already saved on change, but this confirms the step)
-    localStorage.setItem('subcategory_weights', JSON.stringify(subcategoryWeights));
-    localStorage.setItem('assessment_weights', JSON.stringify(weights));
-    console.log("Weights adjustment submitted. Fetching questionnaires...");
-    fetchQuestionnaires(); // Fetch questions to proceed to the next step
+    // Weights are saved live via handleSubcategoryWeightsChange.
+    // This button confirms the user is done adjusting and wants to proceed.
+    console.log("Weights adjustment confirmed by user.");
+    fetchQuestionnaires(); // Fetch questions to proceed
   };
 
   const handleAnswerChange = (questionIndex: number, value: number) => {
     setQuestions(prev => {
-      if (!prev || !prev[currentCategory] || !prev[currentCategory][questionIndex]) {
-          console.error("Error updating answer: Invalid state structure for", currentCategory, questionIndex);
-          return prev; // Return previous state if structure is invalid
-      }
-      // Create deep copy to avoid mutation issues
+        // Create a deep copy to avoid direct state mutation
       const updatedQuestions = JSON.parse(JSON.stringify(prev)); 
+        if (updatedQuestions[currentCategory]?.[questionIndex]) {
       updatedQuestions[currentCategory][questionIndex].answer = value;
+        } else {
+            console.error(`Could not update answer for ${currentCategory} index ${questionIndex}. State might be inconsistent.`);
+        }
       return updatedQuestions;
     });
   };
 
-  // Update the handleNext function
+  // CORRECTED: Parent handler only updates lock state and saves
+  const toggleCategoryLock = (category: string, subcategory: string) => {
+    const lockKey = `${category}-${subcategory}`;
+    setLockedCategories(prev => {
+      const updatedLockState = { ...prev, [lockKey]: !prev[lockKey] };
+      try {
+        localStorage.setItem('locked_categories', JSON.stringify(updatedLockState));
+      } catch (error) {
+          console.error("Error saving locked categories to localStorage:", error);
+           toast({ title: "Storage Error", description: "Could not save lock state locally.", variant: "destructive" });
+      }
+      // NO weight recalculation here in the parent.
+      return updatedLockState;
+    });
+  };
+
   const handleNext = () => {
-    const currentQuestions = questions[currentCategory] || [];
-    const unanswered = currentQuestions.filter(q => q.answer === null || q.answer === undefined);
-    
+    const currentQuestionsList = questions[currentCategory] || [];
+    const unanswered = currentQuestionsList.filter(q => q.answer === null);
     if (unanswered.length > 0) {
-      showToast(
-        "Incomplete Section",
-        `Please answer all ${currentQuestions.length} questions in the "${currentCategory}" category before proceeding. (${unanswered.length} remaining)`,
-        "destructive"
-      );
+      toast({
+        title: "Incomplete Section",
+        description: `Please answer all ${currentQuestionsList.length} questions in "${currentCategory}" (${unanswered.length} remaining).`,
+        variant: "destructive",
+      });
       return;
     }
     
@@ -614,9 +543,10 @@ function AssessmentTypeContent({ params }: { params: { type: string } }): JSX.El
       const nextIndex = categoryIndex + 1;
       setCategoryIndex(nextIndex);
       setCurrentCategory(categories[nextIndex]);
-      setActiveTab("questions");
-      window.scrollTo(0, 0);
+      setActiveTab("questions"); // Ensure questions tab is active
+      window.scrollTo(0, 0); // Scroll to top
     } else {
+      // Last category, prepare for submission
       handleSubmit();
     }
   };
@@ -626,193 +556,121 @@ function AssessmentTypeContent({ params }: { params: { type: string } }): JSX.El
       const prevIndex = categoryIndex - 1;
       setCategoryIndex(prevIndex);
       setCurrentCategory(categories[prevIndex]);
-      setActiveTab("questions"); // Switch back to questions tab
-      window.scrollTo(0, 0); // Scroll to top
+      setActiveTab("questions");
+      window.scrollTo(0, 0);
     }
   };
 
-  const toggleCategoryLock = (category: string, subcategory: string) => {
-    const lockKey = `${category}-${subcategory}`;
-    setLockedCategories(prev => {
-      const updated = { ...prev, [lockKey]: !prev[lockKey] };
-      localStorage.setItem('locked_categories', JSON.stringify(updated));
-      
-      // Recalculate weights when toggling locks
-      const updatedWeights = { ...subcategoryWeights };
-      const categoryWeights = updatedWeights[category];
-      if (categoryWeights) {
-        const subcategories = Object.keys(categoryWeights);
-        const lockedSubcategories = subcategories.filter(sub => updated[`${category}-${sub}`]);
-        const unlockedSubcategories = subcategories.filter(sub => !updated[`${category}-${sub}`]);
-        
-        // Calculate total weight of locked subcategories
-        const lockedTotal = lockedSubcategories.reduce((sum, sub) => sum + (categoryWeights[sub] || 0), 0);
-        
-        // Distribute remaining weight among unlocked subcategories
-        if (unlockedSubcategories.length > 0) {
-          const remainingWeight = 100 - lockedTotal;
-          const weightPerUnlocked = remainingWeight / unlockedSubcategories.length;
-          
-          unlockedSubcategories.forEach(sub => {
-            categoryWeights[sub] = parseFloat(weightPerUnlocked.toFixed(1));
-          });
-        }
-        
-        // Ensure total is exactly 100
-        const total = Object.values(categoryWeights).reduce((sum, w) => sum + w, 0);
-        if (Math.abs(total - 100) > 0.1) {
-          const factor = 100 / total;
-          Object.keys(categoryWeights).forEach(sub => {
-            categoryWeights[sub] = parseFloat((categoryWeights[sub] * factor).toFixed(1));
-          });
-        }
-        
-        setSubcategoryWeights(updatedWeights);
-        const derivedCategoryWeights = convertSubcategoryToCategory(updatedWeights);
-        setWeights(derivedCategoryWeights);
-        
-        // Save updated weights
-        localStorage.setItem('subcategory_weights', JSON.stringify(updatedWeights));
-        localStorage.setItem('assessment_weights', JSON.stringify(derivedCategoryWeights));
-      }
-      
-      return updated;
-    });
-  };
-
-  // --- Main Submission Logic (FIXED) ---
+  // --- Main Submission Logic ---
   const handleSubmit = async () => {
-    try {
-      if (!companyInfo || !assessmentType) {
-        throw new Error("Missing required information");
-      }
-
-      const categoryResponses: CategoryResponse[] = Object.entries(questions).map(([category, responses]) => ({
-        category,
-        responses: responses.map(q => ({
+     if (!companyInfo || !assessmentType || Object.keys(questions).length === 0 || !user) {
+       toast({ title: "Submission Error", description: "Missing required information (Company Info, User, or Questions). Cannot submit.", variant: "destructive" });
+       setSubmitting(false);
+       return;
+     }
+     setSubmitting(true);
+     try {
+       // Format payload according to API specification
+       const categoryResponses = Object.entries(questions).map(([category, qList]) => ({
+           category: category,
+           weight: weights[category] ?? 0,
+           responses: qList.map(q => ({
           question: q.question,
-          answer: q.answer || 0
-        })),
-        weight: weights[category] || 0,
-        subcategoryResponses: Object.entries(subcategoryWeights[category] || {}).map(([subcategory, weight]) => ({
-          subcategory,
-          weight,
-          responses: responses.map(q => ({
-            question: q.question,
-            answer: q.answer || 0
-          }))
+               answer: q.answer ?? 0 // Default unanswered to 0
         }))
       }));
 
-      const payload: AssessmentSubmission = {
+       const payload = {
         assessmentType,
-        companyInfo,
-        userId: user?.uid || "",
-        categoryResponses,
-        finalWeights: weights,
-        finalSubcategoryWeights: subcategoryWeights
+         categoryResponses
       };
 
       console.log("Submitting assessment payload:", JSON.stringify(payload, null, 2));
-
       const result = await submitAssessment(payload);
-      console.log("Assessment submitted successfully. API Result:", result);
+       console.log("Assessment submitted successfully:", result);
       
       try {
+            // Save result for immediate display on results page
         localStorage.setItem(`assessment_result_${assessmentType}`, JSON.stringify(result));
-        localStorage.setItem(`subcategory_weights_${assessmentType}`, JSON.stringify(subcategoryWeights));
-        console.log("Result and final weights saved to localStorage.");
       } catch (storageError) {
-        console.error("Error saving results/weights to localStorage:", storageError);
-        toast({
-          title: "Storage Warning",
-          description: "Could not save assessment results locally. Your results were submitted, but might not be immediately visible if you refresh.",
-          variant: "destructive",
-        });
-      }
+            console.error("Error saving results to localStorage:", storageError);
+            // Don't block navigation, but warn user
+            toast({ title: "Storage Warning", description: "Could not save results locally for instant view.", variant: "default" });
+        }
 
+       // Clear specific assessment data from localStorage after successful submission
+       localStorage.removeItem('subcategory_weights'); // Clear general weights
+       localStorage.removeItem('assessment_weights');
+       localStorage.removeItem('locked_categories');
+       // Keep company_info if doing multi-assessment, clear otherwise or at the end
+
+       // Handle navigation
       if (isDoingAllAssessments) {
         const nextIndex = currentAssessmentIndex + 1;
         if (nextIndex < allAssessmentTypes.length) {
-          console.log(`Multi-assessment: Moving to next assessment: ${allAssessmentTypes[nextIndex]}`);
+           // Move to next assessment
           localStorage.setItem('current_assessment_index', nextIndex.toString());
           router.replace(`/assessment/${encodeURIComponent(allAssessmentTypes[nextIndex])}`);
+           // Don't clear company_info yet
         } else {
-          console.log("Multi-assessment: All assessments completed. Cleaning up and navigating to dashboard.");
+           // All assessments done
+           toast({ title: "All Assessments Completed!", description: "Navigating to dashboard.", variant: "default" });
           localStorage.removeItem('doing_all_assessments');
           localStorage.removeItem('current_assessment_index');
           localStorage.removeItem('assessment_types');
-          localStorage.removeItem('company_info');
-          localStorage.removeItem('subcategory_weights');
-          localStorage.removeItem('assessment_weights');
-          localStorage.removeItem('locked_categories');
+           localStorage.removeItem('company_info'); // Clear info now
           router.replace('/dashboard');
         }
       } else {
-        console.log(`Single assessment completed. Navigating to results page for ${assessmentType}`);
-        localStorage.removeItem('company_info');
-        localStorage.removeItem('subcategory_weights');
-        localStorage.removeItem('assessment_weights');
-        localStorage.removeItem('locked_categories');
+         // Single assessment done
+         localStorage.removeItem('company_info'); // Clear info
         router.replace(`/results/${encodeURIComponent(assessmentType)}`);
       }
 
-    } catch (err: unknown) {
+     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       console.error("Error submitting assessment:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to submit assessment",
-        variant: "destructive"
-      });
-    }
+       toast({ title: "Submission Error", description: error.message, variant: "destructive" });
+       setSubmitting(false); // Allow retry
+     }
+     // No need to setSubmitting(false) on success because we navigate away
   };
 
-  // --- Conditional Rendering based on Step / Loading / Error ---
 
-  // Loading State (Initial Load)
-  if (loading && step !== 'company-info' && step !== 'weight-adjustment') { // Show loading only if not on info/weight steps already
+  // --- Render Logic ---
+
+  // Initial Loading Screen (if not on company-info step)
+  if (loading && step !== 'company-info') {
     return (
       <div className="container mx-auto px-4 py-12 flex items-center justify-center min-h-[calc(100vh-200px)]">
         <div className="text-center">
           <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-lg font-medium">Loading Assessment...</p>
-          <p className="text-sm text-muted-foreground mt-2">Fetching questions and configuration for {assessmentType}.</p>
+          <p className="text-lg font-medium">Loading...</p>
+          <p className="text-sm text-muted-foreground mt-2">Preparing {assessmentType} assessment.</p>
         </div>
       </div>
     );
   }
 
-  // Error State (Loading Failed)
+  // Loading Error Screen
   if (loadingError) {
     return (
       <div className="container mx-auto px-4 py-12 flex items-center justify-center min-h-[calc(100vh-200px)]">
         <Card className="w-full max-w-lg text-center bg-destructive/10 border-destructive">
-            <CardHeader>
-                <CardTitle className="text-destructive">Error Loading Assessment</CardTitle>
-            </CardHeader>
+             <CardHeader><CardTitle className="text-destructive">Error Loading Assessment</CardTitle></CardHeader>
             <CardContent>
                  <p className="mb-4">{loadingError}</p>
-                 <p className="text-sm mb-4 text-muted-foreground">Could not load the required data. The server might be temporarily unavailable or there could be a configuration issue.</p>
+                  <p className="text-sm mb-4 text-muted-foreground">Could not load required data.</p>
             </CardContent>
             <CardFooter className="flex justify-center gap-4">
-                 <Button
-                   variant="outline"
-                   onClick={() => window.location.reload()} // Simple refresh might work
-                 >
-                   <ArrowLeft className="mr-2 h-4 w-4"/> Try Again
-                 </Button>
-                 <Button
-                   variant="secondary"
-                   onClick={() => router.push("/")} // Go to home/dashboard
-                 >
-                   Go Home
-                 </Button>
+                  <Button variant="outline" onClick={() => window.location.reload()}> Try Again </Button>
+                  <Button variant="secondary" onClick={() => router.push("/")}> Go Home </Button>
             </CardFooter>
         </Card>
       </div>
     );
   }
+
 
   // Step: Company Info
   if (step === 'company-info') {
@@ -820,8 +678,7 @@ function AssessmentTypeContent({ params }: { params: { type: string } }): JSX.El
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-3xl mx-auto">
           <h1 className="text-3xl font-bold text-center mb-8">Company Profile</h1>
-          <p className="text-center text-muted-foreground mb-6">Please provide some details about the company being assessed.</p>
-          {/* Pass initialData if editing */}
+          <p className="text-center text-muted-foreground mb-6">Provide details about the company being assessed.</p>
           <CompanyInfoForm onSubmit={handleCompanyInfoSubmit} loading={loading} initialData={companyInfo} />
         </div>
       </div>
@@ -830,63 +687,62 @@ function AssessmentTypeContent({ params }: { params: { type: string } }): JSX.El
 
   // Step: Weight Adjustment
   if (step === 'weight-adjustment') {
+     // Ensure categories are available for the adjustment component
+     const adjustmentCategories = Object.keys(subcategoryWeights);
     return (
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-3xl font-bold text-center mb-2">Adjust Assessment Weights</h1>
           <p className="text-center text-muted-foreground mb-8">
-            {companyInfo?.name ? `Based on ${companyInfo.name}'s profile, we recommend the weights below.` : 'Customize the importance of each category and subcategory.'} Review and adjust as needed.
+            Review and adjust the importance of each category and subcategory. Total must equal 100% per category group implicitly.
           </p>
-          {/* Ensure SubcategoryWeightAdjustment handles potential empty weights gracefully */}
           <SubcategoryWeightAdjustment
             weights={subcategoryWeights}
-            recommendedWeights={recommendedSubcategoryWeights} // Pass recommendations
-            onWeightsChange={handleSubcategoryWeightsChange} // Pass handler
-            onSubmit={handleWeightsSubmit} // Pass handler for 'Confirm Weights' button
-            loading={loading} // Pass loading state if needed inside
-            lockedCategories={lockedCategories} // Pass lock state
-            onToggleLock={(category, subcategory) => toggleCategoryLock(category, subcategory)} // Pass lock toggle handler
-            categories={categories} // Pass actual categories from questionnaire
+            recommendedWeights={recommendedSubcategoryWeights}
+            onWeightsChange={handleSubcategoryWeightsChange} // CORRECTED handler
+            onSubmit={handleWeightsSubmit}
+            loading={loading} // Pass loading state if needed
+            lockedCategories={lockedCategories}
+            onToggleLock={toggleCategoryLock} // CORRECTED handler
+            // Pass the categories derived from the current weights state
+            categories={adjustmentCategories}
           />
         </div>
       </div>
     );
   }
 
-  // --- Step: Questions (Main Assessment UI) ---
-  // Ensure we have categories and the current category exists before rendering
-  if (!categories || categories.length === 0 || !currentCategory || !questions[currentCategory]) {
-     // This case should ideally be caught by loading/error states, but acts as a safeguard
+
+  // Step: Questions (Main Assessment UI)
+  // Safeguard: Ensure necessary data is present before rendering questions UI
+   if (step !== 'questions' || !categories.length || !currentCategory || !questions[currentCategory]) {
      return (
        <div className="container mx-auto px-4 py-12 text-center">
-         <p className="text-lg text-muted-foreground">Assessment data is not fully loaded. Please wait or try refreshing.</p>
-         <Button onClick={() => window.location.reload()} className="mt-4">Refresh Page</Button>
+               <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+               <p className="text-muted-foreground">Preparing questions...</p>
+               {/* Add a button to retry fetching if stuck */}
+               <Button onClick={fetchQuestionnaires} variant="outline" className="mt-4">Retry Load</Button>
        </div>
      );
   }
   
   return (
     <div className="container mx-auto px-4 py-8">
-      {/* Header Section */}
+      {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">{assessmentType} Assessment</h1>
-        {/* Subtitle with scale */}
         <p className="text-muted-foreground mb-4">
-          Please rate your agreement with the following statements on a scale of 1 (Strongly Disagree) to 4 (Strongly Agree).
+          Rate your agreement: 1 (Strongly Disagree) to 4 (Strongly Agree).
         </p>
-
-        {/* Multi-Assessment Indicator */}
         {isDoingAllAssessments && allAssessmentTypes.length > 0 && (
           <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 text-blue-700 dark:text-blue-300 rounded-md p-3 mb-4 flex items-center gap-3 shadow-sm">
             <Info className="h-5 w-5 flex-shrink-0" />
             <div>
               <p className="font-semibold">Completing All Pillars: Assessment {currentAssessmentIndex + 1} of {allAssessmentTypes.length}</p>
-              <p className="text-sm">You are currently assessing: <span className="font-medium">{assessmentType}</span></p>
+              <p className="text-sm">Current: <span className="font-medium">{assessmentType}</span></p>
             </div>
           </div>
         )}
-        
-        {/* Progress Bar */}
         <div className="mb-2 flex justify-between text-sm font-medium">
           <span>Overall Progress</span>
           <span>{Math.round(progress)}%</span>
@@ -894,21 +750,33 @@ function AssessmentTypeContent({ params }: { params: { type: string } }): JSX.El
         <Progress value={progress} className="h-2 w-full" />
       </div>
       
-      {/* Tabs for Questions / Weights */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full mb-6">
-        <TabsList className="grid w-full grid-cols-2 mb-4">
-          <TabsTrigger value="questions">Questions ({categoryIndex + 1}/{categories.length})</TabsTrigger>
-          <TabsTrigger value="weights">Category Weights</TabsTrigger>
-        </TabsList>
-        
-        {/* Questions Tab Content */}
-        <TabsContent value="questions">
+      {/* Simplified Tabs */}
+      <div className="w-full mb-6">
+        <div className="grid w-full grid-cols-2 mb-4 rounded-lg overflow-hidden border">
+          <button 
+            onClick={() => setActiveTab("questions")}
+            className={`py-2 px-4 text-center ${activeTab === "questions" 
+              ? "bg-primary text-primary-foreground" 
+              : "bg-background hover:bg-muted"}`}
+          >
+            Questions ({categoryIndex + 1}/{categories.length})
+          </button>
+          <button 
+            onClick={() => setActiveTab("weights")}
+            className={`py-2 px-4 text-center ${activeTab === "weights" 
+              ? "bg-primary text-primary-foreground" 
+              : "bg-background hover:bg-muted"}`}
+          >
+            Category Weights
+          </button>
+        </div>
+
+        {/* Questions Tab */}
+        {activeTab === "questions" && (
           <Card className="shadow-md">
             <CardHeader>
               <CardTitle className="text-xl md:text-2xl">{currentCategory}</CardTitle>
-              <CardDescription>
-                Category {categoryIndex + 1} of {categories.length}. Please answer all questions below.
-              </CardDescription>
+              <CardDescription>Category {categoryIndex + 1} of {categories.length}.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-8">
@@ -922,20 +790,12 @@ function AssessmentTypeContent({ params }: { params: { type: string } }): JSX.El
                       className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-6 pt-2"
                     >
                       {[
-                        { value: 1, label: "Strongly Disagree" },
-                        { value: 2, label: "Disagree" },
-                        { value: 3, label: "Agree" },
-                        { value: 4, label: "Strongly Agree" }
-                      ].map((option) => (
+                        { value: 1, label: "Strongly Disagree" }, { value: 2, label: "Disagree" },
+                        { value: 3, label: "Agree" }, { value: 4, label: "Strongly Agree" }
+                      ].map(option => (
                         <div key={option.value} className="flex items-center space-x-2">
-                          <RadioGroupItem 
-                            value={option.value.toString()} 
-                            id={`q-${currentCategory}-${index}-${option.value}`} 
-                            aria-label={`${q.question} - ${option.label}`}
-                          />
-                          <Label htmlFor={`q-${currentCategory}-${index}-${option.value}`} className="cursor-pointer font-normal">
-                            {option.label}
-                          </Label>
+                          <RadioGroupItem value={option.value.toString()} id={`q-${currentCategory}-${index}-${option.value}`} aria-label={`${q.question} - ${option.label}`}/>
+                          <Label htmlFor={`q-${currentCategory}-${index}-${option.value}`} className="cursor-pointer font-normal">{option.label}</Label>
                         </div>
                       ))}
                     </RadioGroup>
@@ -944,57 +804,30 @@ function AssessmentTypeContent({ params }: { params: { type: string } }): JSX.El
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-        
-        {/* Weights Tab Content */}
-        <TabsContent value="weights">
-          {/* Use the SubcategoryWeightAdjustment component here for consistency */}
-          {/* This provides both category overview and subcategory detail */}
+        )}
+
+        {/* Weights Tab */}
+        {activeTab === "weights" && (
           <SubcategoryWeightAdjustment
              weights={subcategoryWeights}
              onWeightsChange={handleSubcategoryWeightsChange}
              lockedCategories={lockedCategories}
-             onToggleLock={(category, subcategory) => toggleCategoryLock(category, subcategory)}
-             // Pass categories to ensure it displays correctly
+            onToggleLock={toggleCategoryLock}
              categories={categories} 
-             // No onSubmit needed here, changes save live
-             // No recommended weights needed here unless you want comparison view
+            recommendedWeights={recommendedSubcategoryWeights}
           />
-        </TabsContent>
-      </Tabs>
+        )}
+      </div>
       
-      {/* Navigation Buttons */}
+      {/* Navigation */}
       <div className="flex justify-between items-center mt-8 pt-4 border-t">
-        <Button 
-          variant="outline" 
-          onClick={handlePrevious}
-          disabled={categoryIndex === 0 || submitting}
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Previous
+        <Button variant="outline" onClick={handlePrevious} disabled={categoryIndex === 0 || submitting}>
+          <ArrowLeft className="mr-2 h-4 w-4" /> Previous
         </Button>
-        
-        <Button 
-          onClick={handleNext}
-          disabled={submitting || loadingError !== null}
-          className="min-w-[120px] relative"
-        >
-          {submitting ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Processing...
-            </>
-          ) : categoryIndex < categories.length - 1 ? (
-            <>
-              Next Category
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </>
-          ) : (
-            <>
-              Submit Assessment
-              <CheckCircle className="ml-2 h-4 w-4" />
-            </>
-          )}
+        <Button onClick={handleNext} disabled={submitting || loadingError !== null} className="min-w-[120px]">
+          {submitting ? (<> <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing... </>)
+           : categoryIndex < categories.length - 1 ? (<> Next Category <ArrowRight className="ml-2 h-4 w-4" /> </>)
+           : (<> Submit Assessment <CheckCircle className="ml-2 h-4 w-4" /> </>)}
         </Button>
       </div>
     </div>
