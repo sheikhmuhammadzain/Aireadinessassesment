@@ -85,13 +85,13 @@ export default function Header() {
   
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background">
-      <div className="container flex h-16 items-center">
+      <div className="container flex h-16 items-center justify-between max-w-6xl mx-auto px-4">
         <div className="flex gap-6 md:gap-10">
           <Link href="/" className="flex items-center space-x-2">
             <span className="hidden font-bold sm:inline-block">
               AI Readiness
             </span>
-        </Link>
+          </Link>
           <nav className="hidden gap-6 md:flex">
             <Link 
               href="/" 

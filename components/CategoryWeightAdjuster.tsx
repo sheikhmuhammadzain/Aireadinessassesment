@@ -268,6 +268,13 @@ export function CategoryWeightAdjuster({
                 Weights do not sum to 100%.
               </p>
             )}
+            
+            {/* Instructions for weight adjustment */}
+            <div className="mt-4 pt-4 border-t border-border/50">
+              <p className="text-sm text-muted-foreground">
+                Adjust the relative importance of each category. Higher percentages indicate greater importance in your overall assessment.
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -275,9 +282,9 @@ export function CategoryWeightAdjuster({
       {/* Submit button */}
       {onSubmit && (
         <div className="flex justify-end mt-6 pt-4 border-t">
-          <Button onClick={onSubmit} disabled={loading}>
+          <Button onClick={onSubmit} disabled={loading || !isBalanced}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Confirm Weights & Proceed
+            Continue to Questions
           </Button>
         </div>
       )}

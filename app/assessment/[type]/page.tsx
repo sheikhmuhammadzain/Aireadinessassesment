@@ -443,7 +443,24 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
       localStorage.setItem('subcategory_weights', JSON.stringify(recSubWeights));
       localStorage.setItem('assessment_weights', JSON.stringify(recCatWeights));
 
-      setStep('weight-adjustment'); // Move to the adjustment step
+      // Check if all categories have only one subcategory (thus nothing to adjust)
+      let allCategoriesHaveOnlyOneSubcategory = true;
+      
+      for (const category in recSubWeights) {
+        const subcategoryCount = Object.keys(recSubWeights[category]).length;
+        if (subcategoryCount > 1) {
+          allCategoriesHaveOnlyOneSubcategory = false;
+          break;
+        }
+      }
+      
+      // If all categories have only one subcategory, skip the weight adjustment step
+      if (allCategoriesHaveOnlyOneSubcategory) {
+        console.log("Skipping weight adjustment step as all categories have only one subcategory");
+        fetchQuestionnaires(); // Go directly to the questions step
+      } else {
+        setStep('weight-adjustment'); // Only show adjustment UI if there's something to adjust
+      }
 
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
@@ -728,8 +745,8 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
   
   return (
     <div className="container mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="mb-8">
+      {/* Header - Add max-width and center alignment */}
+      <div className="mb-8 max-w-6xl mx-auto">
         <h1 className="text-3xl font-bold mb-2">{assessmentType} Assessment</h1>
         <p className="text-muted-foreground mb-4">
           Rate your agreement: 1 (Strongly Disagree) to 4 (Strongly Agree).
@@ -750,8 +767,8 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
         <Progress value={progress} className="h-2 w-full" />
       </div>
       
-      {/* Simplified Tabs */}
-      <div className="w-full mb-6">
+      {/* Simplified Tabs - Also add consistent max-width */}
+      <div className="w-full mb-6 max-w-6xl mx-auto">
         <div className="grid w-full grid-cols-2 mb-4 rounded-lg overflow-hidden border">
           <button 
             onClick={() => setActiveTab("questions")}
@@ -821,8 +838,8 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
         )}
       </div>
       
-      {/* Navigation */}
-      <div className="flex justify-between items-center mt-8 pt-4 border-t">
+      {/* Navigation - Also add consistent max-width */}
+      <div className="flex justify-between items-center mt-8 pt-4 border-t max-w-6xl mx-auto">
         <Button variant="outline" onClick={handlePrevious} disabled={categoryIndex === 0 || submitting}>
           <ArrowLeft className="mr-2 h-4 w-4" /> Previous
         </Button>
