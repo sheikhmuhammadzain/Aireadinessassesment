@@ -149,8 +149,10 @@ export function AIRecommendations({
                 }));
               } else if (Array.isArray(aiRecs)) {
                 if (aiRecs.length > 0 && typeof aiRecs[0] === 'string') {
-                  parsedRecs = aiRecs.map(rec => ({
-                    title: rec as string,
+                  // Cast the entire array as string[] first
+                  const stringArray = aiRecs as string[];
+                  parsedRecs = stringArray.map(rec => ({
+                    title: rec,
                     details: `Detailed guidance for implementing "${rec}" in your organization.`
                   }));
                 } else if (aiRecs.length > 0 && typeof aiRecs[0] === 'object' && 'title' in aiRecs[0] && 'details' in aiRecs[0]) {
