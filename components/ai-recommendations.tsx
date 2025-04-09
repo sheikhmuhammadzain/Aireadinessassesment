@@ -147,11 +147,21 @@ export function AIRecommendations({
                   title: line,
                   details: `Detailed guidance for implementing "${line}" in your organization.`
                 }));
-              } else if (Array.isArray(aiRecs) && typeof aiRecs[0] === 'string') {
-                parsedRecs = (aiRecs as string[]).map(rec => ({
-                  title: rec,
-                  details: `Detailed guidance for implementing "${rec}" in your organization.`
-                }));
+              } else if (Array.isArray(aiRecs)) {
+                if (aiRecs.length > 0 && typeof aiRecs[0] === 'string') {
+                  parsedRecs = aiRecs.map(rec => ({
+                    title: rec as string,
+                    details: `Detailed guidance for implementing "${rec}" in your organization.`
+                  }));
+                } else if (aiRecs.length > 0 && typeof aiRecs[0] === 'object' && 'title' in aiRecs[0] && 'details' in aiRecs[0]) {
+                  parsedRecs = aiRecs as RecommendationDetail[];
+                } else {
+                  console.error(`Unexpected type for recommendations: ${typeof aiRecs[0]}`);
+                  parsedRecs = [{
+                    title: "Unable to parse recommendations",
+                    details: "The AI-generated recommendations could not be properly formatted."
+                  }];
+                }
               } else {
                 console.error(`Unexpected type for recommendations: ${typeof aiRecs}`);
                 parsedRecs = [{
