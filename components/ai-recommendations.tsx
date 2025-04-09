@@ -68,7 +68,7 @@ export function AIRecommendations({
         
         // Verify the cached data matches the current categories
         const hasSameCategories = categories.every(cat => 
-          parsedRecommendations.some(rec => 
+          parsedRecommendations.some((rec: CategoryRecommendation) => 
             rec.category === cat.category && Math.abs(rec.score - cat.score) < 0.5
           )
         );
