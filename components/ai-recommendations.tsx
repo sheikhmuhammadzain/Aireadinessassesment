@@ -148,21 +148,45 @@ export function AIRecommendations({
                   details: `Detailed guidance for implementing "${line}" in your organization.`
                 }));
               } else if (Array.isArray(aiRecs)) {
-                if (aiRecs.length > 0 && typeof aiRecs[0] === 'string') {
-                  // Cast the entire array as string[] first
-                  const stringArray = aiRecs as string[];
-                  parsedRecs = stringArray.map(rec => ({
-                    title: rec,
-                    details: `Detailed guidance for implementing "${rec}" in your organization.`
-                  }));
-                } else if (aiRecs.length > 0 && typeof aiRecs[0] === 'object' && 'title' in aiRecs[0] && 'details' in aiRecs[0]) {
-                  parsedRecs = aiRecs as RecommendationDetail[];
+                if (aiRecs.length > 0) {
+                  if (typeof aiRecs[0] === 'string') {
+                    // Handle string array - safely
+                    parsedRecs = [];
+                    for (let i = 0; i < aiRecs.length; i++) {
+                      const item = aiRecs[i];
+                      if (typeof item === 'string') {
+                        parsedRecs.push({
+                          title: item,
+                          details: `Detailed guidance for implementing "${item}" in your organization.`
+                        });
+                      }
+                    }
+                  } else if (typeof aiRecs[0] === 'object' && aiRecs[0] !== null && 
+                             'title' in aiRecs[0] && 'details' in aiRecs[0]) {
+                    // Handle recommendation detail array - with proper type checking
+                    parsedRecs = [];
+                    for (let i = 0; i < aiRecs.length; i++) {
+                      const item = aiRecs[i];
+                      if (item && typeof item === 'object' && 
+                          'title' in item && 'details' in item &&
+                          typeof item.title === 'string' && 
+                          typeof item.details === 'string') {
+                        parsedRecs.push({
+                          title: item.title,
+                          details: item.details
+                        });
+                      }
+                    }
+                  } else {
+                    console.error(`Unexpected type for recommendations: ${typeof aiRecs[0]}`);
+                    parsedRecs = [{
+                      title: "Unable to parse recommendations",
+                      details: "The AI-generated recommendations could not be properly formatted."
+                    }];
+                  }
                 } else {
-                  console.error(`Unexpected type for recommendations: ${typeof aiRecs[0]}`);
-                  parsedRecs = [{
-                    title: "Unable to parse recommendations",
-                    details: "The AI-generated recommendations could not be properly formatted."
-                  }];
+                  // Empty array case
+                  parsedRecs = [];
                 }
               } else {
                 console.error(`Unexpected type for recommendations: ${typeof aiRecs}`);
