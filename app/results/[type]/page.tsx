@@ -5,7 +5,7 @@
   import { useRouter } from "next/navigation";
   import { Button } from "@/components/ui/button";
   import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-  import { ArrowLeft, Download, Home, Loader2, TrendingUp, FileText, Code, RefreshCw, BarChart2, Target, CheckCircle, AlertCircle, Info, List, Zap, Separator } from "lucide-react"; // Added more relevant icons
+  import { ArrowLeft, Download, Home, Loader2, TrendingUp, FileText, Code, RefreshCw, BarChart2, Target, CheckCircle, AlertCircle, Info, List, Zap } from "lucide-react"; // Added more relevant icons
   import { useToast } from "@/hooks/use-toast";
   import { AIRecommendations } from "@/components/ai-recommendations";
   // Assuming AIGapAnalysis is not used visually or is styled internally
@@ -18,6 +18,7 @@
   import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion"; // Keep if used, otherwise remove
   import jsPDF from 'jspdf';
   import html2canvas from 'html2canvas'; // Keep for functionality
+  import { Separator } from "@/components/ui/separator";
 
   // --- Functionality Interfaces and Types (Keep As Is) ---
   interface AssessmentResult {

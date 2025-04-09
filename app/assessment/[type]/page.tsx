@@ -32,7 +32,7 @@ import { ProtectedRoute } from "@/components/protected-route";
 import { useAuth } from "@/lib/auth-context";
 
 // Force dynamic to ensure data is always fresh
-export const dynamicConfig = "force-dynamic";
+export const dynamic = "force-dynamic";
 
 // --- Type Definitions ---
 // Interface for questions state within a category
