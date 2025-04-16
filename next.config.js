@@ -48,6 +48,7 @@ const nextConfig = {
   },
   // Handle API rewrites - Using the new working API URL
   async rewrites() {
+    // Use the same default URL as in our API client
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || 'http://103.18.20.205:8090';
     
     console.log(`Using API URL: ${apiUrl} for rewrites configuration`);
