@@ -69,12 +69,11 @@ interface AssessmentSubmission {
 
 // --- Main Page Component ---
 export default function AssessmentPage({ params }: { params: Promise<{ type: string }> }) {
-  // Unwrap params using React.use
+  // Use the use() hook to unwrap the Promise params
   const unwrappedParams = use(params);
-
+  
   return (
     <ProtectedRoute>
-      {/* Pass type directly */}
       <AssessmentTypeContent type={unwrappedParams.type} />
     </ProtectedRoute>
   );

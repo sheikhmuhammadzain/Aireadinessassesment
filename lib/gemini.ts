@@ -7,7 +7,7 @@ const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
 let genAI: any = null;
 
 try {
-  if (!apiKey) {
+if (!apiKey) {
     console.warn('NEXT_PUBLIC_GEMINI_API_KEY is not set in environment variables. Gemini features will be disabled.');
   } else {
     genAI = new GoogleGenerativeAI(apiKey);
@@ -157,6 +157,12 @@ function queueGeminiRequest(modelName: string, prompt: string): Promise<string> 
 
 export async function generateRecommendations(category: string, score: number) {
   try {
+    // If API key isn't set, immediately return fallback
+    if (!apiKey) {
+      console.log('No Gemini API key available, using fallback recommendations');
+      return generateFallbackRecommendations(category, score);
+    }
+    
     const prompt = `As an AI readiness expert, provide 4 specific, actionable, and detailed recommendations for improving the "${category}" category where the current score is ${score}%. 
 
 The recommendations should be:
@@ -188,86 +194,91 @@ Details: [2-3 sentences with detailed, actionable guidance]`;
     // Use the queuing mechanism
     const text = await queueGeminiRequest("gemini-2.0-flash-lite", prompt);
 
-    // Enhanced robust parsing with multiple approaches
-    let recommendations = [];
-    
-    // First approach: Try parsing by block of text (most reliable)
-    const blocks = text.split(/\n\s*\n/);
-    
-    for (const block of blocks) {
-      const titleMatch = block.match(/Title:\s*(.*?)(?:\n|$)/i);
-      const detailsMatch = block.match(/Details:\s*([\s\S]*?)(?=\n\s*Title:|\n\s*$|$)/i);
+    try {
+      // Enhanced robust parsing with multiple approaches
+      let recommendations = [];
       
-      if (titleMatch && detailsMatch) {
-        recommendations.push({
-          title: titleMatch[1].trim(),
-          details: detailsMatch[1].trim().replace(/\n/g, ' ')
-        });
-      }
-    }
-
-    // Second approach: If first approach yielded no results, try line-by-line parsing
-    if (recommendations.length === 0) {
-      const lines = text.split('\n');
-      let currentTitle = null;
+      // First approach: Try parsing by block of text (most reliable)
+      const blocks = text.split(/\n\s*\n/);
       
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
+      for (const block of blocks) {
+        const titleMatch = block.match(/Title:\s*(.*?)(?:\n|$)/i);
+        const detailsMatch = block.match(/Details:\s*([\s\S]*?)(?=\n\s*Title:|\n\s*$|$)/i);
         
-        if (line.toLowerCase().startsWith('title:')) {
-          currentTitle = line.substring(6).trim();
-        } else if (line.toLowerCase().startsWith('details:') && currentTitle) {
-          // Collect all lines until next "Title:" or end
-          let details = line.substring(8).trim();
-          let j = i + 1;
-          
-          while (j < lines.length && !lines[j].toLowerCase().startsWith('title:')) {
-            if (lines[j].trim()) {
-              details += ' ' + lines[j].trim();
-            }
-            j++;
-          }
-          
+        if (titleMatch && detailsMatch) {
           recommendations.push({
-            title: currentTitle,
-            details: details
+            title: titleMatch[1].trim(),
+            details: detailsMatch[1].trim().replace(/\n/g, ' ')
           });
-          
-          currentTitle = null;
         }
       }
-    }
-    
-    // Third approach: If no structured format is detected, create basic recommendations from text paragraphs
-    if (recommendations.length === 0 && text.length > 30) {
-      // Fall back to creating basic recommendations from paragraphs
-      const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim().length > 0);
-      
-      // Take up to 4 paragraphs and format them
-      for (let i = 0; i < Math.min(paragraphs.length, 4); i++) {
-        const para = paragraphs[i].trim();
+
+      // Second approach: If first approach yielded no results, try line-by-line parsing
+      if (recommendations.length === 0) {
+        const lines = text.split('\n');
+        let currentTitle = null;
         
-        // Create a basic title by taking first few words
-        const basicTitle = para.split(' ').slice(0, 5).join(' ') + '...';
-        
-        recommendations.push({
-          title: `Strategy ${i+1}: ${basicTitle}`,
-          details: para
-        });
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim();
+          
+          if (line.toLowerCase().startsWith('title:')) {
+            currentTitle = line.substring(6).trim();
+          } else if (line.toLowerCase().startsWith('details:') && currentTitle) {
+            // Collect all lines until next "Title:" or end
+            let details = line.substring(8).trim();
+            let j = i + 1;
+            
+            while (j < lines.length && !lines[j].toLowerCase().startsWith('title:')) {
+              if (lines[j].trim()) {
+                details += ' ' + lines[j].trim();
+              }
+              j++;
+            }
+            
+            recommendations.push({
+              title: currentTitle,
+              details: details
+            });
+            
+            currentTitle = null;
+          }
+        }
       }
-    }
+      
+      // Third approach: If no structured format is detected, create basic recommendations from text paragraphs
+      if (recommendations.length === 0 && text.length > 30) {
+        // Fall back to creating basic recommendations from paragraphs
+        const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+        
+        // Take up to 4 paragraphs and format them
+        for (let i = 0; i < Math.min(paragraphs.length, 4); i++) {
+          const para = paragraphs[i].trim();
+          
+          // Create a basic title by taking first few words
+          const basicTitle = para.split(' ').slice(0, 5).join(' ') + '...';
+          
+          recommendations.push({
+            title: `Strategy ${i+1}: ${basicTitle}`,
+            details: para
+          });
+        }
+      }
 
-    // Return the parsed recommendations (up to 4)
-    if (recommendations.length > 0) {
-      return recommendations.slice(0, 4);
+      // Return the parsed recommendations (up to 4)
+      if (recommendations.length > 0) {
+        return recommendations.slice(0, 4);
+      }
+      
+      // No recommendations parsed, use fallback
+      console.warn('Could not extract recommendations from text response - using fallback');
+      return generateFallbackRecommendations(category, score);
+    } catch (parseError) {
+      // If there's an error during parsing, log it and use fallback
+      console.error('Error parsing recommendations:', parseError);
+      return generateFallbackRecommendations(category, score);
     }
-
-    // All parsing methods failed, use fallback recommendations
-    console.warn('Could not extract recommendations from text response:', text);
-    throw new Error('Could not parse recommendations from model response');
   } catch (error) {
     console.error('Error generating recommendations:', error);
-    
     // Better fallback recommendations
     return generateFallbackRecommendations(category, score);
   }
@@ -377,11 +388,11 @@ Category Scores:
 
 Your analysis MUST include:
 1. An overall assessment of current maturity level
-2. Key strengths based on highest-scoring categories
-3. Primary improvement areas based on lowest-scoring categories
-4. Strategic recommendations that could have the most significant impact
-
-Keep the tone professional, constructive, and forward-looking.
+    2. Key strengths based on highest-scoring categories
+    3. Primary improvement areas based on lowest-scoring categories
+    4. Strategic recommendations that could have the most significant impact
+    
+    Keep the tone professional, constructive, and forward-looking.
 IMPORTANT: Provide ONLY the summary text, with no additional formatting or prefixes.`;
 
     // Use the queuing mechanism

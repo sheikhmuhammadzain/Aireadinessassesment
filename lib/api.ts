@@ -1,7 +1,10 @@
 import { AssessmentResponse, AssessmentResult, CompanyInfo, CategoryWeights, SubcategoryWeights } from "@/types";
 
-// Update API base URL at the top of the file
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://10.229.220.15:8070";
+// Use a proxy URL for API requests to avoid CORS issues
+// This points to our Next.js API route that will forward requests to the actual backend
+const USE_PROXY = true;
+const API_PROXY_URL = '/api/backend';
+const API_DIRECT_URL = process.env.NEXT_PUBLIC_API_URL || "http://103.18.20.205:8090";
 
 // Simple in-memory cache for API responses
 const apiCache = new Map<string, { data: any; timestamp: number }>();
@@ -48,14 +51,21 @@ async function cachedApiCall<T>(cacheKey: string, apiFn: () => Promise<T>): Prom
 }
 
 /**
- * Normalize URL to prevent double slash issues
+ * Create API URL using either direct backend URL or proxy URL
  * @param path API path (should start with a slash)
  * @returns Properly formatted URL
  */
-function normalizeUrl(path: string): string {
+function createApiUrl(path: string): string {
   // Ensure path starts with a slash
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  return `${API_BASE_URL}${normalizedPath}`;
+  
+  if (USE_PROXY) {
+    // When using proxy, we need to keep the full path after /api/backend
+    return `${API_PROXY_URL}${normalizedPath}`;
+  } else {
+    // When accessing directly, add path to backend URL
+    return `${API_DIRECT_URL}${normalizedPath}`;
+  }
 }
 
 /**
@@ -66,15 +76,17 @@ function normalizeUrl(path: string): string {
 export async function fetchQuestionnaire(slug: string) {
   return cachedApiCall(`questionnaire_${slug}`, async () => {
     try {
-      console.log(`Fetching questionnaire from ${API_BASE_URL}/questionnaire/${encodeURIComponent(slug)}`);
+      const apiUrl = createApiUrl(`/questionnaire/${encodeURIComponent(slug)}`);
+      console.log(`Fetching questionnaire from ${apiUrl}`);
       
       // Using fetch with better timeout handling
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
       
-      const response = await fetch(`/api/questionnaire/${encodeURIComponent(slug)}`, {
+      const response = await fetch(apiUrl, {
         signal: controller.signal,
         headers: {
+          'Accept': 'application/json',
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
         }
@@ -116,14 +128,16 @@ export async function fetchQuestionnaire(slug: string) {
 export async function fetchAllQuestionnaires() {
   return cachedApiCall('all_questionnaires', async () => {
     try {
-      console.log("Fetching all questionnaires");
+      const apiUrl = createApiUrl('/questionnaires');
+      console.log(`Fetching all questionnaires from ${apiUrl}`);
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
       
-      const response = await fetch("/api/questionnaires", {
+      const response = await fetch(apiUrl, {
         signal: controller.signal,
         headers: {
+          'Accept': 'application/json',
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
         }
@@ -174,9 +188,12 @@ export async function submitAssessment(payload: AssessmentResponse): Promise<Ass
     
     // Add a timeout to prevent hanging requests
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
     
-    const response = await fetch("/api/calculate-results", {
+    const apiUrl = createApiUrl('/calculate-results');
+    console.log(`Submitting to: ${apiUrl}`);
+    
+    const response = await fetch(apiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -206,33 +223,18 @@ export async function submitAssessment(payload: AssessmentResponse): Promise<Ass
         }
       }
       
-      console.error(`API error: ${errorMessage}`, errorDetail);
-      throw new Error(`Failed to submit assessment: ${errorMessage}`);
+      console.error(`API Error: ${errorMessage}`, errorDetail);
+      throw new Error(errorMessage);
     }
-
-    // If the API is down or returning unexpected data, provide a fallback result
-    try {
-      const result = await response.json();
-      
-      // Validate the result has the expected structure
-      if (!result || typeof result !== 'object' || !result.categoryScores) {
-        console.error("API returned invalid result structure:", result);
-        return generateFallbackResult(payload);
-      }
-      
-      return result;
-    } catch (jsonError) {
-      console.error("Error parsing JSON response:", jsonError);
-      return generateFallbackResult(payload);
-    }
+    
+    const result = await response.json();
+    return result;
   } catch (error) {
     console.error("Error submitting assessment:", error);
-    
-    // Handle timeout specifically
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Request timed out. The server might be down or slow to respond.');
+    // Provide more detailed error information
+    if (error instanceof Error) {
+      throw new Error(`Error submitting assessment: ${error.message}`);
     }
-    
     throw error;
   }
 }
@@ -352,9 +354,10 @@ export async function getRecommendations(assessmentType: string, category: strin
     const encodedType = encodeURIComponent(assessmentType);
     const encodedCategory = encodeURIComponent(category);
     
-    const response = await fetch(
-      normalizeUrl(`/recommendations/${encodedType}/${encodedCategory}?score=${score}`)
-    );
+    const apiUrl = createApiUrl(`/recommendations/${encodedType}/${encodedCategory}?score=${score}`);
+    console.log(`Fetching recommendations from: ${apiUrl}`);
+    
+    const response = await fetch(apiUrl);
     
     if (!response.ok) {
       const errorText = await response.text();
@@ -380,24 +383,28 @@ export async function getRecommendations(assessmentType: string, category: strin
  * This helps ensure data is ready when needed and in the correct format
  */
 export function prefetchCommonQuestionnaires() {
+  // Only run this on the client side
+  if (typeof window === 'undefined') return;
+  
   const commonTypes = ['AI Culture', 'AI Governance', 'AI Infrastructure', 'AI Strategy', 'AI Data', 'AI Talent'];
   
   console.log('Prefetching common questionnaire data');
   
   commonTypes.forEach(type => {
-    fetchQuestionnaire(type)
-      .then(data => {
-        console.log(`Successfully prefetched ${type} questionnaire data`);
-        // Optionally store in a global cache or localStorage for immediate access
-        try {
-          // Store preprocessed data structure in localStorage
-          if (typeof window !== 'undefined') {
+    // Use setTimeout to stagger requests and not block initial page load
+    setTimeout(() => {
+      fetchQuestionnaire(type)
+        .then(data => {
+          console.log(`Successfully prefetched ${type} questionnaire data`);
+          // Optionally store in a global cache or localStorage for immediate access
+          try {
+            // Store preprocessed data structure in localStorage
             localStorage.setItem(`prefetched_questionnaire_${type}`, JSON.stringify(data));
+          } catch (err) {
+            console.warn(`Could not cache ${type} in localStorage:`, err);
           }
-        } catch (err) {
-          console.warn(`Could not cache ${type} in localStorage:`, err);
-        }
-      })
-      .catch(err => console.warn(`Prefetch failed for ${type}:`, err));
+        })
+        .catch(err => console.warn(`Prefetch failed for ${type}:`, err));
+    }, Math.random() * 2000); // Random delay between 0-2 seconds
   });
 } 

@@ -48,30 +48,17 @@ const nextConfig = {
   },
   // Handle API rewrites - Using the new working API URL
   async rewrites() {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || 'http://localhost:8090';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || 'http://103.18.20.205:8090';
     
     console.log(`Using API URL: ${apiUrl} for rewrites configuration`);
     
-    return {
-      fallback: [
-        {
-          source: '/api/questionnaire/:path*',
-          destination: '/api/questionnaire/:path*',
-        },
-        {
-          source: '/api/assessment/:path*',
-          destination: '/api/assessment/:path*',
-        },
-        {
-          source: '/api/company/:path*',
-          destination: '/api/company/:path*',
-        },
-        {
-          source: '/api/results/:path*',
-          destination: '/api/results/:path*',
-        },
-      ],
-    };
+    return [
+      // Proxy all backend API requests through Next.js server to avoid CORS issues
+      {
+        source: '/api/backend/:path*',
+        destination: `${apiUrl}/:path*`,
+      }
+    ];
   }
 };
 
