@@ -11,13 +11,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User, UserRound, LogOut, Shield } from "lucide-react";
+import { User, UserRound, LogOut, Shield, Building } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { ROLE_TO_PILLAR } from "@/lib/auth-context";
+import { useState } from "react";
 
 export function UserAccountMenu() {
   const { user, logout, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
+  // Add state to control the dropdown open state
+  const [open, setOpen] = useState(false);
 
   // Don't show anything while loading auth state
   if (isLoading) {
@@ -36,8 +39,21 @@ export function UserAccountMenu() {
   // Check if user is admin
   const isAdmin = user.role === "admin";
 
+  // Handle navigation with dropdown control
+  const handleNavigation = (path: string) => {
+    setOpen(false); // Close dropdown first
+    router.push(path);
+  };
+
+  // Handle logout with dropdown control
+  const handleLogout = () => {
+    setOpen(false); // Close dropdown first
+    logout();
+    router.push("/");
+  };
+
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="icon" className="relative rounded-full">
           <UserRound className="h-5 w-5" />
@@ -57,11 +73,22 @@ export function UserAccountMenu() {
             <span>Role: {user.role === "admin" ? "Administrator" : ROLE_TO_PILLAR[user.role]}</span>
           </DropdownMenuItem>
           
+          {/* Company Profile link - Admin only */}
+          {isAdmin && (
+            <DropdownMenuItem 
+              className="cursor-pointer"
+              onClick={() => handleNavigation("/company-profile")}
+            >
+              <Building className="mr-2 h-4 w-4 text-primary" />
+              <span>Company Profile</span>
+            </DropdownMenuItem>
+          )}
+          
           {/* Admin panel link */}
           {isAdmin && (
             <DropdownMenuItem 
               className="cursor-pointer"
-              onClick={() => router.push("/admin")}
+              onClick={() => handleNavigation("/admin")}
             >
               <Shield className="mr-2 h-4 w-4 text-primary" />
               <span>Admin Panel</span>
@@ -71,10 +98,7 @@ export function UserAccountMenu() {
         <DropdownMenuSeparator />
         <DropdownMenuItem 
           className="text-red-600 cursor-pointer"
-          onClick={() => {
-            logout();
-            router.push("/");
-          }}
+          onClick={handleLogout}
         >
           <LogOut className="mr-2 h-4 w-4" />
           <span>Log out</span>

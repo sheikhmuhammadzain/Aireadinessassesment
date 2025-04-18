@@ -1,8 +1,27 @@
 export interface CompanyInfo {
+  id?: string;
   name: string;
-  size: string;
   industry: string;
-  description?: string;
+  size: string;
+  region: string;
+  aiMaturity: string;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// Define assessment status types
+export interface Assessment {
+  type: string;
+  status: "not-started" | "in-progress" | "completed";
+  score?: number | null;
+  completedAt?: string | null;
+}
+
+export interface CompanyAssessmentStatus {
+  companyId: string;
+  companyName: string;
+  assessments: Assessment[];
 }
 
 export interface Question {

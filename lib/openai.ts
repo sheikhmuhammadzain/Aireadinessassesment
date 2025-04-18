@@ -218,6 +218,18 @@ export async function generateRecommendations(category: string, score: number, g
  * @param assessmentResults All assessment results
  * @returns Promise with HTML formatted report
  */
+// import { OpenAI } from 'openai';
+
+// // Assume 'openai' is initialized elsewhere (e.g., const openai = new OpenAI({ apiKey: 'YOUR_API_KEY' });)
+// declare const openai: OpenAI; // Placeholder for your OpenAI client instance
+
+// // Helper function to determine progress bar color based on score
+// function getColorForScore(score: number): string {
+//   if (score < 40) return '#ef4444'; // Red
+//   if (score < 70) return '#f59e0b'; // Amber
+//   return '#22c55e'; // Green
+// }
+
 export async function generateDeepResearchReport(assessmentResults: Record<string, any>) {
   try {
     // Create a data summary for the prompt
@@ -225,7 +237,7 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
       return {
         category: type,
         overallScore: result.overallScore,
-        categoryScores: result.categoryScores,
+        categoryScores: result.categoryScores || {}, // Ensure it's an object
         qValues: result.qValues || {},
         adjustedWeights: result.adjustedWeights || {},
         userWeights: result.userWeights || {},
@@ -233,26 +245,29 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
       };
     });
 
+    // Calculate overall readiness score - ensure scores are numbers
     const overallReadiness = categoriesData.length > 0
-      ? Math.round(categoriesData.reduce((sum, cat) => sum + cat.overallScore, 0) / categoriesData.length)
+      ? Math.round(categoriesData.reduce((sum, cat) => sum + (Number(cat.overallScore) || 0), 0) / categoriesData.length)
       : 0;
 
     const prompt = `
       Generate a comprehensive AI Readiness Deep Research Report (at least 3500 words in length) based on the following assessment data:
-      
+
       Overall AI Readiness Score: ${overallReadiness}%
-      
+
       Assessment Results:
       ${JSON.stringify(categoriesData, null, 2)}
-      
+
       The report should include:
-      
+
+      0. Table of Contents (Generated based on the following sections)
+
       1. Executive Summary (500+ words)
          - Comprehensive key findings and detailed overall AI readiness posture
          - In-depth analysis of major strengths and weaknesses
          - Prioritized strategic recommendations with implementation timelines
          - Business impact assessment of current AI readiness state
-      
+
       2. Assessment Methodology (400+ words)
          - Detailed methodology overview including score calculation and normalization algorithms
          - Comprehensive breakdown of assessment categories and their significance to business outcomes
@@ -260,7 +275,7 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
          - Detailed description of all weight adjustment methods (user weights, softmax weights, adjusted weights)
          - Validation methodology and confidence levels
          - Limitations of the assessment approach and how to interpret results
-      
+
       3. Detailed Analysis by Category
          - For each category, provide an extensive section with:
            - Current state assessment with exact score percentage
@@ -270,15 +285,15 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
            - Comprehensive industry benchmarking including competitor comparisons
            - Detailed analysis of the impact of Q-values and weights on the overall assessment
            - Potential future trajectory of this category without intervention
-           - Make sure to explicitly reference the specific Q-values and weights for each category
-      
+           - Make sure to explicitly reference the specific Q-values and weights for each category's subcategories
+
       4. Gap Analysis (500+ words)
          - Detailed identification of significant capability gaps for each category
          - Comprehensive risk assessment of these gaps with probability and impact ratings
          - Quantifiable impact on AI adoption and business outcomes
          - Competitive disadvantages resulting from identified gaps
          - Regulatory and compliance implications of gaps
-      
+
       5. Implementation Roadmap (500+ words)
          - Detailed short-term actions (0-6 months) with specific tools, platforms, and methodologies
          - Comprehensive medium-term initiatives (6-18 months) with resource requirements
@@ -286,14 +301,14 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
          - Extensive key performance indicators for measuring progress at each stage
          - Cost-benefit analysis for major initiatives
          - Risk mitigation strategies for implementation
-      
+
       6. Technology and Infrastructure Recommendations (400+ words)
          - Specific enterprise-grade tools and platforms recommended with version details
          - Comprehensive integration considerations with existing systems
          - Detailed scalability planning with capacity recommendations
          - Cost estimates and ROI projections for recommended technologies
          - Technical architecture recommendations with diagrams (described in text)
-      
+
       7. Organizational and Cultural Considerations (400+ words)
          - Required organizational changes with detailed org chart implications
          - Comprehensive skills development strategy with training programs and timelines
@@ -301,41 +316,36 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
          - Cultural transformation roadmap with specific milestones
          - Leadership development requirements
          - Performance management adaptations for AI-driven operations
-      
+
       8. Detailed Score Breakdown and Weights Analysis (300+ words)
-         - Comprehensive table showing each category with its raw score, user weight, q-value, softmax weight, adjusted weight and contribution to overall score
+         - Comprehensive table showing each subcategory with its category, raw score, user weight, q-value, softmax weight, adjusted weight and contribution to overall category score
          - Detailed explanation of Q-values and their algorithmic impact on the final assessment
          - Thorough explanation of how user weights differ from adjusted weights with clear examples from the data
          - Statistical analysis of score distribution and significance
-         - Visual representation of scores (describe charts as text that would be shown)
-         - Confidence intervals and margin of error analysis
-      
-      Throughout the report, maintain a highly professional tone. Consistently reference exact scores, weights, 
-      and Q-values. For each category, explicitly state the score percentage and how it compares to benchmarks.
-      
-      Ensure that the total report content contains at least 3500 words with comprehensive coverage of each topic.
-      Each section should be thoroughly detailed with specific, actionable insights rather than general statements.
-      
-      Format the report as a professional HTML document with proper headings, paragraphs, lists, and tables where appropriate.
-      Use clear section headings and subheadings. Include a table of contents at the beginning. Make it visually organized and easy to read.
-      
-      IMPORTANT: Ensure that ALL data fields provided in the assessment results (including ALL Q-values, user weights, adjusted weights, softmax weights) 
-      are explicitly referenced and analyzed in the report. Do not leave any data points unmentioned or unanalyzed.
+         - Visual representation of scores (describe charts as text that would be shown, e.g., 'A bar chart visualizing category scores...' or 'A radar chart showing strengths across dimensions...')
+         - Confidence intervals and margin of error analysis (if applicable/calculable from input, otherwise discuss conceptually)
+
+      Throughout the report, maintain a highly professional, analytical, and strategic tone. Consistently reference exact scores, weights (user, Q-value, softmax, adjusted), and provide specific, actionable insights derived directly from the data. Avoid generalizations. Use clear headings and subheadings for each section as outlined above. Ensure the total word count significantly exceeds 3500 words.
+
+      Format the report as clean, well-structured HTML. Use appropriate tags like <h1>, <h2>, <h3>, <p>, <ul>, <ol>, and <table>. Ensure the Table of Contents links correctly to the corresponding H1/H2 sections (use appropriate id attributes for headings).
+
+      IMPORTANT: Ensure that ALL data fields provided in the assessment results (including ALL categoryScores, Q-values, user weights, adjusted weights, softmax weights for *every subcategory*) are explicitly referenced and analyzed within the 'Detailed Analysis by Category' and 'Detailed Score Breakdown' sections. Do not leave any data points unmentioned or unanalyzed. Provide context for the weight values (e.g., 'Subcategory X has a high adjusted weight of Y%, driven by a strong Q-value of Z, indicating its critical learned importance despite a moderate user weight of W%.').
     `;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4o", // Or your preferred high-capability model
       messages: [
         {
           role: "system",
-          content: "You are an elite AI strategy consultant who specializes in creating comprehensive, actionable AI readiness reports for organizations. Your reports combine strategic insight with practical implementation guidance, always referencing specific data points, scores, metrics, and mathematical weights from the assessment. You must include all data points in your analysis, especially q-values, user weights, adjusted weights, and softmax weights for every category and subcategory."
+          content: "You are an elite AI strategy consultant and technical writer from a top-tier consulting firm. You specialize in creating comprehensive, data-driven, actionable AI readiness reports for Fortune 500 companies. Your reports are known for their depth, clarity, strategic insight, and meticulous attention to detail. You must analyze and reference *every* provided data point (scores, all weight types, Q-values) for *every* category and subcategory. Structure the report exactly as requested, using precise language and a highly professional tone. Ensure the final output is well-formatted HTML exceeding 3500 words."
         },
         {
           role: "user",
           content: prompt
         }
       ],
-      max_tokens: 12000
+      // max_tokens: 12000 // Consider adjusting based on typical report length and model limits. GPT-4o has a large context window.
+      temperature: 0.6 // Slightly creative but still factual
     });
 
     const content = response.choices[0]?.message?.content;
@@ -343,135 +353,216 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
       throw new Error("No content in OpenAI response");
     }
 
-    // Get company name from localStorage if available
-    const companyName = typeof window !== 'undefined' ? 
-      localStorage.getItem('companyName') || 'Your Company' : 'Your Company';
-    
-    // Format current date in a readable format
-    const currentDate = new Date().toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+    // Get company name from localStorage if available, provide a default
+    const companyName = typeof window !== 'undefined' ?
+      localStorage.getItem('companyName') || 'Valued Client' : 'Valued Client';
+
+    // Format current date
+    const currentDate = new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
     });
 
-    // Prepare the HTML document with professional styling
+    // Prepare the HTML document with enhanced professional styling
     const htmlReport = `
     <!DOCTYPE html>
     <html lang="en">
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>AI Readiness Assessment Report</title>
+      <title>AI Readiness Assessment Report - ${companyName}</title>
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Roboto+Slab:wght@400;700&display=swap" rel="stylesheet">
       <style>
+        :root {
+          --font-primary: 'Inter', sans-serif;
+          --font-headings: 'Roboto Slab', serif;
+          --color-primary: #0a4a7d; /* Deeper Blue */
+          --color-secondary: #0c5a99;
+          --color-accent: #4db8ff; /* Brighter Accent Blue */
+          --color-text: #2c3e50; /* Dark Grey-Blue */
+          --color-text-muted: #5a6a7a;
+          --color-background: #f8f9fa;
+          --color-white: #ffffff;
+          --color-border: #dee2e6;
+          --border-radius: 6px;
+          --box-shadow: 0 4px 15px rgba(0, 0, 0, 0.07);
+          --box-shadow-light: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
         body {
-          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-          line-height: 1.6;
-          color: #333;
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 20px;
-          background-color: #f9f9f9;
+          font-family: var(--font-primary);
+          line-height: 1.7;
+          color: var(--color-text);
+          background-color: var(--color-background);
+          margin: 0;
+          padding: 0;
+          font-size: 16px;
         }
+
+        .report-wrapper {
+            max-width: 1200px;
+            margin: 40px auto;
+            background-color: var(--color-white);
+            box-shadow: var(--box-shadow);
+            border-radius: var(--border-radius);
+            overflow: hidden; /* Contain child elements */
+        }
+
         .report-container {
-          background-color: white;
-          box-shadow: 0 0 10px rgba(0,0,0,0.1);
-          padding: 40px;
-          border-radius: 8px;
+          padding: 40px 50px; /* More padding */
         }
+
         .header {
           display: flex;
           justify-content: space-between;
           align-items: flex-start;
-          margin-bottom: 30px;
-          border-bottom: 1px solid #e0e0e0;
-          padding-bottom: 20px;
+          margin-bottom: 40px;
+          padding-bottom: 25px;
+          border-bottom: 1px solid var(--color-border);
         }
+
         .logo-container {
           text-align: right;
+          padding-top: 5px;
         }
         .logo-text {
-          font-size: 24px;
-          font-weight: bold;
-          color: #38bdf8;
+          font-size: 28px;
+          font-weight: 700;
+          color: var(--color-accent);
           margin: 0;
+          letter-spacing: -1px;
         }
         .logo-subtitle {
-          font-size: 12px;
-          color: #0369a1;
+          font-size: 13px;
+          color: var(--color-primary);
           margin: 0;
+          font-weight: 600;
         }
+
         .report-title {
-          font-size: 32px;
-          color: #333;
-          margin: 0 0 15px 0;
-          font-weight: bold;
-        }
-        .report-subtitle {
-          font-size: 18px;
-          color: #666;
-          margin: 0 0 20px 0;
+          font-family: var(--font-headings);
+          font-size: 36px; /* Larger */
+          color: var(--color-primary);
+          margin: 0 0 10px 0;
+          font-weight: 700;
         }
         .report-meta {
-          margin-top: 30px;
+          margin-top: 20px;
+          font-size: 0.9em;
+          color: var(--color-text-muted);
         }
         .meta-item {
-          margin-bottom: 10px;
+          margin-bottom: 8px;
         }
         .meta-label {
-          font-weight: bold;
+          font-weight: 600;
           display: inline-block;
-          width: 130px;
+          width: 140px; /* Adjusted width */
+          color: var(--color-text);
         }
+
+        h1, h2, h3, h4 {
+          font-family: var(--font-headings);
+          color: var(--color-primary);
+          margin-top: 1.8em;
+          margin-bottom: 0.8em;
+          font-weight: 700;
+          line-height: 1.3;
+        }
+
         h1 {
-          color: #0369a1;
-          border-bottom: 2px solid #38bdf8;
+          font-size: 30px;
+          border-bottom: 2px solid var(--color-accent);
           padding-bottom: 10px;
-          font-size: 28px;
-          margin-top: 40px;
         }
         h2 {
-          color: #0369a1;
-          border-bottom: 1px solid #bae6fd;
-          padding-bottom: 5px;
-          margin-top: 30px;
-          font-size: 22px;
+          font-size: 24px;
+          color: var(--color-secondary);
+          border-bottom: 1px solid #e0f2fe; /* Lighter border */
+          padding-bottom: 8px;
         }
         h3 {
-          color: #0284c7;
-          margin-top: 25px;
-          font-size: 18px;
+          font-size: 20px;
+          color: var(--color-secondary);
+          font-weight: 600;
         }
+        h4 {
+          font-size: 18px;
+          color: var(--color-text);
+           font-weight: 600;
+        }
+
+        p {
+          margin-bottom: 1.2em;
+        }
+
+        ul, ol {
+          margin-bottom: 1.5em;
+          padding-left: 25px;
+        }
+        li {
+          margin-bottom: 0.6em;
+        }
+
+        a {
+          color: var(--color-secondary);
+          text-decoration: none;
+          font-weight: 600;
+        }
+        a:hover {
+          color: var(--color-accent);
+          text-decoration: underline;
+        }
+
         table {
           width: 100%;
           border-collapse: collapse;
-          margin: 20px 0;
-          box-shadow: 0 0 5px rgba(0,0,0,0.05);
+          margin: 30px 0;
+          box-shadow: var(--box-shadow-light);
+          border-radius: var(--border-radius);
+          overflow: hidden; /* Ensures border-radius applies to corners */
+          font-size: 0.95em;
         }
         th, td {
-          padding: 12px 15px;
-          border: 1px solid #e0e0e0;
+          padding: 14px 18px; /* More padding */
+          border: 1px solid var(--color-border);
           text-align: left;
+          vertical-align: top; /* Align content top */
         }
         th {
-          background-color: #f0f9ff;
-          font-weight: bold;
-          color: #0284c7;
+          background-color: #f1f3f5; /* Lighter grey header */
+          font-weight: 600;
+          color: var(--color-primary);
+          font-size: 0.9em;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          border-bottom: 2px solid var(--color-accent);
         }
-        tr:nth-child(even) {
-          background-color: #f9fafb;
+        tr:nth-child(even) td {
+          background-color: #fcfdff; /* Very subtle striping */
         }
+         tr:hover td {
+           background-color: #e0f2fe; /* Light blue hover */
+         }
+
         .toc {
-          background-color: #f0f9ff;
-          padding: 20px 30px;
-          border-radius: 8px;
-          margin: 30px 0;
-          box-shadow: 0 0 5px rgba(0,0,0,0.05);
+          background-color: #f8fafd;
+          padding: 25px 35px;
+          border-radius: var(--border-radius);
+          margin: 40px 0;
+          border: 1px solid var(--color-border);
+          box-shadow: var(--box-shadow-light);
         }
         .toc-title {
-          color: #0369a1;
+          font-family: var(--font-headings);
+          color: var(--color-primary);
           margin-top: 0;
-          margin-bottom: 15px;
-          font-size: 20px;
+          margin-bottom: 20px;
+          font-size: 22px;
+          font-weight: 700;
         }
         .toc ul {
           list-style-type: none;
@@ -479,314 +570,383 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
           margin: 0;
         }
         .toc ul ul {
-          padding-left: 20px;
+          padding-left: 25px; /* Indent sub-items */
+          margin-top: 5px;
         }
+        .toc li { margin-bottom: 8px; }
         .toc a {
           text-decoration: none;
-          color: #0284c7;
-          line-height: 1.8;
+          color: var(--color-secondary);
+          font-weight: 400; /* Regular weight for TOC items */
+          font-size: 1em;
         }
         .toc a:hover {
-          text-decoration: underline;
+          color: var(--color-accent);
+          text-decoration: none;
         }
+
         .executive-summary {
-          background-color: #f0f9ff;
-          padding: 25px;
-          border-left: 4px solid #38bdf8;
-          margin: 25px 0;
-          border-radius: 0 8px 8px 0;
+          background-color: #e6f7ff; /* Light blue background */
+          padding: 30px 35px;
+          border-left: 5px solid var(--color-accent);
+          margin: 35px 0;
+          border-radius: 0 var(--border-radius) var(--border-radius) 0;
+          box-shadow: var(--box-shadow-light);
         }
-        .overall-score {
+
+        .overall-score-panel {
           text-align: center;
-          margin: 40px 0;
-          padding: 30px;
-          background-color: #f0f9ff;
-          border-radius: 8px;
-          box-shadow: 0 0 10px rgba(0,0,0,0.05);
+          margin: 40px 0 50px 0;
+          padding: 35px 20px;
+          background: linear-gradient(135deg, var(--color-secondary), var(--color-primary));
+          border-radius: var(--border-radius);
+          box-shadow: var(--box-shadow);
+          color: var(--color-white);
         }
         .score-value {
-          font-size: 60px;
-          font-weight: bold;
-          color: #0369a1;
+          font-size: 72px; /* Larger score */
+          font-weight: 700;
           margin: 0;
+          line-height: 1;
+          letter-spacing: -2px;
         }
         .score-label {
-          font-size: 18px;
-          color: #64748b;
+          font-size: 20px;
+          color: #d0eaff; /* Lighter text for label */
           margin: 10px 0 0 0;
+          font-weight: 400;
         }
-        .category-scores {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 20px;
-          margin: 30px 0;
+
+        .category-scores-container {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* Responsive grid */
+          gap: 25px;
+          margin: 40px 0;
         }
         .category-score-card {
-          flex: 1 0 calc(50% - 20px);
-          min-width: 250px;
-          background-color: white;
-          border-radius: 8px;
-          padding: 20px;
-          box-shadow: 0 0 5px rgba(0,0,0,0.1);
+          background-color: var(--color-white);
+          border-radius: var(--border-radius);
+          padding: 25px;
+          box-shadow: var(--box-shadow-light);
+          border: 1px solid var(--color-border);
+          transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .category-score-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--box-shadow);
         }
         .category-score-card h3 {
           margin-top: 0;
-          color: #0284c7;
-          border-bottom: 1px solid #e0e0e0;
+          margin-bottom: 15px;
+          font-size: 18px; /* Slightly smaller category titles */
+          color: var(--color-primary);
+          font-weight: 600;
+          border-bottom: 1px solid var(--color-border);
           padding-bottom: 10px;
         }
         .category-score {
-          font-size: 24px;
-          font-weight: bold;
-          margin: 15px 0;
+          font-size: 36px; /* Larger score */
+          font-weight: 700;
+          margin: 10px 0;
+          line-height: 1;
         }
         .progress-container {
-          background-color: #e0e0e0;
-          border-radius: 5px;
-          height: 10px;
+          background-color: #e9ecef;
+          border-radius: 10px;
+          height: 12px; /* Thicker bar */
           width: 100%;
-          margin: 10px 0;
+          margin: 15px 0 5px 0;
+          overflow: hidden;
         }
         .progress-bar {
-          height: 10px;
-          border-radius: 5px;
+          height: 100%;
+          border-radius: 10px;
+          transition: width 0.5s ease-in-out;
+          background-image: linear-gradient(45deg, rgba(255, 255, 255, .15) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, .15) 50%, rgba(255, 255, 255, .15) 75%, transparent 75%, transparent);
+          background-size: 1rem 1rem;
         }
-        .strength {
-          color: #15803d;
-          margin-bottom: 5px;
-        }
-        .weakness {
-          color: #b91c1c;
-          margin-bottom: 5px;
-        }
-        .roadmap {
-          border-left: 4px solid #38bdf8;
-          padding-left: 20px;
-          margin: 20px 0;
-        }
-        .roadmap h3 {
-          color: #0284c7;
-          margin-bottom: 15px;
-        }
-        .roadmap ul {
-          padding-left: 20px;
-        }
-        .roadmap li {
-          margin-bottom: 10px;
-        }
-        .data-table {
-          width: 100%;
-          margin: 25px 0;
-          font-size: 14px;
-        }
-        .data-table th {
-          background-color: #0284c7;
-          color: white;
-        }
-        .data-table tr:hover {
-          background-color: #f0f9ff;
-        }
-        footer {
-          margin-top: 50px;
-          padding-top: 20px;
-          border-top: 1px solid #e0e0e0;
-          text-align: center;
-          font-size: 0.9em;
-          color: #64748b;
-        }
+        .strength { color: #1a7f37; font-weight: 600; } /* Darker Green */
+        .weakness { color: #c82333; font-weight: 600; } /* Darker Red */
+
+        .roadmap { border-left: 4px solid var(--color-accent); padding-left: 25px; margin: 30px 0; }
+        .roadmap h3 { color: var(--color-secondary); margin-bottom: 15px; }
+        .roadmap ul { padding-left: 20px; list-style-type: disc; }
+        .roadmap li { margin-bottom: 12px; }
+
+        .data-table { /* Already styled above, keeping class name consistent */ }
+
         .divider {
           height: 1px;
-          background-color: #e0e0e0;
-          margin: 40px 0;
+          background-color: var(--color-border);
+          border: none;
+          margin: 60px 0; /* More vertical space */
         }
-        .detailed-scores {
-          margin: 30px 0;
+
+        .detailed-scores-section { margin: 40px 0; }
+
+        .explanation-box {
+          background-color: #f8f9fa;
+          padding: 20px 25px;
+          border-radius: var(--border-radius);
+          margin: 25px 0;
+          border: 1px solid var(--color-border);
+          font-size: 0.95em;
+          color: var(--color-text-muted);
         }
-        .q-value-explanation {
-          background-color: #f8fafc;
-          padding: 15px;
-          border-radius: 5px;
-          margin: 20px 0;
-          font-style: italic;
-          color: #64748b;
-        }
-        .weight-explanation {
-          display: flex;
-          flex-wrap: wrap;
+        .explanation-box strong { color: var(--color-text); }
+
+
+        .weight-explanation-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
           gap: 20px;
-          margin: 30px 0;
+          margin: 35px 0;
         }
         .weight-card {
-          flex: 1 0 calc(50% - 20px);
-          min-width: 250px;
-          background-color: #f8fafc;
-          border-radius: 8px;
-          padding: 15px;
-          box-shadow: 0 0 5px rgba(0,0,0,0.05);
+          background-color: #f8fafd; /* Slightly different background */
+          border-radius: var(--border-radius);
+          padding: 20px;
+          box-shadow: var(--box-shadow-light);
+          border: 1px solid var(--color-border);
         }
         .weight-card h4 {
           margin-top: 0;
-          color: #0284c7;
-          border-bottom: 1px solid #e0e0e0;
-          padding-bottom: 5px;
-          margin-bottom: 10px;
+          color: var(--color-primary);
+          border-bottom: 1px solid var(--color-border);
+          padding-bottom: 8px;
+          margin-bottom: 15px;
+          font-size: 16px;
+          font-weight: 600;
         }
+        .weight-card p { font-size: 0.9em; color: var(--color-text-muted); margin-bottom: 0; }
+
         .highlight-box {
-          background-color: #ecfdf5;
-          border-left: 4px solid #10b981;
-          padding: 20px;
-          margin: 20px 0;
-          border-radius: 0 8px 8px 0;
+          padding: 25px 30px;
+          margin: 30px 0;
+          border-radius: var(--border-radius);
+          border-left-width: 5px;
+          border-left-style: solid;
+          box-shadow: var(--box-shadow-light);
         }
+        .highlight-info { background-color: #e6f7ff; border-left-color: var(--color-accent); }
+        .highlight-success { background-color: #e6f9f0; border-left-color: #22c55e; }
+        .highlight-warning { background-color: #fff9e6; border-left-color: #f59e0b; }
+        .highlight-danger { background-color: #fdece C; border-left-color: #ef4444; }
+
         .highlight-title {
-          font-weight: bold;
-          color: #065f46;
+          font-weight: 700;
+          color: var(--color-primary); /* Default title color */
           margin-top: 0;
           margin-bottom: 10px;
-          font-size: 16px;
+          font-size: 1.1em;
         }
+        .highlight-info .highlight-title { color: #005f8a; }
+        .highlight-success .highlight-title { color: #1a7f37; }
+        .highlight-warning .highlight-title { color: #b36d00; }
+        .highlight-danger .highlight-title { color: #b91c1c; }
+
+
+        footer {
+          margin-top: 50px;
+          padding: 25px 50px;
+          border-top: 1px solid var(--color-border);
+          text-align: center;
+          font-size: 0.85em;
+          color: var(--color-text-muted);
+          background-color: #f8f9fa; /* Match body background */
+        }
+        footer p { margin: 0; }
+
+        /* Utility Classes */
+        .text-center { text-align: center; }
+        .font-bold { font-weight: 700; }
+        .mt-0 { margin-top: 0 !important; }
+
+        /* Specific styling for LLM generated content if needed */
+        .llm-content-wrapper strong {
+            /* Example: Make LLM bold text stand out more */
+            color: var(--color-primary);
+        }
+        .llm-content-wrapper blockquote {
+            border-left: 3px solid var(--color-accent);
+            padding-left: 15px;
+            margin-left: 0;
+            font-style: italic;
+            color: var(--color-text-muted);
+        }
+
       </style>
     </head>
     <body>
-      <div class="report-container">
-        <div class="header">
-          <div>
-            <h1 class="report-title">AI Readiness Assessment Report</h1>
-            <div class="report-meta">
-              <div class="meta-item"><span class="meta-label">Assessment Type:</span> ${categoriesData[0]?.category || "Comprehensive Assessment"}</div>
-              <div class="meta-item"><span class="meta-label">Date:</span> ${currentDate}</div>
-              <div class="meta-item"><span class="meta-label">Prepared for:</span> ${companyName}</div>
-            </div>
-          </div>
-          
-          <div class="logo-container">
-            <p class="logo-text">CYBERGEN</p>
-            <p class="logo-subtitle">One Team</p>
-          </div>
-        </div>
-        
-        <div class="overall-score">
-          <p class="score-value">${overallReadiness}%</p>
-          <p class="score-label">Overall AI Readiness Score</p>
-        </div>
-        
-        <div class="category-scores">
-          ${categoriesData.map(cat => `
-            <div class="category-score-card">
-              <h3>${cat.category}</h3>
-              <div class="category-score">${Math.round(cat.overallScore)}%</div>
-              <div class="progress-container">
-                <div class="progress-bar" style="width: ${Math.round(cat.overallScore)}%; background-color: ${getColorForScore(cat.overallScore)};"></div>
+      <div class="report-wrapper">
+        <div class="report-container">
+          <header class="header">
+            <div>
+              <h1 class="report-title">AI Readiness Deep Research Report</h1>
+              <div class="report-meta">
+                <div class="meta-item"><span class="meta-label">Prepared for:</span> ${companyName}</div>
+                <div class="meta-item"><span class="meta-label">Assessment Date:</span> ${currentDate}</div>
+                <div class="meta-item"><span class="meta-label">Report Version:</span> 1.0</div>
+                 <div class="meta-item"><span class="meta-label">Assessment Type:</span> ${categoriesData.length > 0 ? categoriesData[0].category : "Comprehensive"} Readiness</div>
               </div>
             </div>
-          `).join('')}
+            <div class="logo-container">
+              <p class="logo-text">CYBERGEN</p>
+              <p class="logo-subtitle">Strategic AI Insights</p>
+            </div>
+          </header>
+
+          <section class="overall-score-panel">
+            <p class="score-label">Overall AI Readiness Score</p>
+            <p class="score-value">${overallReadiness}%</p>
+          </section>
+
+          <section class="category-scores-container">
+            ${categoriesData.map(cat => `
+              <div class="category-score-card">
+                <h3>${cat.category}</h3>
+                <div class="category-score" style="color: ${getColorForScore(cat.overallScore)};">${Math.round(cat.overallScore)}%</div>
+                <div class="progress-container">
+                  <div class="progress-bar" style="width: ${Math.round(cat.overallScore)}%; background-color: ${getColorForScore(cat.overallScore)};"></div>
+                </div>
+                 <p style="font-size: 0.85em; color: var(--color-text-muted); text-align: center; margin-top: 10px;">Readiness Level</p>
+              </div>
+            `).join('')}
+          </section>
+
+          <hr class="divider">
+
+          <main class="llm-content-wrapper">
+            ${content}
+            <!-- The LLM-generated content, including TOC, Executive Summary, Methodology, etc., goes here -->
+          </main>
+
+          <hr class="divider">
+
+          <section class="detailed-scores-section" id="detailed-score-breakdown"> <!-- Added ID for potential TOC link -->
+            <h2>Detailed Score Breakdown and Weights Analysis</h2>
+
+            ${Object.values(categoriesData).some(cat => Object.values(cat.userWeights || {}).length > 0 && Object.values(cat.userWeights || {}).every(w => w === 0)) ? `
+            <div class="highlight-box highlight-info">
+              <p class="highlight-title">Note on Weight Application</p>
+              <p>For categories where initial user weights were uniformly zero, equal weighting (100% / number of subcategories) has been applied to calculate the Adjusted Weights and Overall Category Score. This ensures all subcategories contribute meaningfully to the analysis in the absence of specific user prioritization.</p>
+            </div>
+            ` : ''}
+
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>Subcategory</th>
+                  <th>Raw Score (%)</th>
+                  <th>User Weight (%)</th>
+                  <th>Q-Value</th>
+                  <th>Softmax Weight (%)</th>
+                  <th>Adjusted Weight (%)</th>
+                  <th>Score Contribution</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${categoriesData.flatMap(cat => {
+                  const categorySubcategories = Object.keys(cat.categoryScores || {});
+                  if (categorySubcategories.length === 0) {
+                    return `<tr><td colspan="8">No subcategory data available for ${cat.category}</td></tr>`;
+                  }
+
+                  // Check if all user weights are zero OR if userWeights is empty/undefined
+                  const userWeightsProvided = cat.userWeights && Object.keys(cat.userWeights).length > 0;
+                  const allUserWeightsZero = userWeightsProvided && Object.values(cat.userWeights).every(w => Number(w) === 0);
+                  const useDefaultWeights = !userWeightsProvided || allUserWeightsZero;
+
+                  const subCategoryCount = categorySubcategories.length;
+                  const defaultWeight = subCategoryCount > 0 ? (100 / subCategoryCount) : 0;
+
+                  return Object.entries(cat.categoryScores).map(([subCategory, score]) => {
+                    const numScore = Number(score) || 0; // Ensure score is a number
+
+                    // Determine the weight to use for calculation and display
+                    let userWeightDisplay: number | string;
+                    let adjustedWeightValue: number;
+
+                    if (useDefaultWeights) {
+                      userWeightDisplay = 'N/A (Default Applied)';
+                      // Use the actual adjusted weight if available and seems calculated, otherwise use default
+                      adjustedWeightValue = Number(cat.adjustedWeights?.[subCategory]) || defaultWeight;
+                      // Recalculate Softmax based on Q-values if available, otherwise show 0
+                      // Note: Accurate recalculation needs all Q-values for the category. Assuming pre-calculated is best here.
+                    } else {
+                      userWeightDisplay = (Number(cat.userWeights?.[subCategory]) || 0);
+                      adjustedWeightValue = Number(cat.adjustedWeights?.[subCategory]) || 0; // Use provided adjusted weight
+                    }
+
+                    const qValue = Number(cat.qValues?.[subCategory]) || 0;
+                    const softmaxWeight = Number(cat.softmaxWeights?.[subCategory]) || 0; // Use provided softmax weight
+
+                    // Recalculate score contribution using the determined adjusted weight
+                    const scoreContribution = (numScore * adjustedWeightValue) / 100;
+
+                    return `
+                      <tr>
+                        <td>${cat.category}</td>
+                        <td>${subCategory}</td>
+                        <td>${numScore.toFixed(2)}</td>
+                        <td>${typeof userWeightDisplay === 'number' ? userWeightDisplay.toFixed(2) : userWeightDisplay}</td>
+                        <td>${qValue.toFixed(4)}</td>
+                        <td>${softmaxWeight.toFixed(2)}</td>
+                        <td>${adjustedWeightValue.toFixed(2)}</td>
+                        <td class="font-bold">${scoreContribution.toFixed(2)}</td>
+                      </tr>
+                    `;
+                  });
+                }).join('')}
+              </tbody>
+            </table>
+
+            <div class="weight-explanation-grid">
+              <div class="weight-card">
+                <h4>User Weights</h4>
+                <p>Reflect the initial strategic importance assigned by the user to each subcategory within its parent category (sum to 100% per category). If N/A, indicates default equal weighting was applied.</p>
+              </div>
+              <div class="weight-card">
+                <h4>Q-Values</h4>
+                <p>Machine-learned values indicating the learned importance or impact of a subcategory on overall readiness, derived via reinforcement learning from assessment patterns. Higher values suggest greater impact.</p>
+              </div>
+              <div class="weight-card">
+                <h4>Softmax Weights</h4>
+                <p>Normalized Q-Values (transformed into a probability distribution using the Softmax function) highlighting the *relative* learned importance among subcategories within the same category.</p>
+              </div>
+              <div class="weight-card">
+                <h4>Adjusted Weights</h4>
+                <p>The final weights used for scoring, calculated by blending User Weights and learned importance (via Softmax Weights). These provide a balanced view of stated priorities and data-driven significance.</p>
+              </div>
+            </div>
+
+             <div class="explanation-box">
+                <strong>Score Contribution:</strong> This value represents the subcategory's Raw Score multiplied by its Adjusted Weight, indicating its contribution to the overall category score. Summing these contributions for all subcategories within a category yields the Category Overall Score.
+             </div>
+
+             <div class="highlight-box highlight-info">
+                <p class="highlight-title">Interpreting Weights and Q-Values</p>
+                <p>Analyze discrepancies between User Weights and Adjusted/Softmax Weights. A high Adjusted Weight despite a low User Weight (often driven by a high Q-Value/Softmax Weight) suggests the subcategory is empirically more critical to AI readiness than initially perceived. Conversely, a low Adjusted Weight despite a high User Weight may indicate the subcategory, while strategically desired, has less impact based on current data patterns or scoring dynamics.</p>
+             </div>
+          </section>
+
+          <footer>
+             <p>Confidential AI Readiness Assessment Report for ${companyName}</p>
+             <p>© ${new Date().getFullYear()} Cybergen Strategic AI Insights. All rights reserved.</p>
+             <p>This report was generated leveraging advanced AI analysis based on the provided assessment data.</p>
+          </footer>
         </div>
-        
-        ${content}
-        
-        <div class="divider"></div>
-        
-        <div class="detailed-scores">
-          <h2 id="detailed-scores">Detailed Scoring Information</h2>
-          
-          ${Object.values(categoriesData).some(cat => Object.values(cat.userWeights || {}).every(w => w === 0)) ? `
-          <div class="highlight-box" style="background-color: #f0f7ff; border-left-color: #38bdf8;">
-            <p class="highlight-title" style="color: #0369a1;">Note About Weights</p>
-            <p>Some categories had all zero weights in the original assessment. For these categories, equal weights have been automatically calculated for all subcategories to provide a more meaningful analysis.</p>
-          </div>
-          ` : ''}
-          
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Category</th>
-                <th>Subcategory</th>
-                <th>Raw Score</th>
-                <th>User Weight (%)</th>
-                <th>Q Value</th>
-                <th>Softmax Weight (%)</th>
-                <th>Adjusted Weight (%)</th>
-                <th>Weighted Score</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${categoriesData.flatMap(cat => {
-                // Check if all user weights are zero for this category
-                const allWeightsZero = Object.values(cat.userWeights || {}).every(w => w === 0);
-                const subCategoryCount = Object.keys(cat.categoryScores || {}).length;
-                const defaultWeight = subCategoryCount > 0 ? (100 / subCategoryCount) : 0;
-                
-                return Object.entries(cat.categoryScores || {}).map(([subCategory, score]) => {
-                  // Use default weight if all weights are zero
-                  const userWeight = allWeightsZero ? defaultWeight : (cat.userWeights?.[subCategory] || 0);
-                  const qValue = cat.qValues?.[subCategory] || 0;
-                  const softmaxWeight = cat.softmaxWeights?.[subCategory] || 0;
-                  const adjustedWeight = allWeightsZero ? defaultWeight : (cat.adjustedWeights?.[subCategory] || 0);
-                  const weightedScore = ((score as number) * adjustedWeight) / 100;
-                  
-                  return `
-                    <tr>
-                      <td>${cat.category}</td>
-                      <td>${subCategory}</td>
-                      <td>${(score as number).toFixed(2)}%</td>
-                      <td>${userWeight.toFixed(2)}</td>
-                      <td>${qValue.toFixed(4)}</td>
-                      <td>${softmaxWeight.toFixed(2)}</td>
-                      <td>${adjustedWeight.toFixed(2)}</td>
-                      <td>${weightedScore.toFixed(2)}</td>
-                    </tr>
-                  `;
-                });
-              }).join('')}
-            </tbody>
-          </table>
-          
-          <div class="weight-explanation">
-            <div class="weight-card">
-              <h4>User Weights</h4>
-              <p>These are the original weights specified for each category, representing the initial assessment of relative importance. User weights sum to 100% within each assessment category.</p>
-            </div>
-            
-            <div class="weight-card">
-              <h4>Q Values</h4>
-              <p>Q values represent the learned importance of each category through reinforcement learning algorithms. Higher Q values indicate categories that have greater impact on overall AI readiness based on assessment data.</p>
-            </div>
-            
-            <div class="weight-card">
-              <h4>Softmax Weights</h4>
-              <p>Softmax weights are derived by applying a softmax function to the Q values, which normalizes them into a probability distribution. This helps highlight the relative importance between categories.</p>
-            </div>
-            
-            <div class="weight-card">
-              <h4>Adjusted Weights</h4>
-              <p>The final weights used in scoring, combining both user weights and learned importance (Q values). These are optimized to reflect both strategic priorities and empirical significance.</p>
-            </div>
-          </div>
-          
-          <div class="highlight-box">
-            <p class="highlight-title">Weight Calculation Methodology</p>
-            <p>The assessment uses a sophisticated multi-stage weighting system that combines human expertise (user weights) with machine learning (Q values) to create optimized adjusted weights:</p>
-            <ol>
-              <li><strong>User weights</strong> are collected during the assessment setup</li>
-              <li><strong>Q values</strong> are calculated through reinforcement learning based on assessment patterns</li>
-              <li><strong>Softmax transformation</strong> is applied to normalize Q values into a probability distribution</li>
-              <li><strong>Adjusted weights</strong> are computed by blending user weights with softmax weights</li>
-              <li>The final score is calculated using these adjusted weights to provide a more accurate representation of AI readiness</li>
-            </ol>
-          </div>
-        </div>
-      
-        <footer>
-          <p>© ${new Date().getFullYear()} Cybergen | AI Readiness Assessment Platform | Generated with AI-powered analysis</p>
-        </footer>
       </div>
     </body>
     </html>
     `;
 
     return htmlReport;
+
   } catch (error) {
     console.error("Error generating comprehensive report:", error);
+    // Return a styled error message
     return `
     <!DOCTYPE html>
     <html lang="en">
@@ -794,23 +954,21 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
       <meta charset="UTF-8">
       <title>Error Generating Report</title>
       <style>
-        body {
-          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-          line-height: 1.6;
-          color: #333;
-          max-width: 800px;
-          margin: 0 auto;
-          padding: 20px;
-        }
-        h1 {
-          color: #b91c1c;
-        }
+        body { font-family: sans-serif; line-height: 1.6; padding: 30px; background-color: #f8f9fa; }
+        .error-container { background-color: #fff; border: 1px solid #dee2e6; border-left: 5px solid #dc3545; padding: 25px; border-radius: 6px; max-width: 800px; margin: 40px auto; box-shadow: 0 4px 15px rgba(0,0,0,0.07); }
+        h1 { color: #dc3545; margin-top: 0; font-size: 24px; }
+        p { color: #2c3e50; }
+        code { background-color: #e9ecef; padding: 2px 5px; border-radius: 4px; font-family: monospace; }
       </style>
     </head>
     <body>
-      <h1>Error Generating Report</h1>
-      <p>We encountered an error while generating your AI readiness report. Please try again later.</p>
-      <p>Error details: ${error instanceof Error ? error.message : 'Unknown error'}</p>
+      <div class="error-container">
+        <h1>Report Generation Failed</h1>
+        <p>An unexpected error occurred while generating the AI Readiness Deep Research Report. Please review the details below and try again later. If the issue persists, contact support.</p>
+        <p><strong>Error Details:</strong></p>
+        <code>${error instanceof Error ? error.message : 'An unknown error occurred.'}</code>
+        ${error instanceof Error && error.stack ? `<pre style="font-size: 0.8em; color: #6c757d; margin-top: 15px; white-space: pre-wrap; word-wrap: break-word;">${error.stack}</pre>` : ''}
+      </div>
     </body>
     </html>
     `;

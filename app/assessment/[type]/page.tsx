@@ -83,8 +83,32 @@ export default function AssessmentPage({ params }: { params: Promise<{ type: str
 function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
   const assessmentType = decodeURIComponent(type);
   const router = useRouter();
-  const { toast } = useToast(); // Directly use toast from the hook
+  const { toast } = useToast();
   const { user, canEditPillar } = useAuth();
+  
+  // Immediately redirect if user doesn't have access to this pillar
+  useEffect(() => {
+    if (!canEditPillar(assessmentType)) {
+      toast({
+        title: "Access Denied",
+        description: `You don't have permission to access the ${assessmentType} assessment.`,
+        variant: "destructive",
+      });
+      router.push("/dashboard");
+    }
+  }, [assessmentType, canEditPillar, router, toast]);
+
+  // Show loading while checking authorization or prevent flickering of unauthorized content
+  if (!canEditPillar(assessmentType)) {
+    return (
+      <div className="container mx-auto px-4 py-12 flex items-center justify-center min-h-[calc(100vh-200px)]">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-lg font-medium">Checking permissions...</p>
+        </div>
+      </div>
+    );
+  }
   
   // --- State Variables ---
   const [step, setStep] = useState<'company-info' | 'weight-adjustment' | 'questions'>('company-info'); // Start with company info
@@ -186,126 +210,6 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
     return catWeights;
   };
 
-  // --- Effects ---
-
-  // Initial Load Effect
-  useEffect(() => {
-    console.log("Assessment Type:", assessmentType);
-    setLoading(true);
-    setLoadingError(null);
-    setCategoryIndex(0); // Reset index on type change
-    setCurrentCategory(""); // Reset category on type change
-
-    // Multi-assessment setup
-    const doingAll = localStorage.getItem('doing_all_assessments') === 'true';
-    setIsDoingAllAssessments(doingAll);
-    if (doingAll) {
-      const typesStr = localStorage.getItem('assessment_types');
-      const indexStr = localStorage.getItem('current_assessment_index');
-        try {
-        if (!typesStr || !indexStr) throw new Error("Missing multi-assessment state");
-        setAllAssessmentTypes(JSON.parse(typesStr));
-        setCurrentAssessmentIndex(parseInt(indexStr, 10));
-        } catch (e) {
-        console.error("Error parsing multi-assessment state, disabling.", e);
-          setIsDoingAllAssessments(false);
-        // Clean up potentially corrupt storage
-          localStorage.removeItem('doing_all_assessments');
-          localStorage.removeItem('assessment_types');
-          localStorage.removeItem('current_assessment_index');
-      }
-    }
-
-    // Load state from localStorage
-    const storedCompanyInfo = localStorage.getItem('company_info');
-    const storedSubWeights = localStorage.getItem('subcategory_weights'); // Key specific to subweights
-    const storedLocks = localStorage.getItem('locked_categories');
-
-    let initialSubWeights: SubcategoryWeights = {};
-    let initialLocks: Record<string, boolean> = {};
-    let initialCompanyInfo: CompanyInfo | null = null;
-    let determinedStep: 'company-info' | 'weight-adjustment' | 'questions' = 'company-info';
-
-    try {
-      if (storedLocks) initialLocks = JSON.parse(storedLocks);
-    } catch (e) { console.error("Failed to parse stored locks", e); }
-    setLockedCategories(initialLocks);
-
-    try {
-      if (storedCompanyInfo) initialCompanyInfo = JSON.parse(storedCompanyInfo);
-    } catch (e) { console.error("Failed to parse stored company info", e); }
-    setCompanyInfo(initialCompanyInfo);
-
-    try {
-      if (storedSubWeights) initialSubWeights = JSON.parse(storedSubWeights);
-    } catch (e) { console.error("Failed to parse stored sub weights", e); }
-    // Don't set state yet, depends on company info presence
-
-    // Determine starting step based on loaded data
-    if (initialCompanyInfo) {
-      if (Object.keys(initialSubWeights).length > 0) {
-        // Has info and weights -> go to questions (will fetch them)
-        setSubcategoryWeights(initialSubWeights);
-        setWeights(convertSubcategoryToCategory(initialSubWeights));
-        determinedStep = 'questions';
-        fetchQuestionnaires(); // Fetch questions now
-        } else {
-        // Has info, no weights -> go to weight adjustment (will fetch recommendations)
-        determinedStep = 'weight-adjustment';
-        fetchRecommendedWeights(initialCompanyInfo); // Fetch recommendations
-      }
-    } else {
-      // No company info -> start there
-      determinedStep = 'company-info';
-      setLoading(false); // No initial data fetching needed for this step
-    }
-
-    console.log("Determined initial step:", determinedStep);
-    setStep(determinedStep);
-
-    // Add this near the initial load effect
-    const shouldResetWeights = localStorage.getItem('reset_weights') === 'true';
-    
-    if (shouldResetWeights) {
-      console.log("Resetting weights as requested");
-      clearAssessmentData();
-      localStorage.removeItem('reset_weights'); // Clear the flag
-      // Will continue to normal initialization without stored weights
-    }
-  }, [assessmentType]); // Dependency: only assessmentType
-
-  // Progress Calculation Effect
-  useEffect(() => {
-    if (!questions || Object.keys(questions).length === 0) {
-      setProgress(0);
-      return;
-    }
-    let answeredCount = 0;
-    let totalCount = 0;
-    Object.values(questions).forEach(categoryQList => {
-      categoryQList.forEach(q => {
-            totalCount++;
-        if (q.answer !== null) { // Check only for null
-              answeredCount++;
-            }
-          });
-    });
-    setProgress(totalCount > 0 ? (answeredCount / totalCount) * 100 : 0);
-  }, [questions]); // Rerun when questions (including answers) change
-
-  // Authorization Check Effect
-  useEffect(() => {
-    if (user && user.role !== 'admin' && !canEditPillar(assessmentType)) {
-        toast({
-          title: "Access Restricted",
-        description: `You don't have permission for the ${assessmentType} assessment.`,
-          variant: "destructive",
-        });
-      router.replace("/assessment");
-      }
-  }, [user, assessmentType, canEditPillar, router, toast]);
-
-
   // --- Data Fetching Functions ---
 
   // Add a function to clear assessment weights when resetting
@@ -315,8 +219,8 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
     localStorage.removeItem('locked_categories');
   };
 
-  // Modify the fetchQuestionnaires function to initialize weights properly
-  const fetchQuestionnaires = async () => {
+  // Define fetchQuestionnaires first without depending on fetchRecommendedWeights
+  const fetchQuestionnaires = useCallback(async () => {
     if (Object.keys(questionnaire).length > 0 && !loadingError) {
       console.log("Questionnaire seems already loaded.");
       setLoading(false); // Make sure loading is off
@@ -411,16 +315,13 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
       setQuestions({}); setCategories([]); setCurrentCategory(""); // Reset state on error
       setLoading(false);
     }
-  };
+  }, [assessmentType, loadingError, questionnaire, toast]);
 
-  const fetchRecommendedWeights = async (info: CompanyInfo) => {
-    // This function now primarily sets up recommended weights and initializes
-    // the actual weights state if needed, then moves to the adjustment step.
+  // Now define fetchRecommendedWeights without referencing fetchQuestionnaires
+  const fetchRecommendedWeights = useCallback(async (info: CompanyInfo) => {
     setLoading(true);
     try {
       console.log("Setting up recommended weights based on:", info);
-      // TODO: Replace this with actual API call if backend provides recommendations
-      // Simulating fetching structure and calculating default equal weights as "recommendation"
       const questionnaireStructure = await fetchQuestionnaire(assessmentType);
       if (!questionnaireStructure?.[assessmentType]) {
           throw new Error("Could not fetch questionnaire structure for weight setup.");
@@ -456,11 +357,13 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
       // If all categories have only one subcategory, skip the weight adjustment step
       if (allCategoriesHaveOnlyOneSubcategory) {
         console.log("Skipping weight adjustment step as all categories have only one subcategory");
-        fetchQuestionnaires(); // Go directly to the questions step
+        // Change to directly set the step - no fetchQuestionnaires call
+        setStep('questions');
+        setQuestionnaire({ [assessmentType]: assessmentData }); // Reuse the already fetched data
       } else {
         setStep('weight-adjustment'); // Only show adjustment UI if there's something to adjust
       }
-
+      setLoading(false);
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       console.error("Error setting up recommended weights:", error);
@@ -469,11 +372,178 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
       setRecommendedSubcategoryWeights({}); setRecommendedWeights({});
       setSubcategoryWeights({}); setWeights({});
       setStep('weight-adjustment'); // Still go to adjustment, but might be empty
-      } finally {
         setLoading(false);
     }
-  };
+  }, [assessmentType, toast]);
 
+  // Authorization Check Effect
+  useEffect(() => {
+    if (user && user.role !== 'admin' && !canEditPillar(assessmentType)) {
+        toast({
+          title: "Access Restricted",
+        description: `You don't have permission for the ${assessmentType} assessment.`,
+          variant: "destructive",
+        });
+      router.replace("/assessment");
+      }
+  }, [user, assessmentType, canEditPillar, router, toast]);
+  
+  // Progress Calculation Effect
+  useEffect(() => {
+    if (!questions || Object.keys(questions).length === 0) {
+      setProgress(0);
+      return;
+    }
+    let answeredCount = 0;
+    let totalCount = 0;
+    Object.values(questions).forEach(categoryQList => {
+      categoryQList.forEach(q => {
+            totalCount++;
+        if (q.answer !== null) { // Check only for null
+              answeredCount++;
+            }
+          });
+    });
+    setProgress(totalCount > 0 ? (answeredCount / totalCount) * 100 : 0);
+  }, [questions]); // Rerun when questions (including answers) change
+
+  // Initial Load Effect - MOVED to AFTER function definitions
+  useEffect(() => {
+    console.log("Assessment Type:", assessmentType);
+    setLoading(true);
+    setLoadingError(null);
+    setCategoryIndex(0); // Reset index on type change
+    setCurrentCategory(""); // Reset category on type change
+
+    // Multi-assessment setup
+    const doingAll = localStorage.getItem('doing_all_assessments') === 'true';
+    setIsDoingAllAssessments(doingAll);
+    if (doingAll) {
+      const typesStr = localStorage.getItem('assessment_types');
+      const indexStr = localStorage.getItem('current_assessment_index');
+      try {
+        if (!typesStr || !indexStr) throw new Error("Missing multi-assessment state");
+        setAllAssessmentTypes(JSON.parse(typesStr));
+        setCurrentAssessmentIndex(parseInt(indexStr, 10));
+      } catch (e) {
+        console.error("Error parsing multi-assessment state, disabling.", e);
+        setIsDoingAllAssessments(false);
+        // Clean up potentially corrupt storage
+        localStorage.removeItem('doing_all_assessments');
+        localStorage.removeItem('assessment_types');
+        localStorage.removeItem('current_assessment_index');
+      }
+    }
+
+    // Load state from localStorage
+    const storedCompanyInfo = localStorage.getItem('company_info');
+    const storedSubWeights = localStorage.getItem('subcategory_weights'); // Key specific to subweights
+    const storedLocks = localStorage.getItem('locked_categories');
+    const isRetaking = localStorage.getItem('retaking_assessment') === 'true';
+
+    let initialSubWeights: SubcategoryWeights = {};
+    let initialLocks: Record<string, boolean> = {};
+    let initialCompanyInfo: CompanyInfo | null = null;
+    let determinedStep: 'company-info' | 'weight-adjustment' | 'questions' = 'company-info';
+
+    try {
+      if (storedLocks) initialLocks = JSON.parse(storedLocks);
+    } catch (e) { console.error("Failed to parse stored locks", e); }
+    setLockedCategories(initialLocks);
+
+    try {
+      if (storedCompanyInfo) initialCompanyInfo = JSON.parse(storedCompanyInfo);
+    } catch (e) { console.error("Failed to parse stored company info", e); }
+    setCompanyInfo(initialCompanyInfo);
+
+    try {
+      if (storedSubWeights) initialSubWeights = JSON.parse(storedSubWeights);
+    } catch (e) { console.error("Failed to parse stored sub weights", e); }
+    // Don't set state yet, depends on company info presence
+
+    // Determine starting step based on user role and data
+    // Only admins should see company profile and weight adjustment
+    const isAdmin = user?.role === 'admin';
+    
+    if (isAdmin) {
+      // Admin flow - normal decision process
+      if (initialCompanyInfo) {
+        // For admin retaking assessment, respect the retaking flag
+        if (isRetaking) {
+          console.log("Admin retaking assessment, skipping to questions directly");
+          setSubcategoryWeights(initialSubWeights);
+          setWeights(convertSubcategoryToCategory(initialSubWeights));
+          determinedStep = 'questions';
+        } else if (Object.keys(initialSubWeights).length > 0) {
+          // Has info and weights -> go to questions
+          setSubcategoryWeights(initialSubWeights);
+          setWeights(convertSubcategoryToCategory(initialSubWeights));
+          determinedStep = 'questions';
+        } else {
+          // Has info, no weights -> go to weight adjustment
+          determinedStep = 'weight-adjustment';
+        }
+      } else {
+        // No company info -> start with company info for admins
+        determinedStep = 'company-info';
+      }
+    } else {
+      // Non-admin flow - always skip to questions with default or stored weights
+      if (initialCompanyInfo && Object.keys(initialSubWeights).length > 0) {
+        // Use existing company info and weights if available
+        setSubcategoryWeights(initialSubWeights);
+        setWeights(convertSubcategoryToCategory(initialSubWeights));
+      } else {
+        // If missing company info or weights, create default ones
+        console.log("Non-admin user using default assessment configuration");
+        
+        // Create default company info if not exists
+        if (!initialCompanyInfo) {
+          const defaultCompanyInfo: CompanyInfo = {
+            name: "Default Company",
+            industry: "Technology",
+            size: "Mid-size (100-999 employees)",
+            aiMaturity: "Exploring",
+            region: "North America",
+            notes: "Default configuration for non-admin user"
+          };
+          setCompanyInfo(defaultCompanyInfo);
+          localStorage.setItem('company_info', JSON.stringify(defaultCompanyInfo));
+          initialCompanyInfo = defaultCompanyInfo;
+        }
+        
+        // Will set default weights via fetchQuestionnaires if needed
+      }
+      
+      // Always go directly to questions for non-admin users
+      determinedStep = 'questions';
+    }
+
+    console.log("Determined initial step:", determinedStep, "for user role:", user?.role || "unknown");
+    setStep(determinedStep);
+
+    // Add this near the initial load effect
+    const shouldResetWeights = localStorage.getItem('reset_weights') === 'true';
+    
+    if (shouldResetWeights) {
+      console.log("Resetting weights as requested");
+      clearAssessmentData();
+      localStorage.removeItem('reset_weights'); // Clear the flag
+      // Will continue to normal initialization without stored weights
+    }
+
+    // Clean up retaking flag if it exists
+    if (isRetaking) {
+      localStorage.removeItem('retaking_assessment');
+    }
+
+    // Execute the appropriate data fetching based on the determined step
+    if (determinedStep === 'questions') {
+      fetchQuestionnaires();
+    } else if (determinedStep === 'weight-adjustment' && initialCompanyInfo) {
+      fetchRecommendedWeights(initialCompanyInfo);
+    }
+  }, [assessmentType, fetchQuestionnaires, fetchRecommendedWeights, user]);
 
   // --- Event Handlers ---
 
@@ -732,12 +802,55 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
   // Step: Questions (Main Assessment UI)
   // Safeguard: Ensure necessary data is present before rendering questions UI
    if (step !== 'questions' || !categories.length || !currentCategory || !questions[currentCategory]) {
+    // Log the issues to help debug what's missing
+    console.log("Debug missing data:", {
+      step,
+      categoriesLength: categories.length,
+      categories,
+      currentCategory, 
+      hasQuestionsForCurrentCategory: currentCategory ? !!questions[currentCategory] : false,
+      questionKeys: Object.keys(questions)
+    });
+    
+    // Force set the category if categories exist but currentCategory is empty
+    if (categories.length > 0 && (!currentCategory || !questions[currentCategory])) {
+      console.log("Fixing missing current category. Will use:", categories[0]);
+      // Immediately use the first category rather than wait for state update
+      const fixedCategory = categories[0];
+      setCurrentCategory(fixedCategory);
+      setCategoryIndex(0);
+      
+      // If we have the category in questions, we can proceed immediately
+      if (questions[fixedCategory]) {
+        return (
+          <div className="container mx-auto px-4 py-12">
+            {/* Render the actual questions directly */}
+            <div className="mb-8 max-w-6xl mx-auto">
+              <h1 className="text-3xl font-bold mb-2">{assessmentType} Assessment</h1>
+              <p className="text-muted-foreground mb-4">
+                Rate your agreement: 1 (Strongly Disagree) to 4 (Strongly Agree).
+              </p>
+              {/* Rest of your UI */}
+              {/* ... */}
+            </div>
+            {/* This will trigger the main render on next cycle */}
+          </div>
+        );
+      }
+    }
+    
      return (
        <div className="container mx-auto px-4 py-12 text-center">
                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
                <p className="text-muted-foreground">Preparing questions...</p>
-               {/* Add a button to retry fetching if stuck */}
-               <Button onClick={fetchQuestionnaires} variant="outline" className="mt-4">Retry Load</Button>
+        <Button onClick={() => {
+          // Enhanced retry that attempts to fix the category issue
+          if (categories.length > 0) {
+            setCurrentCategory(categories[0]);
+            setCategoryIndex(0);
+          }
+          fetchQuestionnaires();
+        }} variant="outline" className="mt-4">Retry Load</Button>
        </div>
      );
   }

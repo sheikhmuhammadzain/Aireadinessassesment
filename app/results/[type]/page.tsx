@@ -735,7 +735,11 @@
               variant="default"
               size="sm"
               className="flex items-center gap-2"
-              onClick={() => router.push(`/assessment/${encodeURIComponent(assessmentType)}`)}
+              onClick={() => {
+                // Set flag in localStorage that we're retaking an assessment
+                localStorage.setItem('retaking_assessment', 'true');
+                router.push(`/assessment/${encodeURIComponent(assessmentType)}`);
+              }}
               disabled={loading}
             >
               <ArrowLeft className="h-4 w-4" />

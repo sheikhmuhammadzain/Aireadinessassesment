@@ -49,6 +49,7 @@ import { AssessmentLevelsVisual } from "@/components/assessment-levels-visual"; 
 import { ProtectedRoute } from "@/components/protected-route"; // Assuming this exists
 import { useAuth, ROLE_TO_PILLAR } from "@/lib/auth-context"; // Assuming this exists
 import { cn } from "@/lib/utils"; // Import cn utility
+import React from "react";
 
 // --- Interfaces (Keep As Is) ---
 interface AssessmentResult {
@@ -92,12 +93,24 @@ function DashboardContent() {
     const [generatingReport, setGeneratingReport] = useState(false);
     const [reportGenerationMessage, setReportGenerationMessage] = useState("Generating report...");
 
+    // Filter assessment types based on user role
+    const filteredAssessmentTypes = React.useMemo(() => {
+        return assessmentTypes.filter(type => {
+            // Admin can see all assessment types
+            if (user?.role === "admin") return true;
+            
+            // Other users can only see their assigned assessment type
+            return user?.role ? ROLE_TO_PILLAR[user.role] === type.title : false;
+        });
+    }, [user?.role]); // Only recompute when user role changes
+
     // --- Data Loading Effect ---
     useEffect(() => {
         const loadedResults: Record<string, AssessmentResult> = {};
         let hasResults = false;
 
-        assessmentTypes.forEach(type => {
+        // Only load results for assessment types that the user can see
+        filteredAssessmentTypes.forEach(type => {
             const storedResult = localStorage.getItem(`assessment_result_${type.id}`);
             if (storedResult) {
                 try {
@@ -113,14 +126,14 @@ function DashboardContent() {
         if (hasResults) {
             setResults(loadedResults);
             // Prepare overall data for bar chart (simplified)
-            const overallScores = assessmentTypes.map(type => ({
+            const overallScores = filteredAssessmentTypes.map(type => ({
                 name: type.id,
                 score: loadedResults[type.id]?.overallScore ?? 0, // Use nullish coalescing
             }));
             setOverallData(overallScores);
         }
         setLoading(false);
-    }, []);
+    }, [filteredAssessmentTypes]); // Dependency is now a memoized value
 
     // --- Report Generation Animation Effect (Simplified) ---
     useEffect(() => {
@@ -181,7 +194,7 @@ function DashboardContent() {
     };
 
     const completedAssessments = Object.keys(results).length;
-    const totalAssessments = assessmentTypes.length;
+    const totalAssessments = filteredAssessmentTypes.length;
     const overallReadiness = calculateOverallReadiness();
     const strongestArea = getStrongestArea();
     const weakestArea = getWeakestArea();
@@ -476,7 +489,7 @@ function DashboardContent() {
                         {/* Details Tab Content */}
                         <TabsContent value="details" className="mt-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {assessmentTypes.map((type) => {
+                                {filteredAssessmentTypes.map((type) => {
                                     const result = results[type.id];
                                     if (!result) return null; // Skip if no result for this type
 

@@ -23,6 +23,7 @@ import { CompanyInfo, CategoryWeights } from "@/types";
 import { fetchAllQuestionnaires, getRecommendedWeights } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { ProtectedRoute } from "@/components/protected-route";
+import { useAuth, ROLE_TO_PILLAR } from "@/lib/auth-context";
 
 const assessmentTypes = [
   {
@@ -80,34 +81,65 @@ export default function AssessmentPage() {
 function AssessmentContent() {
   const router = useRouter();
   const { toast } = useToast();
+  const { user } = useAuth();
   
-  const [step, setStep] = useState<'company-info' | 'weight-adjustment' | 'categories'>('company-info');
+  const [step, setStep] = useState<'company-info' | 'weight-adjustment' | 'categories'>('categories');
   const [loading, setLoading] = useState(false);
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
   const [weights, setWeights] = useState<CategoryWeights>({});
   const [recommendedWeights, setRecommendedWeights] = useState<CategoryWeights | undefined>(undefined);
   const [questionnaires, setQuestionnaires] = useState<Record<string, string[]>>({});
 
-  useEffect(() => {
-    // Check if company info is stored in localStorage
-    const storedCompanyInfo = localStorage.getItem('company_info');
-    const storedWeights = localStorage.getItem('assessment_weights');
+  // Filter assessment types based on user role
+  const filteredAssessmentTypes = assessmentTypes.filter(type => {
+    // Admin can see all assessment types
+    if (user?.role === "admin") return true;
     
-    if (storedCompanyInfo) {
-      try {
-        const parsedInfo = JSON.parse(storedCompanyInfo);
-        setCompanyInfo(parsedInfo);
-        
-        if (storedWeights) {
+    // Other users can only see their assigned assessment type
+    return user?.role ? ROLE_TO_PILLAR[user.role] === type.title : false;
+  });
+
+  useEffect(() => {
+    // Only admins should start at the company-info step
+    // Other users skip directly to the categories step
+    if (user?.role === "admin") {
+      setStep('company-info');
+    } else {
+      setStep('categories');
+    }
+
+    // Check if company info is stored in localStorage - only for admins
+    if (user?.role === "admin") {
+      const storedCompanyInfo = localStorage.getItem('company_info');
+      const storedWeights = localStorage.getItem('assessment_weights');
+      
+      if (storedCompanyInfo) {
+        try {
+          const parsedInfo = JSON.parse(storedCompanyInfo);
+          setCompanyInfo(parsedInfo);
+          
+          if (storedWeights) {
+            const parsedWeights = JSON.parse(storedWeights);
+            setWeights(parsedWeights);
+            setStep('categories');
+          } else {
+            setStep('weight-adjustment');
+            fetchRecommendedWeights(parsedInfo);
+          }
+        } catch (error) {
+          console.error("Error parsing stored company info:", error);
+        }
+      }
+    } else {
+      // For non-admin users, set default weights or use stored weights
+      const storedWeights = localStorage.getItem('assessment_weights');
+      if (storedWeights) {
+        try {
           const parsedWeights = JSON.parse(storedWeights);
           setWeights(parsedWeights);
-          setStep('categories');
-        } else {
-          setStep('weight-adjustment');
-          fetchRecommendedWeights(parsedInfo);
+        } catch (error) {
+          console.error("Error parsing stored weights:", error);
         }
-      } catch (error) {
-        console.error("Error parsing stored company info:", error);
       }
     }
     
@@ -140,7 +172,7 @@ function AssessmentContent() {
     };
     
     fetchQuestionnaires();
-  }, [toast]);
+  }, [toast, user?.role]);
 
   const handleCompanyInfoSubmit = async (info: CompanyInfo, suggestedWeights?: Record<string, number>) => {
     setCompanyInfo(info);
@@ -227,14 +259,14 @@ function AssessmentContent() {
 
   return (
     <div className="container mx-auto px-4 py-12">
-      {step === 'company-info' && (
+      {step === 'company-info' && user?.role === 'admin' && (
         <div className="max-w-3xl mx-auto">
           <h1 className="text-3xl font-bold text-center mb-8">Company Profile</h1>
           <CompanyInfoForm onSubmit={handleCompanyInfoSubmit} loading={loading} />
         </div>
       )}
       
-      {step === 'weight-adjustment' && (
+      {step === 'weight-adjustment' && user?.role === 'admin' && (
         <div className="max-w-4xl mx-auto">
           <h1 className="text-3xl font-bold text-center mb-2">Assessment Weights</h1>
           <p className="text-center text-muted-foreground mb-8">
@@ -250,27 +282,16 @@ function AssessmentContent() {
       )}
       
       {step === 'categories' && (
-        <div>
-          <div className="max-w-3xl mx-auto text-center mb-8">
-            <h1 className="text-3xl font-bold mb-2">Assessment Categories</h1>
-            <p className="text-muted-foreground">
-              Select an individual assessment category or start all assessments at once
-            </p>
-            
-            <div className="mt-6">
-              <Button 
-                size="lg" 
-                onClick={handleStartAllAssessments}
-                className="bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary"
-              >
-                <PlayCircle className="mr-2 h-5 w-5" />
-                Start All Assessments
-              </Button>
-            </div>
-          </div>
+        <div className="max-w-6xl mx-auto">
+          <h1 className="text-3xl font-bold text-center mb-2">AI Readiness Assessment</h1>
+          <p className="text-center text-muted-foreground mb-8">
+            {user?.role === 'admin' 
+              ? 'Complete assessments for each key dimension of AI readiness' 
+              : user?.role ? `Complete your ${ROLE_TO_PILLAR[user.role]} assessment` : 'Complete your assessment'}
+          </p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-            {assessmentTypes.map((type) => {
+            {filteredAssessmentTypes.map((type) => {
               const Icon = type.icon;
               return (
                 <Card key={type.id} className="hover:shadow-lg transition-shadow">
