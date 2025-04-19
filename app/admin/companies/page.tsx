@@ -184,7 +184,82 @@ export default function AdminCompaniesPage() {
     }
     
     setCompanies(companiesData);
-    setAssessmentStatuses(SAMPLE_ASSESSMENT_STATUSES);
+    
+    // Load assessment statuses from localStorage
+    let assessmentStatusesData: CompanyAssessmentStatus[] = [];
+    
+    try {
+      const storedStatusesJson = localStorage.getItem("assessment_statuses");
+      if (storedStatusesJson) {
+        assessmentStatusesData = JSON.parse(storedStatusesJson);
+      }
+    } catch (error) {
+      console.error("Error parsing assessment statuses from localStorage:", error);
+    }
+    
+    // If no assessment statuses in localStorage, use sample data
+    if (assessmentStatusesData.length === 0) {
+      assessmentStatusesData = SAMPLE_ASSESSMENT_STATUSES;
+      // Store sample data in localStorage for future use
+      localStorage.setItem("assessment_statuses", JSON.stringify(SAMPLE_ASSESSMENT_STATUSES));
+    } else {
+      // If we have both saved statuses and company-specific assessment data,
+      // ensure we capture any missing company-specific assessments
+      companiesData.forEach(company => {
+        // Look for company-specific assessment data
+        try {
+          const companyAssessmentsKey = `company_assessments_${company.id}`;
+          const storedCompanyAssessments = localStorage.getItem(companyAssessmentsKey);
+          if (storedCompanyAssessments) {
+            const companyAssessments = JSON.parse(storedCompanyAssessments);
+            if (Object.keys(companyAssessments).length > 0) {
+              // Find or create assessment status for this company
+              let statusIndex = assessmentStatusesData.findIndex(s => s.companyId === company.id);
+              if (statusIndex === -1) {
+                // Create new assessment status
+                assessmentStatusesData.push({
+                  companyId: company.id,
+                  companyName: company.name,
+                  assessments: []
+                });
+                statusIndex = assessmentStatusesData.length - 1;
+              }
+              
+              // Update assessments from company-specific data
+              Object.entries(companyAssessments).forEach(([assessmentType, data]) => {
+                // Check if assessment already exists
+                const existingAssessmentIndex = assessmentStatusesData[statusIndex].assessments.findIndex(
+                  a => a.type === assessmentType
+                );
+                
+                const assessmentData = {
+                  type: assessmentType,
+                  status: "completed" as const,
+                  score: data.overallScore,
+                  completedAt: data.completedAt,
+                  completedBy: data.completedBy
+                };
+                
+                if (existingAssessmentIndex >= 0) {
+                  // Update existing assessment
+                  assessmentStatusesData[statusIndex].assessments[existingAssessmentIndex] = assessmentData;
+                } else {
+                  // Add new assessment
+                  assessmentStatusesData[statusIndex].assessments.push(assessmentData);
+                }
+              });
+            }
+          }
+        } catch (error) {
+          console.error(`Error processing company assessments for ${company.id}:`, error);
+        }
+      });
+      
+      // Save the updated assessment statuses
+      localStorage.setItem("assessment_statuses", JSON.stringify(assessmentStatusesData));
+    }
+    
+    setAssessmentStatuses(assessmentStatusesData);
     setLoading(false);
   }, []);
 

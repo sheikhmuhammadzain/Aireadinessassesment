@@ -649,79 +649,189 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
 
   // --- Main Submission Logic ---
   const handleSubmit = async () => {
-     if (!companyInfo || !assessmentType || Object.keys(questions).length === 0 || !user) {
-       toast({ title: "Submission Error", description: "Missing required information (Company Info, User, or Questions). Cannot submit.", variant: "destructive" });
-       setSubmitting(false);
-       return;
-     }
-     setSubmitting(true);
-     try {
-       // Format payload according to API specification
-       const categoryResponses = Object.entries(questions).map(([category, qList]) => ({
-           category: category,
-           weight: weights[category] ?? 0,
-           responses: qList.map(q => ({
+    if (!companyInfo || !assessmentType || Object.keys(questions).length === 0 || !user) {
+      toast({ title: "Submission Error", description: "Missing required information (Company Info, User, or Questions). Cannot submit.", variant: "destructive" });
+      setSubmitting(false);
+      return;
+    }
+    setSubmitting(true);
+    try {
+      // Format payload according to API specification
+      const categoryResponses = Object.entries(questions).map(([category, qList]) => ({
+        category: category,
+        weight: weights[category] ?? 0,
+        responses: qList.map(q => ({
           question: q.question,
-               answer: q.answer ?? 0 // Default unanswered to 0
+          answer: q.answer ?? 0 // Default unanswered to 0
         }))
       }));
 
-       const payload = {
+      const payload = {
         assessmentType,
-         categoryResponses
+        companyId: companyInfo.id || "",
+        companyName: companyInfo.name || "",
+        categoryResponses,
+        userId: user.id || "",
+        userName: user.name || "",
+        userRole: user.role || "",
+        completedAt: new Date().toISOString()
       };
 
       console.log("Submitting assessment payload:", JSON.stringify(payload, null, 2));
       const result = await submitAssessment(payload);
-       console.log("Assessment submitted successfully:", result);
+      console.log("Assessment submitted successfully:", result);
       
       try {
-            // Save result for immediate display on results page
+        // Save result for immediate display on results page
         localStorage.setItem(`assessment_result_${assessmentType}`, JSON.stringify(result));
-      } catch (storageError) {
-            console.error("Error saving results to localStorage:", storageError);
-            // Don't block navigation, but warn user
-            toast({ title: "Storage Warning", description: "Could not save results locally for instant view.", variant: "default" });
+        
+        // Also save the result by company ID for company-specific retrieval
+        // First, get any existing company assessments
+        const companyAssessmentsKey = `company_assessments_${companyInfo.id}`;
+        const existingData = localStorage.getItem(companyAssessmentsKey);
+        let companyAssessments: Record<string, any> = {};
+        
+        if (existingData) {
+          try {
+            companyAssessments = JSON.parse(existingData);
+          } catch (error) {
+            console.error("Error parsing existing company assessments:", error);
+          }
         }
+        
+        // Update with the new assessment result
+        companyAssessments[assessmentType] = {
+          ...result,
+          completedBy: {
+            id: user.id,
+            name: user.name,
+            role: user.role
+          },
+          completedAt: new Date().toISOString()
+        };
+        
+        // Save back to localStorage
+        localStorage.setItem(companyAssessmentsKey, JSON.stringify(companyAssessments));
+        
+        // Update company assessment status
+        updateCompanyAssessmentStatus(companyInfo.id, assessmentType, result.overallScore);
+        
+      } catch (storageError) {
+        console.error("Error saving results to localStorage:", storageError);
+        // Don't block navigation, but warn user
+        toast({ title: "Storage Warning", description: "Could not save results locally for instant view.", variant: "default" });
+      }
 
-       // Clear specific assessment data from localStorage after successful submission
-       localStorage.removeItem('subcategory_weights'); // Clear general weights
-       localStorage.removeItem('assessment_weights');
-       localStorage.removeItem('locked_categories');
-       // Keep company_info if doing multi-assessment, clear otherwise or at the end
+      // Clear specific assessment data from localStorage after successful submission
+      localStorage.removeItem('subcategory_weights'); // Clear general weights
+      localStorage.removeItem('assessment_weights');
+      localStorage.removeItem('locked_categories');
+      // Keep company_info if doing multi-assessment, clear otherwise or at the end
 
-       // Handle navigation
+      // Handle navigation
       if (isDoingAllAssessments) {
         const nextIndex = currentAssessmentIndex + 1;
         if (nextIndex < allAssessmentTypes.length) {
-           // Move to next assessment
+          // Move to next assessment
           localStorage.setItem('current_assessment_index', nextIndex.toString());
           router.replace(`/assessment/${encodeURIComponent(allAssessmentTypes[nextIndex])}`);
-           // Don't clear company_info yet
+          // Don't clear company_info yet
         } else {
-           // All assessments done
-           toast({ title: "All Assessments Completed!", description: "Navigating to dashboard.", variant: "default" });
+          // All assessments done
+          toast({ title: "All Assessments Completed!", description: "Navigating to dashboard.", variant: "default" });
           localStorage.removeItem('doing_all_assessments');
           localStorage.removeItem('current_assessment_index');
           localStorage.removeItem('assessment_types');
-           localStorage.removeItem('company_info'); // Clear info now
+          localStorage.removeItem('company_info'); // Clear info now
           router.replace('/dashboard');
         }
       } else {
-         // Single assessment done
-         localStorage.removeItem('company_info'); // Clear info
+        // Single assessment done
+        localStorage.removeItem('company_info'); // Clear info
         router.replace(`/results/${encodeURIComponent(assessmentType)}`);
       }
 
-     } catch (err) {
+    } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       console.error("Error submitting assessment:", error);
-       toast({ title: "Submission Error", description: error.message, variant: "destructive" });
-       setSubmitting(false); // Allow retry
-     }
-     // No need to setSubmitting(false) on success because we navigate away
+      toast({ title: "Submission Error", description: error.message, variant: "destructive" });
+      setSubmitting(false); // Allow retry
+    }
+    // No need to setSubmitting(false) on success because we navigate away
   };
 
+  // Helper function to update company assessment status in localStorage
+  const updateCompanyAssessmentStatus = (companyId: string, assessmentType: string, score: number) => {
+    // Get existing assessment statuses
+    let assessmentStatuses: any[] = [];
+    try {
+      const storedStatuses = localStorage.getItem('assessment_statuses');
+      if (storedStatuses) {
+        assessmentStatuses = JSON.parse(storedStatuses);
+      }
+    } catch (error) {
+      console.error("Error parsing assessment statuses:", error);
+    }
+    
+    // Find the company's status, or create a new one
+    let companyStatus = assessmentStatuses.find((s: any) => s.companyId === companyId);
+    
+    if (!companyStatus) {
+      // Try to get the company name
+      let companyName = "Unknown Company";
+      if (companyInfo && companyInfo.name) {
+        companyName = companyInfo.name;
+      } else {
+        try {
+          const companies = JSON.parse(localStorage.getItem('companies') || '[]');
+          const company = companies.find((c: any) => c.id === companyId);
+          if (company) {
+            companyName = company.name;
+          }
+        } catch (error) {
+          console.error("Error finding company name:", error);
+        }
+      }
+      
+      companyStatus = {
+        companyId,
+        companyName,
+        assessments: []
+      };
+      assessmentStatuses.push(companyStatus);
+    }
+    
+    // Find the assessment, or create a new one
+    let assessment = companyStatus.assessments.find((a: any) => a.type === assessmentType);
+    
+    if (assessment) {
+      // Update existing assessment
+      assessment.status = "completed";
+      assessment.score = score;
+      assessment.completedAt = new Date().toISOString();
+      assessment.completedBy = {
+        id: user?.id || "",
+        name: user?.name || "Unknown",
+        role: user?.role || ""
+      };
+    } else {
+      // Add new assessment
+      companyStatus.assessments.push({
+        type: assessmentType,
+        status: "completed",
+        score,
+        completedAt: new Date().toISOString(),
+        completedBy: {
+          id: user?.id || "",
+          name: user?.name || "Unknown",
+          role: user?.role || ""
+        }
+      });
+    }
+    
+    // Save updated assessment statuses
+    localStorage.setItem('assessment_statuses', JSON.stringify(assessmentStatuses));
+  }
 
   // --- Render Logic ---
 

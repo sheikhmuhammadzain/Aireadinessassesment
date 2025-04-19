@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -162,7 +162,11 @@ const SAMPLE_ASSIGNED_USERS = {
   }
 };
 
-export default function CompanyAssessmentsPage({ params }: { params: { id: string } }) {
+export default function CompanyAssessmentsPage({ params }: { params: Promise<{ id: string }> }) {
+  // Unwrap the params Promise
+  const unwrappedParams = use(params);
+  const companyId = unwrappedParams.id;
+  
   const router = useRouter();
   const [company, setCompany] = useState<CompanyInfo | null>(null);
   const [assessmentStatus, setAssessmentStatus] = useState<CompanyAssessmentStatus | null>(null);
@@ -170,26 +174,81 @@ export default function CompanyAssessmentsPage({ params }: { params: { id: strin
   const [activeTab, setActiveTab] = useState<string>("overview");
 
   useEffect(() => {
-    // Simulate API fetch with delay
-    setTimeout(() => {
-      const foundCompany = SAMPLE_COMPANIES.find(c => c.id === params.id);
-      const foundStatus = SAMPLE_ASSESSMENT_STATUSES.find(s => s.companyId === params.id);
+    // Load stored data instead of just using sample data
+    const loadCompanyData = () => {
+      // Try to load real company data first
+      try {
+        const storedCompanies = localStorage.getItem('companies');
+        if (storedCompanies) {
+          const companies = JSON.parse(storedCompanies);
+          const foundCompany = companies.find(c => c.id === companyId);
+          if (foundCompany) {
+            setCompany(foundCompany);
+          }
+        }
+      } catch (error) {
+        console.error("Error loading company data:", error);
+      }
       
-      if (foundCompany && foundStatus) {
-        setCompany(foundCompany);
+      // If no real data, use sample data
+      if (!company) {
+        const foundCompany = SAMPLE_COMPANIES.find(c => c.id === companyId);
+        if (foundCompany) {
+          setCompany(foundCompany);
+        }
+      }
+      
+      // Try to load real assessment status data
+      try {
+        const storedAssessmentStatuses = localStorage.getItem('assessment_statuses');
+        if (storedAssessmentStatuses) {
+          const assessmentStatuses = JSON.parse(storedAssessmentStatuses);
+          const foundStatus = assessmentStatuses.find(s => s.companyId === companyId);
+          if (foundStatus) {
+            setAssessmentStatus(foundStatus);
+            setLoading(false);
+            return;
+          }
+        }
+        
+        // Also try company-specific assessment results
+        const companyAssessmentsKey = `company_assessments_${companyId}`;
+        const storedCompanyAssessments = localStorage.getItem(companyAssessmentsKey);
+        if (storedCompanyAssessments) {
+          const companyAssessments = JSON.parse(storedCompanyAssessments);
+          if (Object.keys(companyAssessments).length > 0) {
+            // Convert to assessment status format
+            const assessmentStatus = {
+              companyId,
+              companyName: company?.name || "Unknown Company",
+              assessments: Object.entries(companyAssessments).map(([type, data]) => ({
+                type,
+                status: "completed",
+                score: data.overallScore,
+                completedAt: data.completedAt,
+                completedBy: data.completedBy
+              }))
+            };
+            setAssessmentStatus(assessmentStatus);
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error("Error loading assessment data:", error);
+      }
+      
+      // If no real data, use sample data
+      const foundStatus = SAMPLE_ASSESSMENT_STATUSES.find(s => s.companyId === companyId);
+      if (foundStatus) {
         setAssessmentStatus(foundStatus);
-      } else {
-        toast({
-          title: "Company Not Found",
-          description: "The requested company could not be found.",
-          variant: "destructive",
-        });
-        router.push("/admin/companies");
       }
       
       setLoading(false);
-    }, 500);
-  }, [params.id, router]);
+    };
+    
+    loadCompanyData();
+  }, [companyId]);
 
   const handleStartAssessment = (assessmentType: string) => {
     toast({
@@ -228,7 +287,21 @@ export default function CompanyAssessmentsPage({ params }: { params: { id: strin
   };
 
   const getAssignedUsers = (assessmentType: string) => {
-    return SAMPLE_ASSIGNED_USERS[params.id]?.[assessmentType] || [];
+    // First try to get from real assessment data
+    if (assessmentStatus) {
+      const assessment = assessmentStatus.assessments.find(a => a.type === assessmentType);
+      if (assessment && assessment.completedBy) {
+        return [{
+          id: assessment.completedBy.id,
+          name: assessment.completedBy.name,
+          role: assessment.completedBy.role,
+          assigned: assessment.completedAt || new Date().toISOString()
+        }];
+      }
+    }
+    
+    // Fall back to sample data
+    return SAMPLE_ASSIGNED_USERS[companyId]?.[assessmentType] || [];
   };
 
   // Calculate the overall score (average of completed assessments)

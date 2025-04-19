@@ -91,7 +91,7 @@ export default function Home() {
 
       {/* --- Hero Section --- */}
       <motion.section
-        className="relative isolate pt-32 pb-24 sm:pt-40 sm:pb-32 lg:pt-48 lg:pb-40 gradient-overlay" // Apply gradient overlay
+        className="relative isolate pt-32 pb-24 sm:pt-32 sm:pb-32 lg:pt-32 lg:pb-40 gradient-overlay" // Apply gradient overlay
         initial="hidden"
         animate="visible"
         variants={staggerContainer}
