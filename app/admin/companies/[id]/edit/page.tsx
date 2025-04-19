@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -155,6 +155,7 @@ export default function EditCompanyPage({ params }: { params: { id: string } }) 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [company, setCompany] = useState<CompanyInfo | null>(null);
+  const paramId = use(params).id;
 
   // Initialize form
   const form = useForm<CompanyFormValues>({
@@ -188,7 +189,7 @@ export default function EditCompanyPage({ params }: { params: { id: string } }) 
       localStorage.setItem("companies", JSON.stringify(SAMPLE_COMPANIES));
     }
     
-    const foundCompany = companies.find(c => c.id === params.id);
+    const foundCompany = companies.find(c => c.id === paramId);
     
     if (foundCompany) {
       setCompany(foundCompany);
@@ -212,7 +213,7 @@ export default function EditCompanyPage({ params }: { params: { id: string } }) 
     }
     
     setLoading(false);
-  }, [params.id, form, router]);
+  }, [paramId, form, router]);
 
   const onSubmit = async (values: CompanyFormValues) => {
     setSubmitting(true);
@@ -228,7 +229,7 @@ export default function EditCompanyPage({ params }: { params: { id: string } }) 
       
       // Update the specific company
       const updatedCompanies = companies.map(c => {
-        if (c.id === params.id) {
+        if (c.id === paramId) {
           return {
             ...c,
             ...values,
@@ -247,7 +248,7 @@ export default function EditCompanyPage({ params }: { params: { id: string } }) 
       });
       
       // Redirect to company details page
-      router.push(`/admin/companies/${params.id}`);
+      router.push(`/admin/companies/${paramId}`);
     } catch (error) {
       console.error("Error updating company:", error);
       toast({

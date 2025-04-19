@@ -30,6 +30,7 @@ import {
     TrendingDown, // Added for improvement area
     Target,      // Added for strongest area
     Info, // Added for insights
+    BarChart2,
 } from "lucide-react";
 import {
     BarChart,
@@ -106,31 +107,77 @@ function DashboardContent() {
 
     // --- Data Loading Effect ---
     useEffect(() => {
+        console.log("Loading dashboard data");
         const loadedResults: Record<string, AssessmentResult> = {};
         let hasResults = false;
 
+        // Debug: check what keys exist in localStorage
+        console.log("Available localStorage keys:", Object.keys(localStorage).filter(key => 
+            key.startsWith('assessment_result_')));
+
         // Only load results for assessment types that the user can see
         filteredAssessmentTypes.forEach(type => {
-            const storedResult = localStorage.getItem(`assessment_result_${type.id}`);
+            const storageKey = `assessment_result_${type.id}`;
+            console.log(`Checking for assessment result: ${storageKey}`);
+            
+            const storedResult = localStorage.getItem(storageKey);
             if (storedResult) {
                 try {
-                    loadedResults[type.id] = JSON.parse(storedResult);
+                    const parsedResult = JSON.parse(storedResult);
+                    console.log(`Found result for ${type.id}:`, parsedResult);
+                    loadedResults[type.id] = parsedResult;
                     hasResults = true;
                 } catch (error) {
                     console.error(`Error parsing stored result for ${type.id}:`, error);
                     // Optionally show a toast for corrupted data
                 }
+            } else {
+                console.log(`No result found for ${type.id}`);
             }
         });
 
+        // Additional check - look for any assessment results
+        if (!hasResults) {
+            console.log("No filtered assessment results found, checking for any assessment results");
+            const allStorageKeys = Object.keys(localStorage);
+            const assessmentResultKeys = allStorageKeys.filter(key => key.startsWith('assessment_result_'));
+            
+            if (assessmentResultKeys.length > 0) {
+                console.log("Found some assessment results not in the filtered types");
+                assessmentResultKeys.forEach(key => {
+                    try {
+                        const assessmentType = key.replace('assessment_result_', '');
+                        const result = JSON.parse(localStorage.getItem(key) || '{}');
+                        console.log(`Found result for ${assessmentType}:`, result);
+                        loadedResults[assessmentType] = result;
+                        hasResults = true;
+                    } catch (error) {
+                        console.error(`Error parsing result from ${key}:`, error);
+                    }
+                });
+            }
+        }
+
         if (hasResults) {
+            console.log("Setting loaded results:", loadedResults);
             setResults(loadedResults);
-            // Prepare overall data for bar chart (simplified)
-            const overallScores = filteredAssessmentTypes.map(type => ({
-                name: type.id,
-                score: loadedResults[type.id]?.overallScore ?? 0, // Use nullish coalescing
-            }));
+            
+            // Prepare overall data for bar chart
+            const overallScores = Object.entries(loadedResults).map(([type, result]) => {
+                // Make sure to handle null/undefined values safely
+                const score = typeof result.overallScore === 'number' ? 
+                    Math.round(result.overallScore * 100) / 100 : 0;
+                
+                return {
+                    name: type, // Use assessment type name
+                    score: score // Use a number between 0-100
+                };
+            }).filter(item => item.score > 0);
+            
+            console.log("Prepared chart data:", overallScores);
             setOverallData(overallScores);
+        } else {
+            console.log("No assessment results found");
         }
         setLoading(false);
     }, [filteredAssessmentTypes]); // Dependency is now a memoized value
@@ -414,39 +461,77 @@ function DashboardContent() {
                                         </CardDescription>
                                     </CardHeader>
                                     <CardContent className="pt-4 pl-0 pr-2 pb-4"> {/* Adjusted padding for chart */}
-                                        <div className="h-[400px]">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <BarChart
-                                                    data={overallData.filter(d => d.score > 0)} // Only show completed
-                                                    margin={{ top: 5, right: 10, left: -15, bottom: 50 }} // Fine-tune margins
-                                                >
-                                                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                                                    <XAxis
-                                                        dataKey="name"
-                                                        angle={-40}
-                                                        textAnchor="end"
-                                                        height={60}
-                                                        tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                                                        interval={0} // Ensure all labels are attempted
-                                                    />
-                                                    <YAxis
-                                                        domain={[0, 100]}
-                                                        tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                                                    />
-                                                    <Tooltip
-                                                        cursor={{ fill: 'hsl(var(--accent))', opacity: 0.5 }}
-                                                        contentStyle={{
-                                                            backgroundColor: 'hsl(var(--popover))',
-                                                            borderColor: 'hsl(var(--border))',
-                                                            color: 'hsl(var(--popover-foreground))',
-                                                            borderRadius: 'var(--radius)', // Use CSS var for radius
-                                                        }}
-                                                        formatter={(value: number) => [`${value}%`, 'Score']}
-                                                    />
-                                                    {/* Single Bar definition using primary color */}
-                                                    <Bar dataKey="score" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} maxBarSize={50} />
-                                                </BarChart>
-                                            </ResponsiveContainer>
+                                        <div className="h-[400px] w-full">
+                                            {overallData.length > 0 ? (
+                                                <div className="h-full flex">
+                                                    {/* Y-axis markers */}
+                                                    <div className="w-12 h-full flex flex-col justify-between pr-2 pb-16">
+                                                        <div className="text-xs text-muted-foreground">100%</div>
+                                                        <div className="text-xs text-muted-foreground">75%</div>
+                                                        <div className="text-xs text-muted-foreground">50%</div>
+                                                        <div className="text-xs text-muted-foreground">25%</div>
+                                                        <div className="text-xs text-muted-foreground">0%</div>
+                                                    </div>
+                                                    
+                                                    {/* Chart content */}
+                                                    <div className="flex-1 flex flex-col">
+                                                        {/* Grid lines */}
+                                                        <div className="flex-1 relative">
+                                                            <div className="absolute w-full h-[1px] bg-gray-200 top-0"></div>
+                                                            <div className="absolute w-full h-[1px] bg-gray-200 top-1/4"></div>
+                                                            <div className="absolute w-full h-[1px] bg-gray-200 top-1/2"></div>
+                                                            <div className="absolute w-full h-[1px] bg-gray-200 top-3/4"></div>
+                                                            <div className="absolute w-full h-[1px] bg-gray-200 bottom-0"></div>
+                                                            
+                                                            {/* Bars */}
+                                                            <div className="h-full flex items-end justify-around gap-6 pb-16 px-4">
+                                                                {overallData.map((item, index) => {
+                                                                    // Choose a color based on the index
+                                                                    const colors = ["bg-blue-500", "bg-indigo-500", "bg-violet-500", "bg-purple-500", "bg-pink-500", "bg-rose-500", "bg-red-500"];
+                                                                    const barColor = colors[index % colors.length];
+                                                                    
+                                                                    return (
+                                                                        <div key={item.name} className="flex flex-col items-center w-full max-w-[150px]">
+                                                                            <div className="w-full flex flex-col items-center">
+                                                                                <div 
+                                                                                    className={`w-[80px] ${barColor} rounded-t-sm transition-all duration-500 shadow-md`}
+                                                                                    style={{ 
+                                                                                        height: `${Math.min(item.score, 100) * 2.5}px`,
+                                                                                        maxHeight: '250px'
+                                                                                    }}
+                                                                                ></div>
+                                                                                <div className="text-sm font-medium mt-2">{item.score}%</div>
+                                                                                <div 
+                                                                                    className="mt-2 text-sm font-medium text-center" 
+                                                                                    style={{ 
+                                                                                        transform: 'rotate(-45deg)',
+                                                                                        transformOrigin: 'top left',
+                                                                                        width: '120px', 
+                                                                                        position: 'relative',
+                                                                                        left: '30px',
+                                                                                        top: '30px'
+                                                                                    }}
+                                                                                >
+                                                                                    {item.name}
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                        <div className="h-[1px] bg-gray-200 mx-4"></div>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="flex flex-col items-center justify-center h-full">
+                                                    <BarChart2 className="h-16 w-16 text-muted-foreground/30 mb-4" />
+                                                    <p className="text-muted-foreground text-center">No assessment data to display</p>
+                                                    <p className="text-sm text-muted-foreground/80 text-center mt-1">
+                                                        Complete assessments to see comparison chart
+                                                    </p>
+                                                </div>
+                                            )}
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -461,7 +546,6 @@ function DashboardContent() {
                                     </CardHeader>
                                     <CardContent className="pt-4 space-y-5">
                                         {overallData
-                                            .filter(d => d.score > 0) // Only consider completed
                                             .sort((a, b) => a.score - b.score) // Sort lowest first
                                             .slice(0, 3) // Take top 3 lowest
                                             .map((item, index) => (
@@ -476,7 +560,7 @@ function DashboardContent() {
                                                     </p>
                                                 </div>
                                             ))}
-                                        {overallData.filter(d => d.score > 0).length === 0 && (
+                                        {overallData.length === 0 && (
                                              <p className="text-sm text-muted-foreground">No completed assessments to prioritize.</p>
                                         )}
                                     </CardContent>

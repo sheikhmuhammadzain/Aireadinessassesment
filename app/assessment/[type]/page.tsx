@@ -537,6 +537,26 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
       localStorage.removeItem('retaking_assessment');
     }
 
+    // Try to get company-specific weights
+    if (initialCompanyInfo) {
+      try {
+        // Use optional chaining and nullish coalescing to handle undefined
+        const companyId = initialCompanyInfo?.id ?? "";
+        if (companyId) {
+          const companyWeightsKey = `company_weights_${companyId}`;
+          const storedCompanyWeights = localStorage.getItem(companyWeightsKey);
+          if (storedCompanyWeights) {
+            console.log("Using company-specific weights");
+            const parsedWeights = JSON.parse(storedCompanyWeights);
+            setWeights(parsedWeights);
+            localStorage.setItem('assessment_weights', JSON.stringify(parsedWeights));
+          }
+        }
+      } catch (error) {
+        console.error("Error loading company-specific weights:", error);
+      }
+    }
+
     // Execute the appropriate data fetching based on the determined step
     if (determinedStep === 'questions') {
       fetchQuestionnaires();
@@ -656,11 +676,46 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
     }
     setSubmitting(true);
     try {
-      // Format payload according to API specification
-      const categoryResponses = Object.entries(questions).map(([category, qList]) => ({
+      // CRITICAL FIX: Ensure we have valid weights that sum to 100
+      // Create an array of all categories in the assessment
+      const allCategories = Object.keys(questions);
+      if (allCategories.length === 0) {
+        throw new Error("No assessment categories found");
+      }
+      
+      // Create valid weights by ensuring every category has a non-zero weight
+      // and the total sum is exactly 100
+      let validWeights: Record<string, number> = {};
+      
+      // First assign equal weights to all categories
+      const equalWeight = Number((100 / allCategories.length).toFixed(1));
+      allCategories.forEach(category => {
+        validWeights[category] = equalWeight;
+      });
+      
+      // Calculate the current sum and adjust if needed to ensure exactly 100
+      let totalWeight = Object.values(validWeights).reduce((sum, weight) => sum + weight, 0);
+      if (Math.abs(totalWeight - 100) > 0.0001) {
+        // If there's a discrepancy, adjust the last category
+        const lastCategory = allCategories[allCategories.length - 1];
+        validWeights[lastCategory] = Number((validWeights[lastCategory] + (100 - totalWeight)).toFixed(1));
+      }
+      
+      // Double-check that weights sum to 100
+      totalWeight = Object.values(validWeights).reduce((sum, weight) => sum + weight, 0);
+      console.log(`Total weight before submission: ${totalWeight}`);
+      console.log("Category weights for submission:", validWeights);
+      
+      if (Math.abs(totalWeight - 100) > 0.1) {
+        // If still not close to 100, show error and prevent submission
+        throw new Error(`Weight validation failed. Total: ${totalWeight.toFixed(1)}%. Must be 100%.`);
+      }
+
+      // Format payload according to API specification using the validWeights
+      const categoryResponses = allCategories.map(category => ({
         category: category,
-        weight: weights[category] ?? 0,
-        responses: qList.map(q => ({
+        weight: validWeights[category],
+        responses: questions[category].map(q => ({
           question: q.question,
           answer: q.answer ?? 0 // Default unanswered to 0
         }))
@@ -687,7 +742,7 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
         
         // Also save the result by company ID for company-specific retrieval
         // First, get any existing company assessments
-        const companyAssessmentsKey = `company_assessments_${companyInfo.id}`;
+        const companyAssessmentsKey = `company_assessments_${companyInfo.id || ""}`;
         const existingData = localStorage.getItem(companyAssessmentsKey);
         let companyAssessments: Record<string, any> = {};
         
@@ -714,7 +769,11 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
         localStorage.setItem(companyAssessmentsKey, JSON.stringify(companyAssessments));
         
         // Update company assessment status
-        updateCompanyAssessmentStatus(companyInfo.id, assessmentType, result.overallScore);
+        if (companyInfo.id) {
+          updateCompanyAssessmentStatus(companyInfo.id, assessmentType, result.overallScore);
+        } else {
+          console.log("No company ID available for assessment status update");
+        }
         
       } catch (storageError) {
         console.error("Error saving results to localStorage:", storageError);

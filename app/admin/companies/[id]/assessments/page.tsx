@@ -176,79 +176,141 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
   useEffect(() => {
     // Load stored data instead of just using sample data
     const loadCompanyData = () => {
-      // Try to load real company data first
+      // First check if the company info is in localStorage (from profile page)
+      try {
+        const storedCompanyInfo = localStorage.getItem('company_info');
+        if (storedCompanyInfo) {
+          const parsedInfo = JSON.parse(storedCompanyInfo);
+          // Only use if ID matches
+          if (parsedInfo.id === companyId) {
+            console.log("Found company in company_info:", parsedInfo);
+            setCompany(parsedInfo);
+            
+            // If we also have assessment status, set it
+            try {
+              const companyAssessmentsKey = `company_assessments_${companyId}`;
+              const storedCompanyAssessments = localStorage.getItem(companyAssessmentsKey);
+              if (storedCompanyAssessments) {
+                const assessments = JSON.parse(storedCompanyAssessments);
+                if (Object.keys(assessments).length > 0) {
+                  // Convert to assessment status format
+                  const status = {
+                    companyId,
+                    companyName: parsedInfo.name,
+                    assessments: Object.entries(assessments).map(([type, data]) => ({
+                      type,
+                      status: "completed",
+                      score: data.overallScore,
+                      completedAt: data.completedAt,
+                      completedBy: data.completedBy
+                    }))
+                  };
+                  setAssessmentStatus(status);
+                  setLoading(false);
+                  return;
+                }
+              }
+            } catch (error) {
+              console.error("Error checking company assessments:", error);
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error checking stored company info:", error);
+      }
+      
+      // Try to load real company data from the companies list
       try {
         const storedCompanies = localStorage.getItem('companies');
         if (storedCompanies) {
           const companies = JSON.parse(storedCompanies);
           const foundCompany = companies.find(c => c.id === companyId);
           if (foundCompany) {
+            console.log("Found company in companies list:", foundCompany);
             setCompany(foundCompany);
+            
+            // Check for assessment status
+            try {
+              const storedStatuses = localStorage.getItem('assessment_statuses');
+              if (storedStatuses) {
+                const statuses = JSON.parse(storedStatuses);
+                const foundStatus = statuses.find(s => s.companyId === companyId);
+                if (foundStatus) {
+                  setAssessmentStatus(foundStatus);
+                  setLoading(false);
+                  return;
+                }
+              }
+            } catch (error) {
+              console.error("Error checking assessment statuses:", error);
+            }
+            
+            // Create default assessment status if not found
+            const defaultStatus = {
+              companyId,
+              companyName: foundCompany.name,
+              assessments: [
+                { type: "AI Governance", status: "not-started" },
+                { type: "AI Culture", status: "not-started" },
+                { type: "AI Infrastructure", status: "not-started" },
+                { type: "AI Strategy", status: "not-started" },
+                { type: "AI Data", status: "not-started" },
+                { type: "AI Talent", status: "not-started" },
+                { type: "AI Security", status: "not-started" }
+              ]
+            };
+            
+            setAssessmentStatus(defaultStatus);
+            setLoading(false);
+            return;
           }
         }
       } catch (error) {
         console.error("Error loading company data:", error);
       }
       
-      // If no real data, use sample data
-      if (!company) {
-        const foundCompany = SAMPLE_COMPANIES.find(c => c.id === companyId);
-        if (foundCompany) {
-          setCompany(foundCompany);
-        }
-      }
-      
-      // Try to load real assessment status data
-      try {
-        const storedAssessmentStatuses = localStorage.getItem('assessment_statuses');
-        if (storedAssessmentStatuses) {
-          const assessmentStatuses = JSON.parse(storedAssessmentStatuses);
-          const foundStatus = assessmentStatuses.find(s => s.companyId === companyId);
-          if (foundStatus) {
-            setAssessmentStatus(foundStatus);
-            setLoading(false);
-            return;
-          }
-        }
-        
-        // Also try company-specific assessment results
-        const companyAssessmentsKey = `company_assessments_${companyId}`;
-        const storedCompanyAssessments = localStorage.getItem(companyAssessmentsKey);
-        if (storedCompanyAssessments) {
-          const companyAssessments = JSON.parse(storedCompanyAssessments);
-          if (Object.keys(companyAssessments).length > 0) {
-            // Convert to assessment status format
-            const assessmentStatus = {
-              companyId,
-              companyName: company?.name || "Unknown Company",
-              assessments: Object.entries(companyAssessments).map(([type, data]) => ({
-                type,
-                status: "completed",
-                score: data.overallScore,
-                completedAt: data.completedAt,
-                completedBy: data.completedBy
-              }))
-            };
-            setAssessmentStatus(assessmentStatus);
-            setLoading(false);
-            return;
-          }
-        }
-      } catch (error) {
-        console.error("Error loading assessment data:", error);
-      }
-      
-      // If no real data, use sample data
+      // If we still don't have a company, check sample data as a fallback
+      const foundCompany = SAMPLE_COMPANIES.find(c => c.id === companyId);
       const foundStatus = SAMPLE_ASSESSMENT_STATUSES.find(s => s.companyId === companyId);
-      if (foundStatus) {
-        setAssessmentStatus(foundStatus);
+      
+      if (foundCompany) {
+        console.log("Found company in sample data:", foundCompany);
+        setCompany(foundCompany);
+        if (foundStatus) {
+          setAssessmentStatus(foundStatus);
+        } else {
+          // Create default status
+          const defaultStatus = {
+            companyId,
+            companyName: foundCompany.name,
+            assessments: [
+              { type: "AI Governance", status: "not-started" },
+              { type: "AI Culture", status: "not-started" },
+              { type: "AI Infrastructure", status: "not-started" },
+              { type: "AI Strategy", status: "not-started" },
+              { type: "AI Data", status: "not-started" },
+              { type: "AI Talent", status: "not-started" },
+              { type: "AI Security", status: "not-started" }
+            ]
+          };
+          setAssessmentStatus(defaultStatus);
+        }
+      } else {
+        // If we get here, we couldn't find the company anywhere
+        console.error("Company not found with ID:", companyId);
+        toast({
+          title: "Company Not Found",
+          description: "The requested company could not be found.",
+          variant: "destructive",
+        });
+        setTimeout(() => router.push("/admin/companies"), 2000);
       }
       
       setLoading(false);
     };
     
     loadCompanyData();
-  }, [companyId]);
+  }, [companyId, router, toast]);
 
   const handleStartAssessment = (assessmentType: string) => {
     toast({
@@ -352,6 +414,15 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
         <div>
           <h1 className="text-3xl font-bold">{company.name}</h1>
           <p className="text-muted-foreground">Assessment Management</p>
+        </div>
+        <div className="ml-auto">
+          <Button 
+            variant="outline" 
+            onClick={() => router.push(`/admin/companies/${companyId}/profile`)}
+            className="mr-2"
+          >
+            Configure Assessment Weights
+          </Button>
         </div>
       </div>
 

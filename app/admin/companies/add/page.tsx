@@ -131,13 +131,16 @@ export default function AddCompanyPage() {
       // Save back to localStorage
       localStorage.setItem("companies", JSON.stringify(updatedCompanies));
       
+      // Save the current company in localStorage for the profiling/weight adjustment page
+      localStorage.setItem("company_info", JSON.stringify(newCompany));
+      
       toast({
         title: "Company Created",
-        description: `${values.name} has been successfully created.`,
+        description: `${values.name} has been successfully created. Proceeding to assessment configuration.`,
       });
       
-      // Navigate back to companies list
-      router.push("/admin/companies");
+      // Navigate to the company profiling/weight adjustment page instead
+      router.push(`/admin/companies/${newCompany.id}/profile`);
     } catch (error) {
       console.error("Error creating company:", error);
       toast({

@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { CheckCircle, XCircle, Clock, Plus, Search, Filter, MoreHorizontal, Pencil, Trash, BarChart } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Plus, Search, Filter, MoreHorizontal, Pencil, Trash, BarChart, Users } from "lucide-react";
 import { CompanyInfo, CompanyAssessmentStatus } from "@/types";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -22,6 +22,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useAuth, User, UserRole } from "@/lib/auth-context";
+import { Label } from "@/components/ui/label";
+
+// Import predefined users from auth context to avoid naming conflicts
+import { PREDEFINED_USERS as AUTH_PREDEFINED_USERS } from "@/lib/auth-context";
 
 // Sample data for demo purposes
 const SAMPLE_COMPANIES: CompanyInfo[] = [
@@ -153,6 +167,7 @@ const SAMPLE_ASSESSMENT_STATUSES: CompanyAssessmentStatus[] = [
 
 export default function AdminCompaniesPage() {
   const router = useRouter();
+  const { user: currentUser } = useAuth();
   const [companies, setCompanies] = useState<CompanyInfo[]>([]);
   const [assessmentStatuses, setAssessmentStatuses] = useState<CompanyAssessmentStatus[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -161,6 +176,15 @@ export default function AdminCompaniesPage() {
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [companyToDelete, setCompanyToDelete] = useState<CompanyInfo | null>(null);
+  
+  // New state for the user assignment feature
+  const [assignRolesDialogOpen, setAssignRolesDialogOpen] = useState(false);
+  const [companyForRoles, setCompanyForRoles] = useState<CompanyInfo | null>(null);
+  const [availableUsers, setAvailableUsers] = useState<User[]>([]);
+  const [assignedUsers, setAssignedUsers] = useState<Record<string, string[]>>({});  // companyId -> array of userIds
+  const [selectedUsers, setSelectedUsers] = useState<Record<string, boolean>>({});  // userId -> selected (true/false)
+  const [editingCompany, setEditingCompany] = useState<CompanyInfo | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
 
   useEffect(() => {
     // Load companies from localStorage
@@ -197,6 +221,50 @@ export default function AdminCompaniesPage() {
       console.error("Error parsing assessment statuses from localStorage:", error);
     }
     
+    // Load user assignments from localStorage
+    try {
+      const storedAssignments = localStorage.getItem("company_user_assignments");
+      if (storedAssignments) {
+        setAssignedUsers(JSON.parse(storedAssignments));
+      }
+    } catch (error) {
+      console.error("Error parsing company user assignments:", error);
+    }
+    
+    // Load all available users (predefined and custom)
+    const loadAllUsers = () => {
+      // Start with predefined users from auth context
+      let allUsers = [...AUTH_PREDEFINED_USERS];
+      
+      // Check for any custom users in localStorage
+      try {
+        // Custom users might be stored individually - iterate through localStorage
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key?.startsWith('user_') || key === 'user') {
+            try {
+              const userData = JSON.parse(localStorage.getItem(key) || '');
+              // Check if this is a user object with required fields
+              if (userData && userData.id && userData.email && userData.name && userData.role) {
+                // Check if this user is already in our list
+                if (!allUsers.some(u => u.id === userData.id)) {
+                  allUsers.push(userData as User);
+                }
+              }
+            } catch (e) {
+              console.error(`Error parsing user data from key ${key}:`, e);
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error loading custom users:", error);
+      }
+      
+      return allUsers;
+    };
+    
+    setAvailableUsers(loadAllUsers());
+    
     // If no assessment statuses in localStorage, use sample data
     if (assessmentStatusesData.length === 0) {
       assessmentStatusesData = SAMPLE_ASSESSMENT_STATUSES;
@@ -215,7 +283,7 @@ export default function AdminCompaniesPage() {
             if (Object.keys(companyAssessments).length > 0) {
               // Find or create assessment status for this company
               let statusIndex = assessmentStatusesData.findIndex(s => s.companyId === company.id);
-              if (statusIndex === -1) {
+              if (statusIndex === -1 && company.id) {
                 // Create new assessment status
                 assessmentStatusesData.push({
                   companyId: company.id,
@@ -225,29 +293,38 @@ export default function AdminCompaniesPage() {
                 statusIndex = assessmentStatusesData.length - 1;
               }
               
-              // Update assessments from company-specific data
-              Object.entries(companyAssessments).forEach(([assessmentType, data]) => {
-                // Check if assessment already exists
-                const existingAssessmentIndex = assessmentStatusesData[statusIndex].assessments.findIndex(
-                  a => a.type === assessmentType
-                );
-                
-                const assessmentData = {
-                  type: assessmentType,
-                  status: "completed" as const,
-                  score: data.overallScore,
-                  completedAt: data.completedAt,
-                  completedBy: data.completedBy
-                };
-                
-                if (existingAssessmentIndex >= 0) {
-                  // Update existing assessment
-                  assessmentStatusesData[statusIndex].assessments[existingAssessmentIndex] = assessmentData;
-                } else {
-                  // Add new assessment
-                  assessmentStatusesData[statusIndex].assessments.push(assessmentData);
-                }
-              });
+              if (statusIndex !== -1) {
+                // Update assessments from company-specific data
+                Object.entries(companyAssessments).forEach(([assessmentType, assessmentData]) => {
+                  // Type assertion for the assessment data
+                  const typedData = assessmentData as {
+                    overallScore: number;
+                    completedAt: string;
+                    completedBy: string;
+                  };
+                  
+                  // Check if assessment already exists
+                  const existingAssessmentIndex = assessmentStatusesData[statusIndex].assessments.findIndex(
+                    a => a.type === assessmentType
+                  );
+                  
+                  const assessmentDataObj = {
+                    type: assessmentType,
+                    status: "completed" as const,
+                    score: typedData.overallScore,
+                    completedAt: typedData.completedAt,
+                    completedBy: typedData.completedBy
+                  };
+                  
+                  if (existingAssessmentIndex >= 0) {
+                    // Update existing assessment
+                    assessmentStatusesData[statusIndex].assessments[existingAssessmentIndex] = assessmentDataObj;
+                  } else {
+                    // Add new assessment
+                    assessmentStatusesData[statusIndex].assessments.push(assessmentDataObj);
+                  }
+                });
+              }
             }
           }
         } catch (error) {
@@ -268,23 +345,16 @@ export default function AdminCompaniesPage() {
   };
 
   const handleEditCompany = (id: string) => {
-    router.push(`/admin/companies/edit/${id}`);
+    router.push(`/admin/companies/${id}/edit`);
   };
 
-  const handleDeleteCompany = (id: string) => {
-    // For demo, just remove from local state and localStorage
-    const updatedCompanies = companies.filter(company => company.id !== id);
+  const handleDeleteCompany = (companyId: string) => {
+    const updatedCompanies = companies.filter(company => company.id !== companyId);
     setCompanies(updatedCompanies);
-    
-    // Also update localStorage
     localStorage.setItem("companies", JSON.stringify(updatedCompanies));
-    
-    const updatedStatuses = assessmentStatuses.filter(status => status.companyId !== id);
-    setAssessmentStatuses(updatedStatuses);
-    
     toast({
-      title: "Company Deleted",
-      description: "The company has been successfully removed.",
+      title: "Company deleted",
+      description: "The company has been successfully deleted.",
     });
   };
 
@@ -360,6 +430,50 @@ export default function AdminCompaniesPage() {
       setDeleteDialogOpen(false);
       setCompanyToDelete(null);
     }
+  };
+
+  const handleOpenAssignRoles = (company: CompanyInfo) => {
+    setCompanyForRoles(company);
+    
+    // Initialize selected users based on current assignments
+    const initialSelected: Record<string, boolean> = {};
+    const companyId = company.id || "";
+    const companyAssignedUsers = assignedUsers[companyId] || [];
+    
+    // Mark users that are already assigned to this company
+    availableUsers.forEach(user => {
+      initialSelected[user.id] = companyAssignedUsers.includes(user.id);
+    });
+    
+    setSelectedUsers(initialSelected);
+    setAssignRolesDialogOpen(true);
+  };
+
+  const handleSaveAssignments = () => {
+    if (!companyForRoles || !companyForRoles.id) return;
+    
+    const companyId = companyForRoles.id;
+    
+    // Get the IDs of selected users
+    const selectedUserIds = Object.entries(selectedUsers)
+      .filter(([_, isSelected]) => isSelected)
+      .map(([userId]) => userId);
+    
+    // Update assignments
+    const updatedAssignments = {
+      ...assignedUsers,
+      [companyId]: selectedUserIds
+    };
+    
+    // Save to state and localStorage
+    setAssignedUsers(updatedAssignments);
+    localStorage.setItem('company_user_assignments', JSON.stringify(updatedAssignments));
+    
+    toast({
+      title: "Success",
+      description: "User roles assigned successfully"
+    });
+    setAssignRolesDialogOpen(false);
   };
 
   return (
@@ -508,6 +622,10 @@ export default function AdminCompaniesPage() {
                                 <Pencil className="mr-2 h-4 w-4" />
                                 Edit Company
                               </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleOpenAssignRoles(company)}>
+                                <Users className="mr-2 h-4 w-4" />
+                                Assign Roles
+                              </DropdownMenuItem>
                               <DropdownMenuItem 
                                 onClick={() => handleDeleteClick(company)}
                                 className="text-destructive focus:text-destructive"
@@ -550,6 +668,46 @@ export default function AdminCompaniesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Assign Roles Dialog */}
+      <Dialog open={assignRolesDialogOpen} onOpenChange={setAssignRolesDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Assign Users to {companyForRoles?.name}</DialogTitle>
+            <DialogDescription>
+              Select users who should have access to this company.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4 max-h-[300px] overflow-y-auto">
+            {availableUsers.map(user => (
+              <div key={user.id} className="flex items-center space-x-2">
+                <Checkbox 
+                  id={`user-${user.id}`}
+                  checked={selectedUsers[user.id] || false}
+                  onCheckedChange={(checked) => {
+                    setSelectedUsers({
+                      ...selectedUsers,
+                      [user.id]: !!checked
+                    });
+                  }}
+                />
+                <Label htmlFor={`user-${user.id}`} className="flex-1">
+                  <div className="flex flex-col">
+                    <span>{user.name}</span>
+                    <span className="text-muted-foreground text-sm">{user.email}</span>
+                  </div>
+                </Label>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAssignRolesDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveAssignments}>Save Assignments</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 } 
