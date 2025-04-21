@@ -27,6 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Plus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { CompanyInfo } from "@/types";
+import api from '@/lib/api/client';
 
 // Zod schema for form validation
 const companyFormSchema = z.object({
@@ -111,25 +112,23 @@ export default function AddCompanyPage() {
     setSubmitting(true);
     
     try {
-      // Create a new company with ID and timestamps
-      const newCompany: CompanyInfo = {
-        ...values,
-        id: Math.random().toString(36).substring(2, 9), // Random ID
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+      // Use the API client to create the company in the database
+      const { data: newCompany, error } = await api.companies.createCompany({
+        name: values.name,
+        industry: values.industry,
+        size: values.size,
+        region: values.region,
+        aiMaturity: values.aiMaturity, // Use aiMaturity to match CompanyInfo type
+        notes: values.notes || "",
+      });
       
-      // Get existing companies from localStorage or start with empty array
-      const existingCompaniesJson = localStorage.getItem("companies");
-      const existingCompanies: CompanyInfo[] = existingCompaniesJson 
-        ? JSON.parse(existingCompaniesJson) 
-        : [];
+      if (error) {
+        throw new Error(error);
+      }
       
-      // Add new company to the array
-      const updatedCompanies = [...existingCompanies, newCompany];
-      
-      // Save back to localStorage
-      localStorage.setItem("companies", JSON.stringify(updatedCompanies));
+      if (!newCompany) {
+        throw new Error("Failed to create company - no data returned");
+      }
       
       // Save the current company in localStorage for the profiling/weight adjustment page
       localStorage.setItem("company_info", JSON.stringify(newCompany));

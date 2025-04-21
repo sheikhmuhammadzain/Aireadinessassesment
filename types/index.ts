@@ -10,6 +10,17 @@ export interface CompanyInfo {
   updatedAt?: string;
 }
 
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: string; // e.g., 'admin', 'user', 'pillar_lead'
+  createdAt?: string;
+  updatedAt?: string;
+  // Add companies if needed, based on backend response structure
+  companies?: CompanyInfo[]; 
+}
+
 // Define assessment status types
 export interface Assessment {
   type: string;

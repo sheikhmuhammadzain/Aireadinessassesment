@@ -51,6 +51,13 @@ export function WeightAdjustment({
     }
   }, [weights]);
 
+  // Add a new useEffect that responds to recommendedWeights changes
+  useEffect(() => {
+    if (recommendedWeights && Object.keys(recommendedWeights).length > 0) {
+      console.log("Received new recommended weights:", recommendedWeights);
+    }
+  }, [recommendedWeights]);
+
   // Toggle lock for a category
   const toggleCategoryLock = (category: string) => {
     // Check if user has permission to modify this category
@@ -203,12 +210,24 @@ export function WeightAdjustment({
   };
 
   const resetToRecommended = () => {
-    if (recommendedWeights) {
+    if (recommendedWeights && Object.keys(recommendedWeights).length > 0) {
+      console.log("Resetting to recommended weights:", recommendedWeights);
       setLocalWeights(recommendedWeights);
       onWeightsChange(recommendedWeights);
       // Reset all locks when resetting to recommended weights
       setLockedCategories({});
       localStorage.setItem('locked_categories', JSON.stringify({}));
+      
+      toast({
+        title: "Weights Reset",
+        description: "Weights have been reset to the recommended values.",
+      });
+    } else {
+      toast({
+        title: "No Recommended Weights",
+        description: "No recommended weights available to reset to.",
+        variant: "destructive",
+      });
     }
   };
 

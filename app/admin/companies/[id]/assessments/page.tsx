@@ -11,6 +11,7 @@ import { ArrowLeft, CheckCircle, BarChart2, FileText, Clock, XCircle, ArrowRight
 import { toast } from "@/hooks/use-toast";
 import { CompanyInfo, CompanyAssessmentStatus } from "@/types";
 import { Separator } from "@/components/ui/separator";
+import { useAuth } from "@/lib/auth-context";
 
 // Sample data for demo purposes (same as in companies page)
 const SAMPLE_COMPANIES: CompanyInfo[] = [
@@ -168,84 +169,316 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
   const companyId = unwrappedParams.id;
   
   const router = useRouter();
+  const { isAuthenticated, token } = useAuth();
   const [company, setCompany] = useState<CompanyInfo | null>(null);
   const [assessmentStatus, setAssessmentStatus] = useState<CompanyAssessmentStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("overview");
+  const [teamMembers, setTeamMembers] = useState<Record<string, any[]>>({});
+  const [loadingTeam, setLoadingTeam] = useState(false);
+
+  // Fetch team members assigned to the company
+  const fetchTeamMembers = async (companyId: string) => {
+    setLoadingTeam(true);
+    try {
+      const { default: api } = await import('@/lib/api/client');
+      
+      // Fetch team members for this company
+      console.log(`Fetching team members for company: ${companyId}`);
+      // Use getCompanyUsers instead of getCompanyTeamMembers which doesn't exist
+      const { data, error } = await api.companies.getCompanyUsers(companyId);
+      
+      if (error) {
+        console.warn("Error fetching team members:", error);
+        return;
+      }
+      
+      if (data && Array.isArray(data) && data.length > 0) {
+        console.log("Successfully fetched team members:", data);
+        
+        // Map roles to assessment types
+        const roleToAssessmentMap: Record<string, string[]> = {
+          'admin': ["AI Governance", "AI Culture", "AI Infrastructure", "AI Strategy", "AI Data", "AI Talent", "AI Security"],
+          'governance_manager': ["AI Governance"],
+          'ai_governance': ["AI Governance"],
+          'culture_director': ["AI Culture"],
+          'ai_culture': ["AI Culture"],
+          'infrastructure_lead': ["AI Infrastructure"],
+          'ai_infrastructure': ["AI Infrastructure"],
+          'strategy_officer': ["AI Strategy"],
+          'ai_strategy': ["AI Strategy"],
+          'data_engineer': ["AI Data"],
+          'ai_data': ["AI Data"],
+          'talent_manager': ["AI Talent"],
+          'ai_talent': ["AI Talent"],
+          'security_specialist': ["AI Security"],
+          'ai_security': ["AI Security"]
+        };
+        
+        // Initialize empty team members object
+        const organizedTeamMembers: Record<string, any[]> = {
+          "AI Governance": [],
+          "AI Culture": [],
+          "AI Infrastructure": [],
+          "AI Strategy": [],
+          "AI Data": [],
+          "AI Talent": [],
+          "AI Security": []
+        };
+        
+        // Assign users to appropriate assessment types based on their role
+        data.forEach(user => {
+          const role = user.role?.toLowerCase().replace(/\s+/g, '_') || 'unknown';
+          const username = user.email?.split('@')[0] || '';
+          
+          // Check if user's role maps directly to assessment types
+          const assessmentTypes = roleToAssessmentMap[role] || [];
+          
+          // Check if username contains clues about their role (fallback)
+          if (assessmentTypes.length === 0) {
+            if (username.includes('admin')) {
+              assessmentTypes.push(...roleToAssessmentMap['admin']);
+            } else if (username.includes('govern')) {
+              assessmentTypes.push('AI Governance');
+            } else if (username.includes('culture')) {
+              assessmentTypes.push('AI Culture');
+            } else if (username.includes('infra')) {
+              assessmentTypes.push('AI Infrastructure');
+            } else if (username.includes('strat')) {
+              assessmentTypes.push('AI Strategy');
+            } else if (username.includes('data')) {
+              assessmentTypes.push('AI Data');
+            } else if (username.includes('talent')) {
+              assessmentTypes.push('AI Talent');
+            } else if (username.includes('secur')) {
+              assessmentTypes.push('AI Security');
+            }
+          }
+          
+          // If still no mapping, check the user's name for more clues
+          if (assessmentTypes.length === 0 && user.name) {
+            const name = user.name.toLowerCase();
+            if (name.includes('admin')) {
+              assessmentTypes.push(...roleToAssessmentMap['admin']);
+            } else if (name.includes('govern')) {
+              assessmentTypes.push('AI Governance');
+            } else if (name.includes('culture')) {
+              assessmentTypes.push('AI Culture');
+            } else if (name.includes('infra')) {
+              assessmentTypes.push('AI Infrastructure');
+            } else if (name.includes('strat')) {
+              assessmentTypes.push('AI Strategy');
+            } else if (name.includes('data')) {
+              assessmentTypes.push('AI Data');
+            } else if (name.includes('talent')) {
+              assessmentTypes.push('AI Talent');
+            } else if (name.includes('secur')) {
+              assessmentTypes.push('AI Security');
+            }
+          }
+          
+          // If we still haven't found a mapping, put in unknown category
+          if (assessmentTypes.length === 0) {
+            // Just put them in the first assessment as a fallback
+            assessmentTypes.push('AI Governance');
+          }
+          
+          // Add user to each of their assigned assessment types
+          assessmentTypes.forEach(type => {
+            if (organizedTeamMembers[type]) {
+              organizedTeamMembers[type].push({
+                id: user.id,
+                name: user.name || user.email || 'Unknown User',
+                role: user.role || roleFromUsername(username) || 'Team Member',
+                assigned: user.created_at || new Date().toISOString()
+              });
+            }
+          });
+        });
+        
+        setTeamMembers(organizedTeamMembers);
+      } else {
+        console.log("No team members found for this company");
+      }
+    } catch (error) {
+      console.error("Error fetching team members:", error);
+    } finally {
+      setLoadingTeam(false);
+    }
+  };
+
+  // Helper function to extract a role from username
+  const roleFromUsername = (username: string): string => {
+    if (!username) return '';
+    
+    if (username.includes('admin')) return 'Admin User';
+    if (username.includes('govern')) return 'Governance Manager';
+    if (username.includes('culture')) return 'Culture Director';
+    if (username.includes('infra')) return 'Infrastructure Lead';
+    if (username.includes('strat')) return 'Strategy Officer';
+    if (username.includes('data')) return 'Data Engineer';
+    if (username.includes('talent')) return 'Talent Manager';
+    if (username.includes('secur')) return 'Security Specialist';
+    
+    return 'Team Member';
+  };
 
   useEffect(() => {
-    // Load stored data instead of just using sample data
-    const loadCompanyData = () => {
-      // First check if the company info is in localStorage (from profile page)
+    const loadCompanyData = async () => {
+      setLoading(true);
+      setError(null);
+      
       try {
+        // Dynamically import the API client
+        const { default: api } = await import('@/lib/api/client');
+        
+        // Fetch company data from backend
+        console.log(`Fetching company with ID: ${companyId}`);
+        const { data: companyData, error: companyError } = await api.companies.getCompany(companyId);
+        
+        if (companyError) {
+          console.error("Error fetching company:", companyError);
+          setError(companyError.message || "Failed to fetch company data");
+          throw new Error(companyError.message);
+        }
+        
+        if (companyData) {
+          console.log("Successfully fetched company data:", companyData);
+          setCompany(companyData);
+          
+          // Fetch assessment statuses for this company
+          console.log(`Fetching assessments for company: ${companyId}`);
+          const { data: assessmentData, error: assessmentError } = await api.assessments.getCompanyAssessments(companyId);
+          
+          if (assessmentError) {
+            console.warn("Error fetching assessment data:", assessmentError);
+            // Continue execution - we'll create default assessment status
+          }
+          
+          if (assessmentData && assessmentData.assessments && assessmentData.assessments.length > 0) {
+            console.log("Successfully fetched assessment data:", assessmentData);
+            setAssessmentStatus(assessmentData);
+          } else {
+            console.log("No assessment data found, creating default status");
+            // Create default assessment status
+            const defaultStatus: CompanyAssessmentStatus = {
+              companyId,
+              companyName: companyData.name,
+              assessments: [
+                { type: "AI Governance", status: "not-started" },
+                { type: "AI Culture", status: "not-started" },
+                { type: "AI Infrastructure", status: "not-started" },
+                { type: "AI Strategy", status: "not-started" },
+                { type: "AI Data", status: "not-started" },
+                { type: "AI Talent", status: "not-started" },
+                { type: "AI Security", status: "not-started" }
+              ]
+            };
+            setAssessmentStatus(defaultStatus);
+          }
+          
+          setLoading(false);
+          return;
+        }
+      } catch (apiError) {
+        console.error("API error:", apiError);
+        // Continue to fallback methods
+      }
+      
+      // Fallback methods if API fails
+      try {
+        console.log("API fetch failed, checking localStorage for company data");
+        
+        // Check localStorage for company info
         const storedCompanyInfo = localStorage.getItem('company_info');
         if (storedCompanyInfo) {
           const parsedInfo = JSON.parse(storedCompanyInfo);
-          // Only use if ID matches
           if (parsedInfo.id === companyId) {
-            console.log("Found company in company_info:", parsedInfo);
+            console.log("Found company in localStorage:", parsedInfo);
             setCompany(parsedInfo);
             
-            // If we also have assessment status, set it
-            try {
-              const companyAssessmentsKey = `company_assessments_${companyId}`;
-              const storedCompanyAssessments = localStorage.getItem(companyAssessmentsKey);
-              if (storedCompanyAssessments) {
-                const assessments = JSON.parse(storedCompanyAssessments);
-                if (Object.keys(assessments).length > 0) {
-                  // Convert to assessment status format
-                  const status = {
-                    companyId,
-                    companyName: parsedInfo.name,
-                    assessments: Object.entries(assessments).map(([type, data]) => ({
-                      type,
-                      status: "completed",
-                      score: data.overallScore,
-                      completedAt: data.completedAt,
-                      completedBy: data.completedBy
-                    }))
-                  };
-                  setAssessmentStatus(status);
-                  setLoading(false);
-                  return;
-                }
+            // Check localStorage for assessment data
+            const companyAssessmentsKey = `company_assessments_${companyId}`;
+            const storedCompanyAssessments = localStorage.getItem(companyAssessmentsKey);
+            
+            if (storedCompanyAssessments) {
+              const assessments = JSON.parse(storedCompanyAssessments);
+              if (Object.keys(assessments).length > 0) {
+                // Convert to assessment status format
+                const status: CompanyAssessmentStatus = {
+                  companyId,
+                  companyName: parsedInfo.name,
+                  assessments: Object.entries(assessments).map(([type, data]: [string, any]) => ({
+                    type,
+                    status: "completed",
+                    score: data.overallScore,
+                    completedAt: data.completedAt,
+                    completedBy: data.completedBy
+                  }))
+                };
+                setAssessmentStatus(status);
+                setLoading(false);
+                return;
               }
-            } catch (error) {
-              console.error("Error checking company assessments:", error);
             }
           }
         }
-      } catch (error) {
-        console.error("Error checking stored company info:", error);
-      }
-      
-      // Try to load real company data from the companies list
-      try {
+        
+        // Check companies list in localStorage
         const storedCompanies = localStorage.getItem('companies');
         if (storedCompanies) {
           const companies = JSON.parse(storedCompanies);
-          const foundCompany = companies.find(c => c.id === companyId);
+          const foundCompany = companies.find((c: CompanyInfo) => c.id === companyId);
+          
           if (foundCompany) {
             console.log("Found company in companies list:", foundCompany);
             setCompany(foundCompany);
             
-            // Check for assessment status
-            try {
-              const storedStatuses = localStorage.getItem('assessment_statuses');
-              if (storedStatuses) {
-                const statuses = JSON.parse(storedStatuses);
-                const foundStatus = statuses.find(s => s.companyId === companyId);
-                if (foundStatus) {
-                  setAssessmentStatus(foundStatus);
-                  setLoading(false);
-                  return;
-                }
+            // Check assessment statuses in localStorage
+            const storedStatuses = localStorage.getItem('assessment_statuses');
+            if (storedStatuses) {
+              const statuses = JSON.parse(storedStatuses);
+              const foundStatus = statuses.find((s: CompanyAssessmentStatus) => s.companyId === companyId);
+              
+              if (foundStatus) {
+                setAssessmentStatus(foundStatus);
+                setLoading(false);
+                return;
               }
-            } catch (error) {
-              console.error("Error checking assessment statuses:", error);
             }
             
-            // Create default assessment status if not found
+            // Create default assessment status
+            const defaultStatus: CompanyAssessmentStatus = {
+              companyId,
+              companyName: foundCompany.name,
+              assessments: [
+                { type: "AI Governance", status: "not-started" },
+                { type: "AI Culture", status: "not-started" },
+                { type: "AI Infrastructure", status: "not-started" },
+                { type: "AI Strategy", status: "not-started" },
+                { type: "AI Data", status: "not-started" },
+                { type: "AI Talent", status: "not-started" },
+                { type: "AI Security", status: "not-started" }
+              ]
+            };
+            setAssessmentStatus(defaultStatus);
+            setLoading(false);
+            return;
+          }
+        }
+        
+        // Final fallback to sample data if all else fails
+        console.log("No data found in localStorage, using sample data as last resort");
+        const foundCompany = SAMPLE_COMPANIES.find(c => c.id === companyId);
+        const foundStatus = SAMPLE_ASSESSMENT_STATUSES.find(s => s.companyId === companyId);
+        
+        if (foundCompany) {
+        setCompany(foundCompany);
+          if (foundStatus) {
+        setAssessmentStatus(foundStatus);
+      } else {
+            // Create default status
             const defaultStatus = {
               companyId,
               companyName: foundCompany.name,
@@ -259,58 +492,42 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
                 { type: "AI Security", status: "not-started" }
               ]
             };
-            
             setAssessmentStatus(defaultStatus);
-            setLoading(false);
-            return;
           }
-        }
-      } catch (error) {
-        console.error("Error loading company data:", error);
-      }
-      
-      // If we still don't have a company, check sample data as a fallback
-      const foundCompany = SAMPLE_COMPANIES.find(c => c.id === companyId);
-      const foundStatus = SAMPLE_ASSESSMENT_STATUSES.find(s => s.companyId === companyId);
-      
-      if (foundCompany) {
-        console.log("Found company in sample data:", foundCompany);
-        setCompany(foundCompany);
-        if (foundStatus) {
-          setAssessmentStatus(foundStatus);
         } else {
-          // Create default status
-          const defaultStatus = {
-            companyId,
-            companyName: foundCompany.name,
-            assessments: [
-              { type: "AI Governance", status: "not-started" },
-              { type: "AI Culture", status: "not-started" },
-              { type: "AI Infrastructure", status: "not-started" },
-              { type: "AI Strategy", status: "not-started" },
-              { type: "AI Data", status: "not-started" },
-              { type: "AI Talent", status: "not-started" },
-              { type: "AI Security", status: "not-started" }
-            ]
-          };
-          setAssessmentStatus(defaultStatus);
-        }
-      } else {
-        // If we get here, we couldn't find the company anywhere
-        console.error("Company not found with ID:", companyId);
+          // Company not found anywhere
+          setError(`Company not found with ID: ${companyId}`);
         toast({
           title: "Company Not Found",
           description: "The requested company could not be found.",
+            variant: "destructive",
+          });
+          setTimeout(() => router.push("/admin/companies"), 2000);
+        }
+      } catch (error) {
+        console.error("Error in fallback loading:", error);
+        setError("Failed to load company data");
+        toast({
+          title: "Error Loading Data",
+          description: "There was a problem loading the company data.",
           variant: "destructive",
         });
-        setTimeout(() => router.push("/admin/companies"), 2000);
       }
       
       setLoading(false);
     };
     
-    loadCompanyData();
-  }, [companyId, router, toast]);
+    if (companyId) {
+      loadCompanyData();
+    }
+  }, [companyId, router]);
+
+  // Fetch team members when company is loaded or when switching to team tab
+  useEffect(() => {
+    if (company && activeTab === "team" && Object.keys(teamMembers).length === 0) {
+      fetchTeamMembers(companyId);
+    }
+  }, [company, activeTab, companyId, teamMembers]);
 
   const handleStartAssessment = (assessmentType: string) => {
     toast({
@@ -349,7 +566,12 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
   };
 
   const getAssignedUsers = (assessmentType: string) => {
-    // First try to get from real assessment data
+    // First check if we have team members from backend
+    if (teamMembers && teamMembers[assessmentType] && teamMembers[assessmentType].length > 0) {
+      return teamMembers[assessmentType];
+    }
+    
+    // If we have assessment status with completedBy info, use that
     if (assessmentStatus) {
       const assessment = assessmentStatus.assessments.find(a => a.type === assessmentType);
       if (assessment && assessment.completedBy) {
@@ -362,7 +584,7 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
       }
     }
     
-    // Fall back to sample data
+    // Fall back to sample data only as last resort
     return SAMPLE_ASSIGNED_USERS[companyId]?.[assessmentType] || [];
   };
 
@@ -392,11 +614,11 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
     );
   }
 
-  if (!company || !assessmentStatus) {
+  if (error || !company || !assessmentStatus) {
     return (
       <div className="container mx-auto py-8 px-4 text-center">
         <h1 className="text-2xl font-bold mb-4">Company Not Found</h1>
-        <p className="text-muted-foreground mb-6">The requested company information could not be loaded.</p>
+        <p className="text-muted-foreground mb-6">{error || "The requested company information could not be loaded."}</p>
         <Button onClick={() => router.push("/admin/companies")}>
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Companies
         </Button>
@@ -703,12 +925,18 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
                 Assessment Team
               </CardTitle>
               <CardDescription>
-                Team members assigned to {company.name}'s assessments
+                Team members assigned to {company?.name}'s assessments
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {loadingTeam ? (
+                <div className="py-6 text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                  <p className="mt-2 text-sm text-muted-foreground">Loading team members...</p>
+                </div>
+              ) : (
               <div className="space-y-6">
-                {assessmentStatus.assessments.map((assessment) => {
+                  {assessmentStatus && assessmentStatus.assessments.map((assessment) => {
                   const users = getAssignedUsers(assessment.type);
                   if (users.length === 0) return null;
                   
@@ -748,18 +976,20 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
                   );
                 })}
                 
-                {Object.values(SAMPLE_ASSIGNED_USERS).flat().length === 0 && (
+                  {(!assessmentStatus || assessmentStatus.assessments.every(a => getAssignedUsers(a.type).length === 0)) && (
                   <div className="text-center py-6">
                     <p className="text-muted-foreground">No team members have been assigned yet</p>
                     <Button 
                       variant="outline" 
                       className="mt-2"
+                        onClick={() => router.push(`/admin/companies/${companyId}/team`)}
                     >
                       Assign Team Members
                     </Button>
                   </div>
                 )}
               </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

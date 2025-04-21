@@ -1,138 +1,58 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  ArrowRight, 
-  BarChart4, 
-  Brain, 
-  Database, 
-  Layers, 
-  Shield, 
-  Users,
-  CheckCircle,
-  Loader2,
-  PlayCircle,
-  Building
-} from "lucide-react";
-import Link from "next/link";
-import { CompanyInfoForm } from "@/components/CompanyInfoForm";
-import { WeightAdjustment } from "@/components/WeightAdjustment";
-import { CompanyInfo, CategoryWeights } from "@/types";
-import { fetchAllQuestionnaires, getRecommendedWeights } from "@/lib/api";
-import { useToast } from "@/hooks/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CompanySelector } from "@/components/CompanySelector";
+import { CompanyInfo } from "@/types";
+import { toast } from "@/hooks/use-toast";
+import { Shield, Users, Layers, BarChart4, Database, Brain, Lock } from "lucide-react";
 import { ProtectedRoute } from "@/components/protected-route";
-import { useAuth, ROLE_TO_PILLAR } from "@/lib/auth-context";
-import { Separator } from "@/components/ui/separator";
-import { Input } from "@/components/ui/input";
+import { useAuth } from "@/lib/auth-context";
 
+// List of assessment types with their icons and descriptions
 const assessmentTypes = [
   {
     id: "AI Governance",
-    title: "AI Governance",
-    description: "Evaluate your organization's AI policies, accountability, and risk management frameworks.",
+    name: "AI Governance", 
     icon: Shield,
+    description: "Evaluate policies, oversight mechanisms, and accountability for AI systems"
   },
   {
     id: "AI Culture",
-    title: "AI Culture",
-    description: "Assess your organization's AI adoption culture, leadership support, and collaborative practices.",
+    name: "AI Culture", 
     icon: Users,
+    description: "Assess organizational awareness, attitudes, and adoption of AI technologies"
   },
   {
     id: "AI Infrastructure",
-    title: "AI Infrastructure",
-    description: "Evaluate your technical infrastructure's readiness to support AI initiatives.",
+    name: "AI Infrastructure", 
     icon: Layers,
+    description: "Evaluate technical foundations, platforms, and tools for AI development"
   },
   {
     id: "AI Strategy",
-    title: "AI Strategy",
-    description: "Assess your organization's AI strategy, security measures, and deployment approaches.",
+    name: "AI Strategy", 
     icon: BarChart4,
+    description: "Assess alignment of AI initiatives with business goals and vision"
   },
   {
     id: "AI Data",
-    title: "AI Data",
-    description: "Evaluate your data management practices, quality, and governance for AI readiness.",
+    name: "AI Data", 
     icon: Database,
+    description: "Evaluate data quality, management practices, and governance"
   },
   {
     id: "AI Talent",
-    title: "AI Talent",
-    description: "Assess your organization's AI talent acquisition, training, and development strategies.",
+    name: "AI Talent", 
     icon: Brain,
-  },
-  {
-    id: "AI Security",
-    title: "AI Security",
-    description: "Assess your organization's AI Security acquisition, training, and development strategies.",
-    icon: Shield,
-  },
-];
-
-// Sample companies for demonstration
-const SAMPLE_COMPANIES: CompanyInfo[] = [
-  {
-    id: "1",
-    name: "TechInnovate Solutions",
-    industry: "Technology",
-    size: "Enterprise (1000+ employees)",
-    region: "North America",
-    aiMaturity: "Exploring",
-    notes: "Global tech firm focused on cloud solutions",
-    createdAt: "2023-06-15T10:30:00Z",
-    updatedAt: "2023-11-22T14:45:00Z"
-  },
-  {
-    id: "2",
-    name: "FinServe Global",
-    industry: "Financial Services",
-    size: "Enterprise (1000+ employees)",
-    region: "Europe",
-    aiMaturity: "Expanding",
-    notes: "International banking corporation",
-    createdAt: "2023-05-10T08:20:00Z",
-    updatedAt: "2023-10-18T11:30:00Z"
-  },
-  {
-    id: "3",
-    name: "HealthPlus Medical",
-    industry: "Healthcare",
-    size: "Mid-size (100-999 employees)",
-    region: "Asia Pacific",
-    aiMaturity: "Exploring",
-    notes: "Medical equipment manufacturer",
-    createdAt: "2023-07-20T09:15:00Z",
-    updatedAt: "2023-12-05T16:20:00Z"
-  },
-  {
-    id: "4",
-    name: "GreenEnergy Co",
-    industry: "Energy",
-    size: "Mid-size (100-999 employees)",
-    region: "North America",
-    aiMaturity: "Initial",
-    notes: "Renewable energy provider",
-    createdAt: "2023-08-05T13:40:00Z",
-    updatedAt: "2023-11-30T10:10:00Z"
-  },
-  {
-    id: "5",
-    name: "RetailNow",
-    industry: "Retail",
-    size: "Small (10-99 employees)",
-    region: "Europe",
-    aiMaturity: "Initial",
-    notes: "E-commerce company for fashion products",
-    createdAt: "2023-09-12T11:25:00Z",
-    updatedAt: "2023-12-10T09:30:00Z"
+    description: "Assess skills, roles, and capabilities for AI implementation"
   }
 ];
 
-export default function AssessmentPage() {
+export default function AssessmentHomePage() {
   return (
     <ProtectedRoute>
       <AssessmentContent />
@@ -142,339 +62,158 @@ export default function AssessmentPage() {
 
 function AssessmentContent() {
   const router = useRouter();
-  const { toast } = useToast();
-  const { user } = useAuth();
-  
-  const [step, setStep] = useState<'company-info' | 'weight-adjustment' | 'companies' | 'categories'>('companies');
-  const [loading, setLoading] = useState(false);
-  const [companies, setCompanies] = useState<CompanyInfo[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
+  const { user, canEditPillar } = useAuth();
   const [selectedCompany, setSelectedCompany] = useState<CompanyInfo | null>(null);
-  const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
-  const [weights, setWeights] = useState<CategoryWeights>({});
-  const [recommendedWeights, setRecommendedWeights] = useState<CategoryWeights | undefined>(undefined);
-  const [questionnaires, setQuestionnaires] = useState<Record<string, string[]>>({});
-
-  // Filter assessment types based on user role
-  const filteredAssessmentTypes = assessmentTypes.filter(type => {
-    // Admin can see all assessment types
-    if (user?.role === "admin") return true;
-    
-    // Other users can only see their assigned assessment type
-    return user?.role ? ROLE_TO_PILLAR[user.role] === type.title : false;
-  });
-
-  useEffect(() => {
-    setLoading(true);
-
-    // Load companies from localStorage or use sample data
-    const storedCompaniesJson = localStorage.getItem("companies");
-    let companiesData: CompanyInfo[] = [];
-    
-    if (storedCompaniesJson) {
-      try {
-        companiesData = JSON.parse(storedCompaniesJson);
-        } catch (error) {
-        console.error("Error parsing companies from localStorage:", error);
-        }
-      }
-    
-    // If no companies in localStorage, use sample data
-    if (companiesData.length === 0) {
-      companiesData = SAMPLE_COMPANIES;
-      // Store sample data in localStorage for future use
-      localStorage.setItem("companies", JSON.stringify(SAMPLE_COMPANIES));
-    }
-    
-    setCompanies(companiesData);
-    
-    // Fetch questionnaires for the assessment types
-    const fetchQuestionnaires = async () => {
-      try {
-        const data = await fetchAllQuestionnaires();
-        setQuestionnaires(data);
-        
-        // Initialize weights with equal distribution if not already set
-        if (Object.keys(weights).length === 0) {
-          const categories = assessmentTypes.map(type => type.id);
-          const defaultWeight = 100 / categories.length;
-          
-          const initialWeights: CategoryWeights = {};
-          categories.forEach(category => {
-            initialWeights[category] = defaultWeight;
-          });
-          
-          setWeights(initialWeights);
-        }
-      } catch (error) {
-        console.error("Error fetching questionnaires:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load assessment data. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchQuestionnaires();
-  }, [toast]);
-
-  const handleCompanyInfoSubmit = async (info: CompanyInfo, suggestedWeights?: Record<string, number>) => {
-    setCompanyInfo(info);
-    setLoading(true);
-    
-    try {
-      // Store company info in localStorage
-      localStorage.setItem('company_info', JSON.stringify(info));
-      
-      if (suggestedWeights) {
-        // Use weights suggested by web search
-        setRecommendedWeights(suggestedWeights);
-        setWeights(suggestedWeights);
-        toast({
-          title: "Web-suggested weights applied",
-          description: "We've applied the weights suggested based on your company's web profile.",
-        });
-      } else {
-        // Fetch recommended weights based on company info
-        await fetchRecommendedWeights(info);
-      }
-      
-      setStep('weight-adjustment');
-    } catch (error) {
-      console.error("Error processing company info:", error);
-      toast({
-        title: "Error",
-        description: "Failed to analyze company profile. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchRecommendedWeights = async (info: CompanyInfo) => {
-    try {
-      const recommendedWeights = await getRecommendedWeights(info);
-      setRecommendedWeights(recommendedWeights);
-      setWeights(recommendedWeights);
-    } catch (error) {
-      console.error("Error fetching recommended weights:", error);
-      // Fall back to equal distribution
-      const categories = assessmentTypes.map(type => type.id);
-      const defaultWeight = 100 / categories.length;
-      
-      const fallbackWeights: CategoryWeights = {};
-      categories.forEach(category => {
-        fallbackWeights[category] = defaultWeight;
-      });
-      
-      setWeights(fallbackWeights);
-    }
-  };
-
-  const handleWeightsChange = (newWeights: CategoryWeights) => {
-    setWeights(newWeights);
-  };
-
-  const handleWeightsSubmit = () => {
-    // Store weights in localStorage
-    localStorage.setItem('assessment_weights', JSON.stringify(weights));
-    setStep('categories');
-  };
-
-  const handleStartAllAssessments = () => {
-    // Store the fact that we're doing all assessments
-    localStorage.setItem('doing_all_assessments', 'true');
-    localStorage.setItem('current_assessment_index', '0');
-    localStorage.setItem('assessment_types', JSON.stringify(assessmentTypes.map(type => type.id)));
-    
-    // Navigate to the first assessment
-    router.push(`/assessment/${encodeURIComponent(assessmentTypes[0].id)}`);
-  };
-
-  // Add a function to handle starting a single assessment
-  const handleStartSingleAssessment = (assessmentId: string) => {
-    // Store the fact that we're doing a single assessment
-    localStorage.setItem('doing_all_assessments', 'false');
-    
-    // Store the selected company info
-    if (selectedCompany) {
-      localStorage.setItem('company_info', JSON.stringify(selectedCompany));
-    }
-    
-    // Navigate to the selected assessment
-    router.push(`/assessment/${encodeURIComponent(assessmentId)}`);
-  };
+  const [companySelected, setCompanySelected] = useState(false);
+  const [selectedType, setSelectedType] = useState<string>("AI Governance");
 
   const handleSelectCompany = (company: CompanyInfo) => {
     setSelectedCompany(company);
-    setCompanyInfo(company);
+    setCompanySelected(true);
     
-    // Store company info in localStorage
+    // Save to localStorage for backwards compatibility
     localStorage.setItem('company_info', JSON.stringify(company));
     
-    setStep('categories');
+        toast({
+      title: "Company Selected",
+      description: `Selected ${company.name} for assessment.`
+    });
   };
 
-  const handleBackToCompanies = () => {
-    setSelectedCompany(null);
-    setStep('companies');
+  const handleStartAssessment = () => {
+    if (!selectedCompany) {
+      toast({
+        title: "No Company Selected",
+        description: "Please select a company to continue.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!canEditPillar(selectedType)) {
+      toast({
+        title: "Access Denied",
+        description: `You don't have permission to access the ${selectedType} assessment.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    router.push(`/assessment/${encodeURIComponent(selectedType)}`);
   };
-
-  // Filter companies based on search term
-  const filteredCompanies = companies.filter(company => 
-    company.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    company.industry.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  if (loading) {
-    return (
-      <div className="container mx-auto px-4 py-12 flex items-center justify-center min-h-[calc(100vh-200px)]">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-lg font-medium">Loading assessment data...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="container mx-auto px-4 py-12">
-      {step === 'company-info' && user?.role === 'admin' && (
-        <div className="max-w-3xl mx-auto">
-          <h1 className="text-3xl font-bold text-center mb-8">Company Profile</h1>
-          <CompanyInfoForm onSubmit={handleCompanyInfoSubmit} loading={loading} />
-        </div>
-      )}
+    <div className="container mx-auto py-10 px-4">
+      <h1 className="text-3xl font-bold mb-6">AI Readiness Assessment</h1>
       
-      {step === 'weight-adjustment' && user?.role === 'admin' && (
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-bold text-center mb-2">Assessment Weights</h1>
-          <p className="text-center text-muted-foreground mb-8">
-            {companyInfo?.name ? `Based on ${companyInfo.name}'s profile, we recommend the following weights` : 'Customize the importance of each assessment category'}
-          </p>
-          <WeightAdjustment 
-            weights={weights}
-            recommendedWeights={recommendedWeights}
-            onWeightsChange={handleWeightsChange}
-            onSubmit={handleWeightsSubmit}
-          />
-        </div>
-      )}
-      
-      {step === 'companies' && (
-        <div className="max-w-6xl mx-auto">
-          <h1 className="text-3xl font-bold text-center mb-2">Select a Company</h1>
-          <p className="text-center text-muted-foreground mb-8">
-            Choose a company to view and complete its assessments
-          </p>
-          
-          <div className="mb-6">
-            <Input
-              placeholder="Search companies by name or industry..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="max-w-xl mx-auto"
-            />
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-            {filteredCompanies.map((company) => (
-              <Card key={company.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Building className="h-5 w-5 text-primary" />
-                    {company.name}
-                  </CardTitle>
-                  <CardDescription>{company.industry} - {company.region}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-sm">
-                    <div className="flex items-center justify-between mb-2">
-                      <span>Size:</span>
-                      <span className="font-medium">{company.size}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>AI Maturity:</span>
-                      <span className="font-medium">{company.aiMaturity}</span>
-                    </div>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button 
-                    className="w-full" 
-                    onClick={() => handleSelectCompany(company)}
-                  >
-                    View Assessments
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
-      
-      {step === 'categories' && selectedCompany && (
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-center justify-between mb-6">
-            <Button variant="outline" onClick={handleBackToCompanies}>
-              Back to Companies
-            </Button>
-            <h1 className="text-3xl font-bold text-center">
-              {selectedCompany.name}
-            </h1>
-            <div className="w-[100px]"></div> {/* Empty div for alignment */}
-          </div>
-          
-          <Separator className="mb-8" />
-          
-          <h2 className="text-2xl font-bold text-center mb-2">AI Readiness Assessment</h2>
-          <p className="text-center text-muted-foreground mb-8">
-            {user?.role === 'admin' 
-              ? 'Complete assessments for each key dimension of AI readiness' 
-              : user?.role ? `Complete your ${ROLE_TO_PILLAR[user.role]} assessment` : 'Complete your assessment'}
-          </p>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-            {filteredAssessmentTypes.map((type) => {
+      {!companySelected ? (
+        <CompanySelector onSelectCompany={handleSelectCompany} />
+      ) : (
+        <div className="space-y-8">
+          <Card>
+            <CardHeader>
+              <CardTitle>Selected Company: {selectedCompany?.name}</CardTitle>
+              <CardDescription>
+                {selectedCompany?.industry} • {selectedCompany?.size} • {selectedCompany?.region}
+              </CardDescription>
+            </CardHeader>
+            <CardFooter>
+              <Button variant="outline" onClick={() => setCompanySelected(false)}>
+                Change Company
+              </Button>
+            </CardFooter>
+          </Card>
+
+          <div>
+            <h2 className="text-2xl font-semibold mb-4">Select Assessment Type</h2>
+            <Tabs defaultValue="assessments" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="assessments">Assessment Types</TabsTrigger>
+                <TabsTrigger value="about">About Assessments</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="assessments" className="mt-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {assessmentTypes.map((type) => {
               const Icon = type.icon;
+                    const canAccess = canEditPillar(type.id);
+                    
               return (
-                <Card key={type.id} className="hover:shadow-lg transition-shadow">
+                      <Card 
+                        key={type.id} 
+                        className={`cursor-pointer transition-all hover:shadow-md ${
+                          selectedType === type.id ? 'ring-2 ring-primary' : ''
+                        } ${!canAccess ? 'opacity-60' : ''}`}
+                        onClick={() => canAccess && setSelectedType(type.id)}
+                      >
+                        <CardHeader className="pb-2">
+                          <div className="flex justify-between items-start">
+                            <div className="flex items-center gap-2">
+                              <Icon className="h-5 w-5 text-primary" />
+                              <CardTitle className="text-lg">{type.name}</CardTitle>
+                            </div>
+                            {!canAccess && <Lock className="h-4 w-4 text-muted-foreground" />}
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <CardDescription>{type.description}</CardDescription>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+                
+                <div className="mt-8 flex justify-end">
+                  <Button onClick={handleStartAssessment} size="lg">
+                    Start {selectedType} Assessment
+                  </Button>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="about" className="mt-6">
+                <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Icon className="h-5 w-5 text-primary" />
-                      {type.title}
-                    </CardTitle>
-                    <CardDescription>{type.description}</CardDescription>
+                    <CardTitle>About the Assessment Framework</CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="text-sm">
-                      <div className="flex items-center justify-between mb-2">
-                        <span>Weight:</span>
-                        <span className="font-medium">{weights[type.id]?.toFixed(1)}%</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>Questions:</span>
-                        <span className="font-medium">{questionnaires[type.id]?.length || 0}</span>
-                      </div>
-                    </div>
+                  <CardContent className="space-y-4">
+                    <p>
+                      The AI Readiness Assessment framework evaluates your organization's preparedness
+                      for AI adoption across six key dimensions:
+                    </p>
+                    <ul className="list-disc pl-5 space-y-2">
+                      <li>
+                        <span className="font-semibold">AI Governance:</span> Examines the policies, 
+                        oversight mechanisms, and accountability structures in place for AI systems.
+                      </li>
+                      <li>
+                        <span className="font-semibold">AI Culture:</span> Evaluates organizational 
+                        awareness, attitudes, and adoption practices for AI technologies.
+                      </li>
+                      <li>
+                        <span className="font-semibold">AI Infrastructure:</span> Assesses the technical 
+                        foundations, platforms, and tools supporting AI development.
+                      </li>
+                      <li>
+                        <span className="font-semibold">AI Strategy:</span> Examines how well AI initiatives 
+                        align with business goals and organizational vision.
+                      </li>
+                      <li>
+                        <span className="font-semibold">AI Data:</span> Evaluates data quality, management 
+                        practices, governance, and accessibility for AI systems.
+                      </li>
+                      <li>
+                        <span className="font-semibold">AI Talent:</span> Assesses skills, roles, training, 
+                        and capabilities needed for successful AI implementation.
+                      </li>
+                    </ul>
+                    <p>
+                      Each assessment takes approximately 15-20 minutes to complete and provides 
+                      targeted recommendations for improvement.
+                    </p>
                   </CardContent>
-                  <CardFooter>
-                    <Button 
-                      className="w-full" 
-                      onClick={() => handleStartSingleAssessment(type.id)}
-                    >
-                      Start Assessment
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </CardFooter>
                 </Card>
-              );
-            })}
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
       )}

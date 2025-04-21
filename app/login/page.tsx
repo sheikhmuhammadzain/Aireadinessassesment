@@ -53,14 +53,15 @@ export default function LoginPage() {
       } else {
         toast({
           title: "Login failed",
-          description: "Invalid email or password. Try admin@cybergen.com or dataengineer@cybergen.com with any password.",
+          description: "Invalid email or password. Please check your credentials and try again.",
           variant: "destructive",
         });
       }
     } catch (error) {
+      console.error("Login error:", error);
       toast({
         title: "Login error",
-        description: "An unexpected error occurred. Please try again.",
+        description: error instanceof Error ? error.message : "Connection error. Please ensure the backend is running at http://127.0.0.1:8000",
         variant: "destructive",
       });
     } finally {

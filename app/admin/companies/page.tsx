@@ -34,6 +34,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth, User, UserRole } from "@/lib/auth-context";
 import { Label } from "@/components/ui/label";
 
+// Import API client
+import api from '@/lib/api/client';
+
 // Import predefined users from auth context to avoid naming conflicts
 import { PREDEFINED_USERS as AUTH_PREDEFINED_USERS } from "@/lib/auth-context";
 
@@ -187,157 +190,79 @@ export default function AdminCompaniesPage() {
   const [formOpen, setFormOpen] = useState(false);
 
   useEffect(() => {
-    // Load companies from localStorage
-    const storedCompaniesJson = localStorage.getItem("companies");
-    let companiesData: CompanyInfo[] = [];
-    
-    if (storedCompaniesJson) {
-      // Parse companies from localStorage
-      try {
-        companiesData = JSON.parse(storedCompaniesJson);
-      } catch (error) {
-        console.error("Error parsing companies from localStorage:", error);
-      }
-    }
-    
-    // If no companies in localStorage, use sample data
-    if (companiesData.length === 0) {
-      companiesData = SAMPLE_COMPANIES;
-      // Store sample data in localStorage for future use
-      localStorage.setItem("companies", JSON.stringify(SAMPLE_COMPANIES));
-    }
-    
-    setCompanies(companiesData);
-    
-    // Load assessment statuses from localStorage
-    let assessmentStatusesData: CompanyAssessmentStatus[] = [];
-    
-    try {
-      const storedStatusesJson = localStorage.getItem("assessment_statuses");
-      if (storedStatusesJson) {
-        assessmentStatusesData = JSON.parse(storedStatusesJson);
-      }
-    } catch (error) {
-      console.error("Error parsing assessment statuses from localStorage:", error);
-    }
-    
-    // Load user assignments from localStorage
-    try {
-      const storedAssignments = localStorage.getItem("company_user_assignments");
-      if (storedAssignments) {
-        setAssignedUsers(JSON.parse(storedAssignments));
-      }
-    } catch (error) {
-      console.error("Error parsing company user assignments:", error);
-    }
-    
-    // Load all available users (predefined and custom)
-    const loadAllUsers = () => {
-      // Start with predefined users from auth context
-      let allUsers = [...AUTH_PREDEFINED_USERS];
+    // Load data from API
+    const fetchData = async () => {
+      setLoading(true);
       
-      // Check for any custom users in localStorage
       try {
-        // Custom users might be stored individually - iterate through localStorage
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key?.startsWith('user_') || key === 'user') {
-            try {
-              const userData = JSON.parse(localStorage.getItem(key) || '');
-              // Check if this is a user object with required fields
-              if (userData && userData.id && userData.email && userData.name && userData.role) {
-                // Check if this user is already in our list
-                if (!allUsers.some(u => u.id === userData.id)) {
-                  allUsers.push(userData as User);
-                }
-              }
-            } catch (e) {
-              console.error(`Error parsing user data from key ${key}:`, e);
-            }
-          }
+        // Fetch companies
+        const { data: companiesData, error: companiesError } = await api.companies.getCompanies();
+        
+        if (companiesError) {
+          console.error("Error fetching companies:", companiesError);
+          toast({
+            title: "Error",
+            description: "Failed to load companies data",
+            variant: "destructive"
+          });
+          // Fallback to empty array if API fails
+          setCompanies([]);
+        } else {
+          setCompanies(companiesData || []);
         }
-      } catch (error) {
-        console.error("Error loading custom users:", error);
-      }
-      
-      return allUsers;
-    };
-    
-    setAvailableUsers(loadAllUsers());
-    
-    // If no assessment statuses in localStorage, use sample data
-    if (assessmentStatusesData.length === 0) {
-      assessmentStatusesData = SAMPLE_ASSESSMENT_STATUSES;
-      // Store sample data in localStorage for future use
-      localStorage.setItem("assessment_statuses", JSON.stringify(SAMPLE_ASSESSMENT_STATUSES));
-    } else {
-      // If we have both saved statuses and company-specific assessment data,
-      // ensure we capture any missing company-specific assessments
-      companiesData.forEach(company => {
-        // Look for company-specific assessment data
-        try {
-          const companyAssessmentsKey = `company_assessments_${company.id}`;
-          const storedCompanyAssessments = localStorage.getItem(companyAssessmentsKey);
-          if (storedCompanyAssessments) {
-            const companyAssessments = JSON.parse(storedCompanyAssessments);
-            if (Object.keys(companyAssessments).length > 0) {
-              // Find or create assessment status for this company
-              let statusIndex = assessmentStatusesData.findIndex(s => s.companyId === company.id);
-              if (statusIndex === -1 && company.id) {
-                // Create new assessment status
-                assessmentStatusesData.push({
-                  companyId: company.id,
-                  companyName: company.name,
-                  assessments: []
-                });
-                statusIndex = assessmentStatusesData.length - 1;
+        
+        // Fetch users
+        const { data: usersData, error: usersError } = await api.users.getUsers();
+        
+        if (usersError) {
+          console.error("Error fetching users:", usersError);
+          // Fallback to predefined users if API fails
+          setAvailableUsers(AUTH_PREDEFINED_USERS);
+        } else {
+          setAvailableUsers(usersData || []);
+        }
+        
+        // For each company, fetch assessments and assigned users
+        if (companiesData) {
+          // Temporary data structures
+          const allAssessmentStatuses: CompanyAssessmentStatus[] = [];
+          const allUserAssignments: Record<string, string[]> = {};
+          
+          // Process each company
+          for (const company of companiesData) {
+            if (company.id) {
+              // Fetch assessments for this company
+              const { data: assessmentsData } = await api.assessments.getCompanyAssessments(company.id);
+              
+              if (assessmentsData) {
+                allAssessmentStatuses.push(assessmentsData);
               }
               
-              if (statusIndex !== -1) {
-                // Update assessments from company-specific data
-                Object.entries(companyAssessments).forEach(([assessmentType, assessmentData]) => {
-                  // Type assertion for the assessment data
-                  const typedData = assessmentData as {
-                    overallScore: number;
-                    completedAt: string;
-                    completedBy: string;
-                  };
-                  
-                  // Check if assessment already exists
-                  const existingAssessmentIndex = assessmentStatusesData[statusIndex].assessments.findIndex(
-                    a => a.type === assessmentType
-                  );
-                  
-                  const assessmentDataObj = {
-                    type: assessmentType,
-                    status: "completed" as const,
-                    score: typedData.overallScore,
-                    completedAt: typedData.completedAt,
-                    completedBy: typedData.completedBy
-                  };
-                  
-                  if (existingAssessmentIndex >= 0) {
-                    // Update existing assessment
-                    assessmentStatusesData[statusIndex].assessments[existingAssessmentIndex] = assessmentDataObj;
-                  } else {
-                    // Add new assessment
-                    assessmentStatusesData[statusIndex].assessments.push(assessmentDataObj);
-                  }
-                });
+              // Fetch assigned users for this company
+              const { data: companyUsers } = await api.companies.getCompanyUsers(company.id);
+              
+              if (companyUsers) {
+                allUserAssignments[company.id] = companyUsers.map(user => user.id);
               }
             }
           }
-        } catch (error) {
-          console.error(`Error processing company assessments for ${company.id}:`, error);
+          
+          setAssessmentStatuses(allAssessmentStatuses);
+          setAssignedUsers(allUserAssignments);
         }
-      });
-      
-      // Save the updated assessment statuses
-      localStorage.setItem("assessment_statuses", JSON.stringify(assessmentStatusesData));
-    }
+      } catch (error) {
+        console.error("Failed to fetch data:", error);
+        toast({
+          title: "Error",
+          description: "An unexpected error occurred",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
     
-    setAssessmentStatuses(assessmentStatusesData);
-    setLoading(false);
+    fetchData();
   }, []);
 
   const handleCreateCompany = () => {
@@ -348,17 +273,41 @@ export default function AdminCompaniesPage() {
     router.push(`/admin/companies/${id}/edit`);
   };
 
-  const handleDeleteCompany = (companyId: string) => {
-    const updatedCompanies = companies.filter(company => company.id !== companyId);
-    setCompanies(updatedCompanies);
-    localStorage.setItem("companies", JSON.stringify(updatedCompanies));
-    toast({
-      title: "Company deleted",
-      description: "The company has been successfully deleted.",
-    });
+  const handleDeleteCompany = async (companyId: string) => {
+    try {
+      const { error } = await api.companies.deleteCompany(companyId);
+      
+      if (error) {
+        throw new Error(error);
+      }
+      
+      // Update the local state
+      setCompanies(companies.filter(company => company.id !== companyId));
+      
+      toast({
+        title: "Company deleted",
+        description: "The company has been successfully deleted.",
+      });
+    } catch (error) {
+      console.error("Error deleting company:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete company",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleViewAssessments = (id: string) => {
+    const { completedCount, totalCount } = getCompletionStatus(id);
+    
+    toast({
+      title: "View Assessments",
+      description: `This company has completed ${completedCount} out of ${totalCount} assessments.`,
+      variant: "default"
+    });
+    
+    // Navigate to company assessments page
     router.push(`/admin/companies/${id}/assessments`);
   };
 
@@ -411,45 +360,71 @@ export default function AdminCompaniesPage() {
     setDeleteDialogOpen(true);
   };
 
-  const confirmDelete = () => {
-    if (companyToDelete) {
-      // Filter out the company to delete
-      const updatedCompanies = companies.filter(
-        (company) => company.id !== companyToDelete.id
-      );
-      setCompanies(updatedCompanies);
-      
-      // Also update localStorage
-      localStorage.setItem("companies", JSON.stringify(updatedCompanies));
-      
-      toast({
-        title: "Company Deleted",
-        description: `${companyToDelete.name} has been deleted.`,
-      });
-      
-      setDeleteDialogOpen(false);
-      setCompanyToDelete(null);
+  const confirmDelete = async () => {
+    if (companyToDelete && companyToDelete.id) {
+      try {
+        const { error } = await api.companies.deleteCompany(companyToDelete.id);
+        
+        if (error) {
+          throw new Error(error);
+        }
+        
+        // Update the local state
+        setCompanies(companies.filter(company => company.id !== companyToDelete.id));
+        
+        toast({
+          title: "Company Deleted",
+          description: `${companyToDelete.name} has been deleted.`,
+        });
+      } catch (error) {
+        console.error("Error deleting company:", error);
+        toast({
+          title: "Error",
+          description: "Failed to delete company",
+          variant: "destructive"
+        });
+      } finally {
+        setDeleteDialogOpen(false);
+        setCompanyToDelete(null);
+      }
     }
   };
 
-  const handleOpenAssignRoles = (company: CompanyInfo) => {
+  const handleOpenAssignRoles = async (company: CompanyInfo) => {
+    if (!company.id) return;
+    
     setCompanyForRoles(company);
     
-    // Initialize selected users based on current assignments
-    const initialSelected: Record<string, boolean> = {};
-    const companyId = company.id || "";
-    const companyAssignedUsers = assignedUsers[companyId] || [];
-    
-    // Mark users that are already assigned to this company
-    availableUsers.forEach(user => {
-      initialSelected[user.id] = companyAssignedUsers.includes(user.id);
-    });
-    
-    setSelectedUsers(initialSelected);
-    setAssignRolesDialogOpen(true);
+    try {
+      // Fetch current user assignments for this company
+      const { data: companyUsers, error } = await api.companies.getCompanyUsers(company.id);
+      
+      if (error) {
+        throw new Error(error);
+      }
+      
+      // Initialize selected users based on current assignments
+      const initialSelected: Record<string, boolean> = {};
+      const companyUserIds = companyUsers ? companyUsers.map(user => user.id) : [];
+      
+      // Mark users that are already assigned to this company
+      availableUsers.forEach(user => {
+        initialSelected[user.id] = companyUserIds.includes(user.id);
+      });
+      
+      setSelectedUsers(initialSelected);
+      setAssignRolesDialogOpen(true);
+    } catch (error) {
+      console.error("Error fetching company users:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load assigned users",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleSaveAssignments = () => {
+  const handleSaveAssignments = async () => {
     if (!companyForRoles || !companyForRoles.id) return;
     
     const companyId = companyForRoles.id;
@@ -459,21 +434,34 @@ export default function AdminCompaniesPage() {
       .filter(([_, isSelected]) => isSelected)
       .map(([userId]) => userId);
     
-    // Update assignments
-    const updatedAssignments = {
-      ...assignedUsers,
-      [companyId]: selectedUserIds
-    };
-    
-    // Save to state and localStorage
-    setAssignedUsers(updatedAssignments);
-    localStorage.setItem('company_user_assignments', JSON.stringify(updatedAssignments));
-    
-    toast({
-      title: "Success",
-      description: "User roles assigned successfully"
-    });
-    setAssignRolesDialogOpen(false);
+    try {
+      // Update the user assignments via API
+      const { error } = await api.companies.assignUsers(companyId, selectedUserIds);
+      
+      if (error) {
+        throw new Error(error);
+      }
+      
+      // Update local state
+      setAssignedUsers({
+        ...assignedUsers,
+        [companyId]: selectedUserIds
+      });
+      
+      toast({
+        title: "Success",
+        description: "User roles assigned successfully"
+      });
+    } catch (error) {
+      console.error("Error assigning users:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save user assignments",
+        variant: "destructive"
+      });
+    } finally {
+      setAssignRolesDialogOpen(false);
+    }
   };
 
   return (

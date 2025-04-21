@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import api from './api/client';
 
 // Define user roles
 export type UserRole = "admin" | "ai_governance" | "ai_culture" | "ai_infrastructure" | "ai_strategy" | "ai_data" | "ai_talent" | "ai_security";
@@ -13,7 +14,7 @@ export interface User {
   role: UserRole;
 }
 
-// Predefined users
+// Predefined users for fallback (will be replaced with API data)
 export const PREDEFINED_USERS: User[] = [
   {
     id: "1",
@@ -97,69 +98,88 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load user from localStorage on mount
+  // Load user from token on mount
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
+    const checkAuth = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
+
       try {
-        const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
+        const { data, error } = await api.auth.getCurrentUser();
+        if (error || !data) {
+          console.error("Failed to get current user:", error);
+          localStorage.removeItem('token');
+          setIsLoading(false);
+          return;
+        }
+
+        setUser(data);
         setIsAuthenticated(true);
       } catch (error) {
-        // Handle JSON parse error
-        console.error("Failed to parse user from localStorage:", error);
-        localStorage.removeItem('user'); // Remove invalid data
+        console.error("Auth check error:", error);
+        localStorage.removeItem('token');
+      } finally {
+        setIsLoading(false);
       }
-    }
-    setIsLoading(false); // Mark loading as complete regardless of result
+    };
+
+    checkAuth();
   }, []);
 
   // Login function
   const login = async (email: string, password: string): Promise<boolean> => {
-    // This is a dummy implementation - in a real app, you'd make an API call
-    // For simplicity, we'll check against our predefined users and accept any password
-    const foundUser = PREDEFINED_USERS.find(u => u.email.toLowerCase() === email.toLowerCase());
-    
-    if (foundUser) {
-      setUser(foundUser);
+    try {
+      const { data, error } = await api.auth.login(email, password);
+      
+      if (error || !data) {
+        console.error("Login failed:", error);
+        throw new Error(error || "Authentication failed");
+      }
+      
+      // Save token and user info
+      localStorage.setItem('token', data.access_token);
+      setUser(data.user);
       setIsAuthenticated(true);
-      localStorage.setItem('user', JSON.stringify(foundUser));
+      
+      // Log success for debugging
+      console.log("Login successful, user role:", data.user.role);
       return true;
+    } catch (error) {
+      console.error("Login error:", error);
+      // Clear any previous auth data
+      localStorage.removeItem('token');
+      setUser(null);
+      setIsAuthenticated(false);
+      throw error; // Re-throw to allow login page to handle it
     }
-    
-    return false;
   };
 
   // Logout function
   const logout = () => {
+    localStorage.removeItem('token');
     setUser(null);
     setIsAuthenticated(false);
-    localStorage.removeItem('user');
   };
 
-  // Signup function (dummy implementation)
+  // Signup function
   const signup = async (email: string, name: string, password: string, role: UserRole): Promise<boolean> => {
-    // Check if email already exists
-    const emailExists = PREDEFINED_USERS.some(u => u.email.toLowerCase() === email.toLowerCase());
-    
-    if (emailExists) {
+    try {
+      const { data, error } = await api.auth.signup(email, name, password, role);
+      
+      if (error || !data) {
+        console.error("Signup failed:", error);
+        return false;
+      }
+      
+      // Auto-login after signup
+      return await login(email, password);
+    } catch (error) {
+      console.error("Signup error:", error);
       return false;
     }
-    
-    // Create new user with dummy ID
-    const newUser: User = {
-      id: `custom_${Date.now()}`,
-      email,
-      name,
-      role
-    };
-    
-    // Store locally
-    setUser(newUser);
-    setIsAuthenticated(true);
-    localStorage.setItem('user', JSON.stringify(newUser));
-    
-    return true;
   };
 
   // Function to check if user can edit a specific pillar

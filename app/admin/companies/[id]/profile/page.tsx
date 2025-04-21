@@ -11,6 +11,7 @@ import { CompanyInfo, CategoryWeights } from "@/types";
 import { getRecommendedWeights } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
+import api from '@/lib/api/client';
 
 // Assessment types (same as used in assessment page)
 const assessmentTypes = [
@@ -65,10 +66,11 @@ export default function CompanyProfilePage({ params }: { params: Promise<{ id: s
   const [weights, setWeights] = useState<CategoryWeights>({});
   const [recommendedWeights, setRecommendedWeights] = useState<CategoryWeights | undefined>(undefined);
   const [progress, setProgress] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     // Load company info from localStorage
-    const loadCompanyData = () => {
+    const loadCompanyData = async () => {
       try {
         // First try to get from company_info (if this is right after company creation)
         const storedCompanyInfo = localStorage.getItem('company_info');
@@ -78,6 +80,21 @@ export default function CompanyProfilePage({ params }: { params: Promise<{ id: s
           // Only use if the ID matches
           if (parsedInfo.id === companyId) {
             setCompanyInfo(parsedInfo);
+            
+            // Try to get saved weights from database
+            try {
+              const { data: savedWeights, error } = await api.weights.getCompanyWeights(companyId);
+              if (!error && savedWeights && savedWeights.weights) {
+                // If we have saved weights, use those
+                console.log("Found saved weights in database:", savedWeights.weights);
+                setRecommendedWeights(savedWeights.weights);
+                setWeights(savedWeights.weights);
+              }
+            } catch (weightError) {
+              console.warn("Could not fetch saved weights from database:", weightError);
+              // Will continue with default weights
+            }
+            
             setLoading(false);
             return;
           }
@@ -90,6 +107,21 @@ export default function CompanyProfilePage({ params }: { params: Promise<{ id: s
           const foundCompany = companies.find((c: any) => c.id === companyId);
           if (foundCompany) {
             setCompanyInfo(foundCompany);
+            
+            // Try to get saved weights from database
+            try {
+              const { data: savedWeights, error } = await api.weights.getCompanyWeights(companyId);
+              if (!error && savedWeights && savedWeights.weights) {
+                // If we have saved weights, use those
+                console.log("Found saved weights in database:", savedWeights.weights);
+                setRecommendedWeights(savedWeights.weights);
+                setWeights(savedWeights.weights);
+              }
+            } catch (weightError) {
+              console.warn("Could not fetch saved weights from database:", weightError);
+              // Will continue with default weights
+            }
+            
             setLoading(false);
             return;
           }
@@ -144,8 +176,27 @@ export default function CompanyProfilePage({ params }: { params: Promise<{ id: s
           description: "We've applied the weights suggested based on your company's web profile.",
         });
       } else {
-        // Fetch recommended weights based on company info
-        await fetchRecommendedWeights(info);
+        // First try to fetch weights from database
+        try {
+          const { data: savedWeights, error } = await api.weights.getCompanyWeights(companyId);
+          if (!error && savedWeights && savedWeights.weights) {
+            // If we have saved weights, use those
+            console.log("Using saved weights from database:", savedWeights.weights);
+            setRecommendedWeights(savedWeights.weights);
+            setWeights(savedWeights.weights);
+            toast({
+              title: "Saved weights applied",
+              description: "We've applied the previously saved weights for this company.",
+            });
+          } else {
+            // If no saved weights, fetch recommended weights based on company info
+            await fetchRecommendedWeights(info);
+          }
+        } catch (weightError) {
+          console.warn("Could not fetch saved weights, falling back to recommendations:", weightError);
+          // Fall back to recommended weights
+          await fetchRecommendedWeights(info);
+        }
       }
       
       setStep('weight-adjustment');
@@ -163,9 +214,33 @@ export default function CompanyProfilePage({ params }: { params: Promise<{ id: s
 
   const fetchRecommendedWeights = async (info: CompanyInfo) => {
     try {
-      const recommendedWeights = await getRecommendedWeights(info);
-      setRecommendedWeights(recommendedWeights);
-      setWeights(recommendedWeights);
+      // First try to fetch weights from database since these may be the previously recommended and saved weights
+      if (info.id) {
+        console.log("Attempting to fetch previously saved weights from the database for company:", info.id);
+        try {
+          const { data: savedWeights, error } = await api.weights.getCompanyWeights(info.id);
+          
+          if (!error && savedWeights && Object.keys(savedWeights).length > 0) {
+            // If we have saved weights in the database, use those as the recommended weights
+            console.log("Found saved weights in database:", savedWeights);
+            setRecommendedWeights(savedWeights);
+            setWeights(savedWeights);
+            
+            toast({
+              title: "Weights Loaded",
+              description: "Using previously saved recommended weights for this company.",
+            });
+            return;
+          }
+        } catch (dbError) {
+          console.warn("Could not fetch weights from database, falling back to recommendations:", dbError);
+        }
+      }
+      
+      // If no weights in database, fall back to AI recommendations or equal distribution
+      const aiRecommendedWeights = await getRecommendedWeights(info);
+      setRecommendedWeights(aiRecommendedWeights);
+      setWeights(aiRecommendedWeights);
     } catch (error) {
       console.error("Error fetching recommended weights:", error);
       // Fall back to equal distribution
@@ -210,6 +285,67 @@ export default function CompanyProfilePage({ params }: { params: Promise<{ id: s
     
     // Navigate to the company assessments page
     router.push(`/admin/companies/${companyId}/assessments`);
+  };
+
+  const saveRecommendedWeights = async () => {
+    // Use the companyId from the URL params instead of companyInfo.id
+    if (!companyId) {
+      toast({
+        title: "Error",
+        description: "Company ID is required to save weights.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // The recommended weights from web search result
+      const recommendedWeights = {
+        "AI Infrastructure": 20.0,
+        "AI Data": 20.0,
+        "AI Governance": 15.0,
+        "AI Strategy": 15.0,
+        "AI Culture": 10.0,
+        "AI Talent": 10.0,
+        "AI Security": 10.0
+      };
+      
+      // Format weights for the API
+      const weightsData = {
+        weights: recommendedWeights
+      };
+      
+      console.log("Saving weights for company ID:", companyId);
+      
+      const { data, error } = await api.weights.updateCompanyWeights(companyId, weightsData);
+      
+      if (error) {
+        throw new Error(error);
+      }
+      
+      toast({
+        title: "Weights Saved",
+        description: "The recommended weights have been saved for this company.",
+      });
+      
+      // Update the weights in the UI to show the recommended weights immediately
+      setRecommendedWeights(recommendedWeights);
+      setWeights(recommendedWeights);
+      
+      // Also update in localStorage for fallback
+      const companyWeightsKey = `company_weights_${companyId}`;
+      localStorage.setItem(companyWeightsKey, JSON.stringify(recommendedWeights));
+    } catch (error) {
+      console.error("Error saving weights:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save recommended weights. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (loading) {
@@ -278,6 +414,20 @@ export default function CompanyProfilePage({ params }: { params: Promise<{ id: s
               </Button>
             </CardFooter>
           </Card>
+          <Button 
+            onClick={saveRecommendedWeights}
+            disabled={isLoading}
+            className="mt-4"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              "Save Recommended Weights"
+            )}
+          </Button>
         </div>
       )}
     </div>
