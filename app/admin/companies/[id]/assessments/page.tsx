@@ -9,7 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, CheckCircle, BarChart2, FileText, Clock, XCircle, ArrowRight, User, Users, Calendar, FileDown, X, Plus, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { CompanyInfo, CompanyAssessmentStatus } from "@/types";
+import { CompanyInfo, CompanyAssessmentStatus, Assessment } from "../../../../../types";
+import { User as UserType } from "../../../../../types";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/lib/auth-context";
 import { generateDeepResearchReport } from "@/lib/openai";
@@ -543,12 +544,11 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
     }
   }, [companyId, router]);
 
-  // Fetch team members when company is loaded or when switching to team tab
   useEffect(() => {
-    if (company && activeTab === "team" && Object.keys(teamMembers).length === 0) {
+    if (company && companyId) {
       fetchTeamMembers(companyId);
     }
-  }, [company, activeTab, companyId, teamMembers]);
+  }, [company, companyId]);
 
   const handleStartAssessment = (assessmentType: string) => {
     toast({
@@ -1036,6 +1036,57 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
                       </Badge>
                     </dd>
                   </div>
+                  
+                  {/* Team Members Section */}
+                  <div className="pt-4">
+                    <dt className="font-medium text-muted-foreground mb-2">Assigned Team Members:</dt>
+                    <dd>
+                      {loadingTeam ? (
+                        <div className="flex items-center py-2">
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          <span className="text-sm">Loading team members...</span>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {/* Get all unique users across all assessment types */}
+                          {Object.values(teamMembers).flat().length > 0 ? (
+                            <div className="space-y-2">
+                              {/* Filter out duplicates by id to show each team member only once */}
+                              {Array.from(new Map(
+                                Object.values(teamMembers)
+                                  .flat()
+                                  .map(user => [user.id, user])
+                              ).values()).map((user: any, index) => (
+                                <div key={`user-${user.id || index}`} className="flex items-center gap-2 text-sm">
+                                  <div className="bg-muted rounded-full p-1">
+                                    <User className="h-3 w-3" />
+                                  </div>
+                                  <span className="font-medium">{user.name}</span>
+                                  <span className="text-muted-foreground">({user.role})</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-sm text-muted-foreground py-1 flex justify-between items-center">
+                              <span>No team members assigned</span>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                className="text-xs py-1 h-7"
+                                onClick={handleOpenAssignDialog}
+                              >
+                                <Plus className="h-3 w-3 mr-1" />
+                                Assign
+                              </Button>
+                            </div>
+                          )}
+                          
+                       
+                        </div>
+                      )}
+                    </dd>
+                  </div>
+                  
                   {company.notes && (
                     <div className="pt-2">
                       <dt className="font-medium text-muted-foreground mb-1">Notes:</dt>

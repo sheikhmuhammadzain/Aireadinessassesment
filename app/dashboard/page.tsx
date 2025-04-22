@@ -449,9 +449,24 @@ function DashboardContent() {
     };
 
     const calculateOverallReadiness = (): number => {
-        const scores = Object.values(results).map(r => r.overallScore);
+        // Get a unique list of assessment types with their highest scores
+        const typeScores: Record<string, number> = {};
+        
+        // Process all results and keep highest score per type
+        Object.entries(results).forEach(([type, result]) => {
+            if (!typeScores[type] || typeScores[type] < result.overallScore) {
+                typeScores[type] = result.overallScore;
+            }
+        });
+        
+        // Get unique scores array
+        const scores = Object.values(typeScores);
         if (scores.length === 0) return 0;
-        return Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length);
+        
+        // Calculate the average
+        const average = Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length);
+        console.log(`Overall readiness: ${average}% (averaged from ${scores.length} unique assessment types)`);
+        return average;
     };
 
     const getStrongestArea = (): string | null => {
@@ -501,11 +516,31 @@ function DashboardContent() {
         const status = assessmentStatuses[companyId];
         if (!status) return 0;
         
-        const completedAssessments = status.assessments.filter(a => a.status === "completed" && a.score);
-        if (completedAssessments.length === 0) return 0;
+        // Group by assessment type and take the latest/highest score for each type
+        const scoresByType: Record<string, number> = {};
         
-        const totalScore = completedAssessments.reduce((sum, assessment) => sum + (assessment.score || 0), 0);
-        return Math.round(totalScore / completedAssessments.length);
+        // Process all completed assessments with scores
+        status.assessments
+            .filter(a => a.status === "completed" && a.score)
+            .forEach(a => {
+                // If this type doesn't exist yet or has a lower score, update it
+                if (!scoresByType[a.type] || scoresByType[a.type] < (a.score || 0)) {
+                    scoresByType[a.type] = a.score || 0;
+                }
+            });
+        
+        // Get array of unique scores (one per assessment type)
+        const uniqueScores = Object.values(scoresByType);
+        
+        if (uniqueScores.length === 0) return 0;
+        
+        // Calculate average of the unique scores
+        const totalScore = uniqueScores.reduce((sum, score) => sum + score, 0);
+        const averageScore = Math.round(totalScore / uniqueScores.length);
+        
+        console.log(`Company ${companyId} overall score: ${averageScore}% (averaged from ${uniqueScores.length} unique assessment types)`);
+        
+        return averageScore;
     };
 
     const handleGenerateReport = async () => {

@@ -24,12 +24,23 @@ export function DashboardStats({
   assessmentStatuses,
   overallReadiness,
 }: DashboardStatsProps) {
-  // Calculate total completed assessments
+  // Calculate total completed assessments (unique by type across all companies)
   const completedAssessments = Object.values(assessmentStatuses).reduce(
-    (total, status) => 
-      total + status.assessments.filter(a => a.status === "completed").length, 
+    (total, status) => {
+      // Count unique completed assessment types for this company
+      const completedTypesForCompany = new Set();
+      status.assessments
+        .filter(a => a.status === "completed")
+        .forEach(a => completedTypesForCompany.add(a.type));
+      
+      // Add the count of unique types for this company to the total
+      return total + completedTypesForCompany.size;
+    }, 
     0
   );
+
+  // Console log for debugging
+  console.log(`Dashboard Overview: Found ${completedAssessments} total completed assessment types across ${companies.length} companies`);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
