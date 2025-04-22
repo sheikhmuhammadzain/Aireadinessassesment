@@ -2,8 +2,8 @@ import { User, CompanyInfo, CompanyAssessmentStatus } from "@/types";
 import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
 
 // Base API URL
-const API_BASE_URL = '/api/backend'; // Use Next.js API proxy instead of direct backend URL
-// const API_BASE_URL = 'http://103.18.20.205:8090'; // Point directly to the backend
+// const API_BASE_URL = '/api/backend'; // Use Next.js API proxy instead of direct backend URL
+const API_BASE_URL = 'http://103.18.20.205:8090'; http://103.18.20.205:8090/ // Point directly to the backend
 
 // Response type wrapper
 interface ApiResponse<T> {
@@ -142,6 +142,32 @@ export const usersApi = {
   
   getUser: async (userId: string): Promise<ApiResponse<User>> => {
     return apiCall<User>(`/users/${userId}`);
+  },
+  
+  createUser: async (userData: { name: string; email: string; role: string; password?: string }): Promise<ApiResponse<User>> => {
+    // If no password provided, generate a random temporary one
+    const data = {
+      ...userData,
+      password: userData.password || Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8)
+    };
+    
+    return apiCall<User>('/users', {
+      method: 'POST',
+      data
+    });
+  },
+  
+  updateUser: async (userId: string, userData: { name?: string; email?: string; role?: string }): Promise<ApiResponse<User>> => {
+    return apiCall<User>(`/users/${userId}`, {
+      method: 'PUT',
+      data: userData
+    });
+  },
+  
+  deleteUser: async (userId: string): Promise<ApiResponse<void>> => {
+    return apiCall<void>(`/users/${userId}`, {
+      method: 'DELETE'
+    });
   },
 };
 

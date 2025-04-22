@@ -2,7 +2,9 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth, User, UserRole, PREDEFINED_USERS, ROLE_TO_PILLAR } from "@/lib/auth-context"; // Assuming paths
+import { UserRole, ROLE_TO_PILLAR, PREDEFINED_USERS } from "@/lib/auth-context"; // Import PREDEFINED_USERS from auth context
+import { User } from "@/types"; // Import User type from types, not auth-context
+import { useAuth } from "@/lib/auth-context"; // Assuming paths
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label"; // Import Label
@@ -42,6 +44,8 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip"; // Import Tooltip components
 
+// Import API client
+import api from '@/lib/api/client';
 
 // Define AssessmentResult type (assuming structure based on usage)
 interface AssessmentResult {
@@ -74,6 +78,7 @@ export default function AdminPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"add" | "edit">("add");
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   // Form state
   const [name, setName] = useState("");
@@ -83,7 +88,39 @@ export default function AdminPage() {
   // Report generation states
   const [generatingReportForUserId, setGeneratingReportForUserId] = useState<string | null>(null); // Track by ID
 
-  // --- Core Logic Functions (Unchanged) ---
+  // --- Core Logic Functions (Updated to use API) ---
+
+  // Fetch users from API
+  const fetchUsers = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await api.users.getUsers();
+      
+      if (error) {
+        console.error("Error fetching users:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load users from the server",
+          variant: "destructive",
+        });
+        setUsers(PREDEFINED_USERS); // Fallback to predefined users
+      } else if (data && Array.isArray(data)) {
+        setUsers(data);
+      } else {
+        setUsers(PREDEFINED_USERS); // Fallback if data is not in expected format
+      }
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load users from the server",
+        variant: "destructive",
+      });
+      setUsers(PREDEFINED_USERS); // Fallback to predefined users
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     // Check if user is authenticated and has admin role
@@ -97,24 +134,9 @@ export default function AdminPage() {
       return;
     }
 
-    // Load users from localStorage or use predefined users
-    const storedUsers = localStorage.getItem("users");
-    if (storedUsers) {
-      try {
-          const parsedUsers = JSON.parse(storedUsers);
-          setUsers(Array.isArray(parsedUsers) ? parsedUsers : PREDEFINED_USERS);
-      } catch (e) {
-          console.error("Failed to parse users from localStorage", e);
-          setUsers(PREDEFINED_USERS);
-          localStorage.setItem("users", JSON.stringify(PREDEFINED_USERS));
-      }
-    } else {
-      // Initialize with predefined users on first load
-      setUsers(PREDEFINED_USERS);
-      localStorage.setItem("users", JSON.stringify(PREDEFINED_USERS));
-    }
+    // Load users from API
+    fetchUsers();
   }, [isAuthenticated, authUser, router, toast]);
-
 
   const handleAddUser = () => {
     setDialogMode("add");
@@ -132,7 +154,7 @@ export default function AdminPage() {
     setIsDialogOpen(true);
   };
 
-    const handleDeleteUser = (userId: string) => {
+  const handleDeleteUser = async (userId: string) => {
     if (userId === "1") { // Assuming '1' is the hardcoded admin ID
       toast({
         title: "Operation Forbidden",
@@ -142,19 +164,30 @@ export default function AdminPage() {
       return;
     }
 
-    setUsers((prevUsers) => {
-      const updatedUsers = prevUsers.filter(u => u.id !== userId);
-      localStorage.setItem("users", JSON.stringify(updatedUsers));
-      return updatedUsers;
-    });
-
-    toast({
-      title: "User Deleted",
-      description: "The user account has been successfully removed.",
-      variant: "default" // Use default variant for success
-    });
+    try {
+      const { error } = await api.users.deleteUser(userId);
+      
+      if (error) {
+        throw new Error(error);
+      }
+      
+      // Update local state after successful API call
+      setUsers((prevUsers) => prevUsers.filter(u => u.id !== userId));
+      
+      toast({
+        title: "User Deleted",
+        description: "The user account has been successfully removed.",
+        variant: "default" // Use default variant for success
+      });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      toast({
+        title: "Deletion Failed",
+        description: "Failed to delete the user. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
-
 
   const resetForm = () => {
     setName("");
@@ -164,7 +197,7 @@ export default function AdminPage() {
     setRole(firstNonAdminRole || 'ai_culture');
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     // Basic validation
     if (!name.trim() || !email.trim() || !role) {
       toast({ title: "Missing Information", description: "Please fill in all fields.", variant: "destructive" });
@@ -176,35 +209,54 @@ export default function AdminPage() {
       return;
     }
 
-    if (dialogMode === "add") {
-      if (users.some(u => u.email.toLowerCase() === email.trim().toLowerCase())) {
-        toast({ title: "Duplicate Email", description: "A user with this email already exists.", variant: "destructive" });
-        return;
+    try {
+      if (dialogMode === "add") {
+        // Create user via API
+        const { data, error } = await api.users.createUser({
+          name: name.trim(),
+          email: email.trim(),
+          role
+        });
+        
+        if (error) {
+          throw new Error(error);
+        }
+        
+        if (data) {
+          // Add new user to state
+          setUsers(prev => [...prev, data]);
+          toast({ title: "User Added", description: `${data.name} has been added.`});
+        }
+      } else if (dialogMode === "edit" && currentUser) {
+        // Update user via API
+        const { data, error } = await api.users.updateUser(currentUser.id, {
+          name: name.trim(),
+          email: email.trim(),
+          role
+        });
+        
+        if (error) {
+          throw new Error(error);
+        }
+        
+        if (data) {
+          // Update user in state
+          setUsers(prev => prev.map(u => u.id === currentUser.id ? data : u));
+          toast({ title: "User Updated", description: `Information for ${data.name} has been updated.`});
+        }
       }
-      const newUser: User = { id: `custom_${Date.now()}`, name: name.trim(), email: email.trim(), role };
-      setUsers(prev => {
-          const updated = [...prev, newUser];
-          localStorage.setItem("users", JSON.stringify(updated));
-          return updated;
+      
+      setIsDialogOpen(false);
+      resetForm();
+    } catch (error) {
+      console.error("Error submitting user:", error);
+      toast({
+        title: dialogMode === "add" ? "Failed to Add User" : "Failed to Update User",
+        description: "An error occurred. Please try again.",
+        variant: "destructive"
       });
-      toast({ title: "User Added", description: `${newUser.name} has been added.`});
-
-    } else if (dialogMode === "edit" && currentUser) {
-       if (users.some(u => u.email.toLowerCase() === email.trim().toLowerCase() && u.id !== currentUser.id)) {
-        toast({ title: "Duplicate Email", description: "Another user with this email already exists.", variant: "destructive" });
-        return;
-      }
-       setUsers(prev => {
-           const updated = prev.map(u => u.id === currentUser.id ? { ...u, name: name.trim(), email: email.trim(), role } : u);
-           localStorage.setItem("users", JSON.stringify(updated));
-           return updated;
-       });
-       toast({ title: "User Updated", description: `Information for ${name.trim()} has been updated.`});
     }
-    setIsDialogOpen(false);
-    resetForm();
   };
-
 
   const loadUserAssessmentResults = (userRole: UserRole): Record<string, AssessmentResult> => {
     const results: Record<string, AssessmentResult> = {};
@@ -297,6 +349,14 @@ export default function AdminPage() {
 
             <Card>
               <CardContent className="p-0"> {/* Remove padding to let table fit nicely */}
+                {loading ? (
+                  <div className="flex justify-center items-center h-64">
+                    <div className="flex flex-col items-center">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+                      <p className="text-muted-foreground">Loading users...</p>
+                    </div>
+                  </div>
+                ) : (
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -316,43 +376,56 @@ export default function AdminPage() {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="inline-flex items-center gap-1">
-                               <Tooltip>
+                              <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" onClick={() => handleEditUser(user)}>
-                                        <Pencil className="h-4 w-4" />
-                                        <span className="sr-only">Edit User</span>
-                                    </Button>
+                                  <Button variant="ghost" size="icon" onClick={() => handleEditUser(user)}>
+                                    <Pencil className="h-4 w-4" />
+                                    <span className="sr-only">Edit User</span>
+                                  </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>Edit User</TooltipContent>
-                               </Tooltip>
-                               <Tooltip>
+                              </Tooltip>
+                              <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => handleDeleteUser(user.id)}
-                                        disabled={user.id === "1"} // Disable deleting admin
-                                        className="text-destructive hover:bg-destructive/10 disabled:opacity-50"
-                                    >
-                                        <Trash className="h-4 w-4" />
-                                        <span className="sr-only">Delete User</span>
-                                    </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleDeleteUser(user.id)}
+                                    disabled={user.id === "1"} // Disable deleting admin
+                                    className="text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                                  >
+                                    <Trash className="h-4 w-4" />
+                                    <span className="sr-only">Delete User</span>
+                                  </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>Delete User</TooltipContent>
-                               </Tooltip>
+                              </Tooltip>
                             </div>
                           </TableCell>
                         </TableRow>
                       )) : (
-                         <TableRow>
-                            <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                                No users found.
-                            </TableCell>
-                         </TableRow>
+                        <TableRow>
+                          <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                            No users found. Click "Add New User" to create one.
+                          </TableCell>
+                        </TableRow>
                       )}
                     </TableBody>
                   </Table>
+                )}
               </CardContent>
+              <CardFooter className="justify-end pt-4">
+                <Button variant="outline" onClick={fetchUsers} size="sm" className="gap-1">
+                  <div className="flex items-center">
+                    {loading ? (
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    ) : (
+                      <div className="h-3 w-3 mr-1" />
+                    )}
+                    Refresh Users
+                  </div>
+                </Button>
+              </CardFooter>
             </Card>
           </TabsContent>
 

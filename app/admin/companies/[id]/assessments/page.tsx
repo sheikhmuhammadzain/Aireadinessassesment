@@ -7,12 +7,15 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, CheckCircle, BarChart2, FileText, Clock, XCircle, ArrowRight, User, Users, Calendar, FileDown } from "lucide-react";
+import { ArrowLeft, CheckCircle, BarChart2, FileText, Clock, XCircle, ArrowRight, User, Users, Calendar, FileDown, X, Plus, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { CompanyInfo, CompanyAssessmentStatus } from "@/types";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/lib/auth-context";
 import { generateDeepResearchReport } from "@/lib/openai";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 // Sample data for demo purposes (same as in companies page)
 const SAMPLE_COMPANIES: CompanyInfo[] = [
@@ -170,7 +173,7 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
   const companyId = unwrappedParams.id;
   
   const router = useRouter();
-  const { isAuthenticated, token } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [company, setCompany] = useState<CompanyInfo | null>(null);
   const [assessmentStatus, setAssessmentStatus] = useState<CompanyAssessmentStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -178,6 +181,13 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
   const [activeTab, setActiveTab] = useState<string>("overview");
   const [teamMembers, setTeamMembers] = useState<Record<string, any[]>>({});
   const [loadingTeam, setLoadingTeam] = useState(false);
+  
+  // New state for team assignment modal
+  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
+  const [availableUsers, setAvailableUsers] = useState<any[]>([]);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [assigningUsers, setAssigningUsers] = useState(false);
 
   // Fetch team members assigned to the company
   const fetchTeamMembers = async (companyId: string) => {
@@ -675,6 +685,189 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
     return Math.round(totalScore / completedAssessments.length);
   };
 
+  // Fetch available users that can be assigned to the company
+  const fetchAvailableUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const { default: api } = await import('@/lib/api/client');
+      
+      // Fetch users from backend
+      const { data, error } = await api.users.getUsers();
+      
+      if (error) {
+        console.warn("Error fetching users:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load available users. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (data && Array.isArray(data)) {
+        console.log("Available users loaded:", data);
+        setAvailableUsers(data);
+      } else {
+        setAvailableUsers([]);
+      }
+    } catch (error) {
+      console.error("Error fetching available users:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load available users. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  // Handle opening the assign users dialog
+  const handleOpenAssignDialog = () => {
+    fetchAvailableUsers();
+    setIsAssignDialogOpen(true);
+  };
+
+  // Handle user selection
+  const handleUserSelection = (userId: string) => {
+    setSelectedUserIds(prev => {
+      if (prev.includes(userId)) {
+        return prev.filter(id => id !== userId);
+      } else {
+        return [...prev, userId];
+      }
+    });
+  };
+
+  // Submit user assignments to backend
+  const handleAssignUsers = async () => {
+    if (selectedUserIds.length === 0) {
+      toast({
+        title: "No Users Selected",
+        description: "Please select at least one user to assign.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setAssigningUsers(true);
+    try {
+      const { default: api } = await import('@/lib/api/client');
+      
+      // Call API to assign users to company
+      const { data, error } = await api.companies.assignUsers(companyId, selectedUserIds);
+      
+      if (error) {
+        console.error("Error assigning users:", error);
+        toast({
+          title: "Error",
+          description: "Failed to assign users to company. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      toast({
+        title: "Success",
+        description: `Successfully assigned ${selectedUserIds.length} users to the company.`,
+      });
+      
+      // Close dialog and refresh team members
+      setIsAssignDialogOpen(false);
+      fetchTeamMembers(companyId);
+      
+    } catch (error) {
+      console.error("Error assigning users:", error);
+      toast({
+        title: "Error",
+        description: "Failed to assign users to company. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setAssigningUsers(false);
+    }
+  };
+
+  // Team Assignment Dialog Component
+  const TeamAssignmentDialog = () => (
+    <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Assign Team Members</DialogTitle>
+          <DialogDescription>
+            Select users to assign to {company?.name || 'this company'}.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="py-4">
+          {loadingUsers ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <span className="ml-2">Loading users...</span>
+            </div>
+          ) : availableUsers.length === 0 ? (
+            <div className="text-center py-4 text-muted-foreground">
+              No users available to assign
+            </div>
+          ) : (
+            <div className="max-h-[300px] overflow-y-auto space-y-2">
+              {availableUsers.map(user => (
+                <div key={user.id} className="flex items-center space-x-2 p-2 hover:bg-muted rounded">
+                  <Checkbox
+                    id={`user-${user.id}`}
+                    checked={selectedUserIds.includes(user.id)}
+                    onCheckedChange={() => handleUserSelection(user.id)}
+                  />
+                  <Label
+                    htmlFor={`user-${user.id}`}
+                    className="flex items-center cursor-pointer flex-1"
+                  >
+                    <div className="bg-muted rounded-full p-1 mr-2">
+                      <User className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <div className="font-medium">{user.name || user.email}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {user.role || 'No role assigned'}
+                      </div>
+                    </div>
+                  </Label>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setIsAssignDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleAssignUsers} 
+            disabled={assigningUsers || selectedUserIds.length === 0}
+          >
+            {assigningUsers && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Assign Users
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
+  // Update the "No team members" section in the team tab to use the modal instead of navigation
+  const renderNoTeamMembersSection = () => (
+    <div className="text-center py-6">
+      <p className="text-muted-foreground">No team members have been assigned yet</p>
+      <Button 
+        variant="outline" 
+        className="mt-2"
+        onClick={handleOpenAssignDialog}
+      >
+        Assign Team Members
+      </Button>
+    </div>
+  );
+
   if (loading) {
     return (
       <div className="container mx-auto py-8 px-4">
@@ -713,7 +906,7 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
           <h1 className="text-3xl font-bold">{company.name}</h1>
           <p className="text-muted-foreground">Assessment Management</p>
         </div>
-        <div className="ml-auto">
+        {/* <div className="ml-auto">
           <Button 
             variant="outline" 
             onClick={() => router.push(`/admin/companies/${companyId}/profile`)}
@@ -721,13 +914,13 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
           >
             Configure Assessment Weights
           </Button>
-        </div>
+        </div> */}
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full max-w-md grid-cols-3">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="assessments">Assessments</TabsTrigger>
+          {/* <TabsTrigger value="assessments">Assessments</TabsTrigger> */}
           <TabsTrigger value="team">Team</TabsTrigger>
         </TabsList>
 
@@ -925,7 +1118,7 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
         </TabsContent>
 
         {/* Assessments Tab */}
-        <TabsContent value="assessments" className="space-y-4">
+        {/* <TabsContent value="assessments" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
@@ -1018,7 +1211,7 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
               )}
             </CardFooter>
           </Card>
-        </TabsContent>
+        </TabsContent> */}
 
         {/* Team Tab */}
         <TabsContent value="team" className="space-y-4">
@@ -1039,68 +1232,75 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
                   <p className="mt-2 text-sm text-muted-foreground">Loading team members...</p>
                 </div>
               ) : (
-              <div className="space-y-6">
+                <div className="space-y-6">
                   {assessmentStatus && Object.entries(teamMembers).map(([assessmentType, users], index) => {
-                  if (users.length === 0) return null;
-                  
-                  // Look up the assessment to get its status
-                  const assessment = assessmentStatus.assessments.find(a => a.type === assessmentType);
-                  if (!assessment) return null;
-                  
-                  return (
-                    <div key={`team-section-${index}-${assessmentType}`} className="space-y-3">
-                      <h3 className="font-medium text-lg flex items-center">
-                        {assessmentType}
-                        {assessment.status === 'completed' && (
-                          <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-200">
-                            Completed
-                          </Badge>
-                        )}
-                      </h3>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {users.map((user, userIndex) => (
-                          <div key={`user-${index}-${assessmentType}-${user.id || userIndex}`} className="flex items-center gap-3 border rounded-md p-3">
-                            <div className="bg-muted rounded-full p-2">
-                              <User className="h-5 w-5" />
-                            </div>
-                            <div>
-                              <div className="font-medium">{user.name}</div>
-                              <div className="text-sm text-muted-foreground flex items-center gap-2">
-                                <span>{user.role}</span>
-                                <span className="text-xs flex items-center gap-1">
-                                  <Calendar className="h-3 w-3" />
-                                  Assigned: {new Date(user.assigned).toLocaleDateString()}
-                                </span>
+                    if (users.length === 0) return null;
+                    
+                    // Look up the assessment to get its status
+                    const assessment = assessmentStatus.assessments.find(a => a.type === assessmentType);
+                    if (!assessment) return null;
+                    
+                    return (
+                      <div key={`team-section-${index}-${assessmentType}`} className="space-y-3">
+                        <h3 className="font-medium text-lg flex items-center">
+                          {assessmentType}
+                          {assessment.status === 'completed' && (
+                            <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-200">
+                              Completed
+                            </Badge>
+                          )}
+                        </h3>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {users.map((user, userIndex) => (
+                            <div key={`user-${index}-${assessmentType}-${user.id || userIndex}`} className="flex items-center gap-3 border rounded-md p-3">
+                              <div className="bg-muted rounded-full p-2">
+                                <User className="h-5 w-5" />
+                              </div>
+                              <div>
+                                <div className="font-medium">{user.name}</div>
+                                <div className="text-sm text-muted-foreground flex items-center gap-2">
+                                  <span>{user.role}</span>
+                                  <span className="text-xs flex items-center gap-1">
+                                    <Calendar className="h-3 w-3" />
+                                    Assigned: {new Date(user.assigned).toLocaleDateString()}
+                                  </span>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
+                        
+                        <Separator className="my-4" />
                       </div>
-                      
-                      <Separator className="my-4" />
-                    </div>
-                  );
-                })}
-                
-                  {(!assessmentStatus || Object.values(teamMembers).every(users => users.length === 0)) && (
-                  <div className="text-center py-6">
-                    <p className="text-muted-foreground">No team members have been assigned yet</p>
-                    <Button 
-                      variant="outline" 
-                      className="mt-2"
-                        onClick={() => router.push(`/admin/companies/${companyId}/team`)}
-                    >
-                      Assign Team Members
-                    </Button>
-                  </div>
-                )}
-              </div>
+                    );
+                  })}
+                  
+                  {(!assessmentStatus || Object.values(teamMembers).every(users => users.length === 0)) && renderNoTeamMembersSection()}
+                </div>
+              )}
+              
+              {/* Add a button to assign more team members even when some exist */}
+              {!loadingTeam && Object.keys(teamMembers).length > 0 && 
+               Object.values(teamMembers).some(users => users.length > 0) && (
+                <div className="mt-6 flex justify-center">
+                  <Button 
+                    variant="outline" 
+                    className="flex items-center gap-2"
+                    onClick={handleOpenAssignDialog}
+                  >
+                    <Plus className="h-4 w-4" />
+                    Assign More Team Members
+                  </Button>
+                </div>
               )}
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+      
+      {/* Include the Team Assignment Dialog */}
+      <TeamAssignmentDialog />
     </div>
   );
 } 

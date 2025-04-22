@@ -614,7 +614,7 @@ function DashboardContent() {
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             {/* Assessment results chart using AssessmentResultsChart component */}
                             {/* <AssessmentResultsChart
-                                data={overallData}
+                                                data={overallData}
                                 onGenerateReport={handleGenerateReport}
                                 isGenerating={generatingReport}
                                 generationMessage={reportGenerationMessage}
@@ -632,7 +632,7 @@ function DashboardContent() {
                             <AssessmentLevels
                                 overallScore={calculateOverallReadiness()}
                             />
-                        </div>
+                            </div>
                     ) : (
                         <Card>
                             <CardHeader>
@@ -648,7 +648,7 @@ function DashboardContent() {
                             </CardContent>
                         </Card>
                     )}
-                </TabsContent>
+                        </TabsContent>
 
                 <TabsContent value="companies" className="space-y-6">
                     <h2 className="text-2xl font-semibold mb-4">
@@ -691,8 +691,8 @@ function DashboardContent() {
                             ))}
                         </div>
                     )}
-                </TabsContent>
-            </Tabs>
+                        </TabsContent>
+                    </Tabs>
         </div>
     );
 }
