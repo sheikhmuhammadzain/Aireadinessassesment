@@ -9,9 +9,7 @@ import CompanyInfoForm from '@/components/CompanyInfoForm';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CompanyInfo } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { getSession } from "next-auth/react";
-import { useToast } from "@/components/ui/use-toast";
-import { ArrowUpRightIcon, ArrowRightIcon, CheckIcon } from '@heroicons/react/24/outline';
+import { useAuth } from "@/lib/auth-context";
 import { AnimatePresence, motion } from 'framer-motion';
 import { getCompanyInfo, updateCompanyInfo } from '@/lib/companyApi';
 import { ProtectedRoute } from "@/components/protected-route";
@@ -26,7 +24,7 @@ export default function CompanyProfilePage() {
 
 function CompanyProfileContent() {
   const router = useRouter();
-  const { toast } = useToast();
+  const { user } = useAuth();
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -36,9 +34,8 @@ function CompanyProfileContent() {
     async function loadUserAndCompany() {
       try {
         setLoading(true);
-        // Check user session
-        const session = await getSession();
-        if (!session?.user) {
+        
+        if (!user?.id) {
           // Redirect to login if not logged in
           console.log("No user session, redirecting to login");
           router.push('/login');
@@ -46,7 +43,7 @@ function CompanyProfileContent() {
         }
 
         // Get company info from API
-        const userCompany = await getCompanyInfo(session.user.id);
+        const userCompany = await getCompanyInfo(user.id);
         if (userCompany) {
           console.log("Company info loaded:", userCompany);
           setCompanyInfo(userCompany);
@@ -59,24 +56,19 @@ function CompanyProfileContent() {
             industry: '',
             size: '',
             description: '',
-            userId: session.user.id,
+            userId: user.id,
           });
         }
       } catch (err) {
         console.error("Error loading company info:", err);
         setError("Failed to load company information. Please try again later.");
-        toast({
-          title: "Error loading data",
-          description: "Could not load company information. Please try again later.",
-          variant: "destructive",
-        });
       } finally {
         setLoading(false);
       }
     }
 
     loadUserAndCompany();
-  }, [router, toast]);
+  }, [router, user]);
 
   const handleSubmit = async (data: CompanyInfo) => {
     try {
@@ -88,18 +80,13 @@ function CompanyProfileContent() {
       // Update local state with response
       setCompanyInfo(updated);
       
-      toast({
-        title: "Company profile updated",
-        description: "Your company information has been successfully saved.",
-      });
+      // Show success message using alert instead of toast
+      alert("Company profile updated successfully");
     } catch (err) {
       console.error("Error saving company info:", err);
       setError("Failed to save company information. Please try again later.");
-      toast({
-        title: "Error saving data",
-        description: "Could not save company information. Please try again later.",
-        variant: "destructive",
-      });
+      // Show error message using alert instead of toast
+      alert("Error saving company information. Please try again later.");
     } finally {
       setSaving(false);
     }
@@ -264,6 +251,44 @@ function ArrowLeftIcon(props: any) {
         strokeLinecap="round"
         strokeLinejoin="round"
         d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"
+      />
+    </svg>
+  );
+}
+
+function CheckIcon(props: any) {
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth={1.5}
+      stroke="currentColor"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M4.5 12.75l6 6 9-13.5"
+      />
+    </svg>
+  );
+}
+
+function ArrowRightIcon(props: any) {
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth={1.5}
+      stroke="currentColor"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"
       />
     </svg>
   );

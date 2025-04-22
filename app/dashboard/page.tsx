@@ -52,26 +52,27 @@ import { ProtectedRoute } from "@/components/protected-route";
 import { useAuth, ROLE_TO_PILLAR } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
 import { CompanyInfo, CompanyAssessmentStatus } from "@/types";
+import { AssessmentResult, AssessmentType, ChartDataItem } from "../types/dashboard";
 import React from "react";
 
-// Interfaces
-interface AssessmentResult {
-    assessmentType: string;
-    categoryScores: Record<string, number>;
-    qValues: Record<string, number>;
-    softmaxWeights: Record<string, number>;
-    overallScore: number;
-}
+// Import dashboard components
+import {
+    // AssessmentResultsChart, - Commented out as not being used
+    KeyInsights,
+    DashboardStats,
+    CompanyCard,
+    AssessmentLevels
+} from "../components/dashboard";
 
 // Assessment Type Configuration
-const assessmentTypes = [
-    { id: "AI Governance", title: "AI Governance", icon: Shield },
-    { id: "AI Culture", title: "AI Culture", icon: Users },
-    { id: "AI Infrastructure", title: "AI Infrastructure", icon: Layers },
-    { id: "AI Strategy", title: "AI Strategy", icon: BarChart4 },
-    { id: "AI Data", title: "AI Data", icon: Database },
-    { id: "AI Talent", title: "AI Talent", icon: Brain },
-    { id: "AI Security", title: "AI Security", icon: Shield },
+const assessmentTypes: AssessmentType[] = [
+    { id: "AI Governance", title: "AI Governance", icon: () => null },
+    { id: "AI Culture", title: "AI Culture", icon: () => null },
+    { id: "AI Infrastructure", title: "AI Infrastructure", icon: () => null },
+    { id: "AI Strategy", title: "AI Strategy", icon: () => null },
+    { id: "AI Data", title: "AI Data", icon: () => null },
+    { id: "AI Talent", title: "AI Talent", icon: () => null },
+    { id: "AI Security", title: "AI Security", icon: () => null },
 ];
 
 // Dashboard Page Wrapper
@@ -92,7 +93,7 @@ function DashboardContent() {
     const [companies, setCompanies] = useState<CompanyInfo[]>([]);
     const [assessmentStatuses, setAssessmentStatuses] = useState<Record<string, CompanyAssessmentStatus>>({});
     const [results, setResults] = useState<Record<string, AssessmentResult>>({});
-    const [overallData, setOverallData] = useState<{ name: string; score: number }[]>([]);
+    const [overallData, setOverallData] = useState<ChartDataItem[]>([]);
     const [generatingReport, setGeneratingReport] = useState(false);
     const [reportGenerationMessage, setReportGenerationMessage] = useState("Generating report...");
     const [activeTab, setActiveTab] = useState("overview");
@@ -132,7 +133,7 @@ function DashboardContent() {
                         // Fetch assessment status for each company
                         const statusesMap: Record<string, CompanyAssessmentStatus> = {};
                         const assessmentResultsMap: Record<string, AssessmentResult> = {};
-                        const chartDataArray: { name: string; score: number }[] = [];
+                        const chartDataArray: ChartDataItem[] = [];
                         
                         for (const company of companiesData) {
                             if (company.id) {
@@ -165,9 +166,12 @@ function DashboardContent() {
                                                                 
                                                                 assessmentResultsMap[assessment.type] = resultData;
                                                                 
-                                                                // Add to chart data
+                                                                // Add to chart data with user-friendly display name
+                                                                const assessmentType = assessmentTypes.find(t => t.id === assessment.type);
+                                                                const displayName = assessmentType ? assessmentType.title : assessment.type;
+                                                                
                                                                 chartDataArray.push({
-                                                                    name: assessment.type,
+                                                                    name: displayName,
                                                                     score: assessment.score
                                                                 });
                                                             }
@@ -230,7 +234,7 @@ function DashboardContent() {
                             // Fetch assessment status for each assigned company
                             const statusesMap: Record<string, CompanyAssessmentStatus> = {};
                             const assessmentResultsMap: Record<string, AssessmentResult> = {};
-                            const chartDataArray: { name: string; score: number }[] = [];
+                            const chartDataArray: ChartDataItem[] = [];
                             
                             for (const company of filteredCompanies) {
                                 if (company.id) {
@@ -264,9 +268,12 @@ function DashboardContent() {
                                                                         
                                                                         assessmentResultsMap[assessment.type] = resultData;
                                                                         
-                                                                        // Add to chart data
+                                                                        // Add to chart data with user-friendly display name
+                                                                        const assessmentType = assessmentTypes.find(t => t.id === assessment.type);
+                                                                        const displayName = assessmentType ? assessmentType.title : assessment.type;
+                                                                        
                                                                         chartDataArray.push({
-                                                                            name: assessment.type,
+                                                                            name: displayName,
                                                                             score: assessment.score
                                                                         });
                                                                     }
@@ -381,23 +388,33 @@ function DashboardContent() {
             if (Object.keys(loadedResults).length > 0) {
                 setResults(loadedResults);
                 
-                // Prepare overall data for bar chart
-                const overallScores = Object.entries(loadedResults).map(([type, result]) => {
-                    const score = typeof result.overallScore === 'number' ? 
-                        Math.round(result.overallScore * 100) / 100 : 0;
+                // Prepare overall data for bar chart with explicit mapping to handle labels correctly
+                const chartData = Object.entries(loadedResults).map(([type, result]) => {
+                    // Find the user-friendly display name for this assessment type
+                    const assessmentType = assessmentTypes.find(a => a.id === type);
+                    const displayName = assessmentType ? assessmentType.title : type;
                     
                     return {
-                        name: type,
-                        score: score
+                        name: displayName,
+                        score: Math.round(result.overallScore)
                     };
-                }).filter(item => item.score > 0);
+                });
                 
-                setOverallData(overallScores);
+                console.log("Setting chart data:", chartData);
+                setOverallData(chartData);
             }
         };
 
         fetchData();
     }, [user, filteredAssessmentTypes, toast]);
+
+    // Debug: Log overall data when it changes
+    useEffect(() => {
+        console.log("Overall data updated:", overallData);
+        if (overallData.length > 0) {
+            console.log("BarChart data:", JSON.stringify(overallData));
+        }
+    }, [overallData]);
 
     // Report Generation Animation Effect
     useEffect(() => {
@@ -484,7 +501,6 @@ function DashboardContent() {
         setGeneratingReport(true);
         try {
             const mainReport = await generateDeepResearchReport(
-                // Directly pass filtered results of completed assessments
                 Object.entries(results).map(([type, result]) => ({
                     type,
                     result,
@@ -492,10 +508,7 @@ function DashboardContent() {
             );
             
             if (mainReport && mainReport.trim()) {
-                // Save the report to localStorage, might be more appropriate to save to backend
                 localStorage.setItem('strategic_report', mainReport);
-                
-                // Navigate to the report page
                 router.push('/dashboard/report');
             } else {
                 throw new Error("Report generation failed");
@@ -528,6 +541,26 @@ function DashboardContent() {
         router.push(`/assessment/${encodeURIComponent(assessmentType)}`);
     };
 
+    // Prepare overall data for bar chart with explicit mapping to handle labels correctly
+    useEffect(() => {
+        if (Object.keys(results).length > 0) {
+            // Create a better formatted dataset for the chart
+            const chartData = Object.entries(results).map(([type, result]) => {
+                // Find the user-friendly display name for this assessment type
+                const assessmentType = assessmentTypes.find(a => a.id === type);
+                const displayName = assessmentType ? assessmentType.title : type;
+                
+                return {
+                    name: displayName,
+                    score: Math.round(result.overallScore)
+                };
+            });
+            
+            console.log("Setting chart data:", chartData);
+            setOverallData(chartData);
+        }
+    }, [results, assessmentTypes]);
+
     if (loading) {
         return (
             <div className="container mx-auto py-8 px-4 flex justify-center items-center min-h-[calc(100vh-200px)]">
@@ -538,6 +571,9 @@ function DashboardContent() {
             </div>
         );
     }
+
+    // Get the user's assessment type based on role
+    const userAssessmentType = user?.role ? ROLE_TO_PILLAR[user.role] : null;
 
     return (
         <div className="container mx-auto py-8 px-4">
@@ -567,186 +603,36 @@ function DashboardContent() {
                 </TabsList>
                 
                 <TabsContent value="overview" className="space-y-6">
-                    {/* Overall stats cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-lg">Total Companies</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="flex items-center">
-                                    <Building className="h-8 w-8 text-primary mr-3" />
-                                    <div className="text-3xl font-bold">{companies.length}</div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                        
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-lg">Assessments Completed</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="flex items-center">
-                                    <CheckCircle className="h-8 w-8 text-green-600 mr-3" />
-                                    <div className="text-3xl font-bold">
-                                        {Object.values(assessmentStatuses).reduce((total, status) => 
-                                            total + status.assessments.filter(a => a.status === "completed").length, 0)}
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                        
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-lg">Overall Readiness</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="flex items-center">
-                                    <BarChart2 className="h-8 w-8 text-primary mr-3" />
-                                    <div className="text-3xl font-bold">
-                                        {calculateOverallReadiness()}%
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
+                    {/* Overall stats cards using DashboardStats component */}
+                    <DashboardStats 
+                        companies={companies}
+                        assessmentStatuses={assessmentStatuses}
+                        overallReadiness={calculateOverallReadiness()}
+                    />
 
                     {Object.keys(results).length > 0 ? (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            {/* Assessment results chart */}
-                            <Card className="col-span-1 lg:col-span-2">
-                                    <CardHeader>
-                                    <CardTitle>Assessment Results Overview</CardTitle>
-                                        <CardDescription>
-                                        Readiness scores across different assessment areas
-                                        </CardDescription>
-                                    </CardHeader>
-                                <CardContent>
-                                    <div className="h-[300px] w-full">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <BarChart
-                                                data={overallData}
-                                                margin={{ top: 20, right: 30, left: 20, bottom: 50 }}
-                                                >
-                                                <CartesianGrid strokeDasharray="3 3" />
-                                                    <XAxis
-                                                        dataKey="name"
-                                                    tick={{ fontSize: 12 }}
-                                                    angle={-45}
-                                                        textAnchor="end"
-                                                        height={60}
-                                                    />
-                                                    <YAxis
-                                                        domain={[0, 100]}
-                                                    tick={{ fontSize: 12 }}
-                                                    label={{
-                                                        value: 'Score (%)',
-                                                        angle: -90,
-                                                        position: 'insideLeft',
-                                                        style: { textAnchor: 'middle' }
-                                                    }}
-                                                    />
-                                                    <Tooltip
-                                                    formatter={(value) => [`${value}%`, 'Score']}
-                                                    labelFormatter={(label) => `${label} Assessment`}
-                                                />
-                                                <Bar
-                                                    dataKey="score"
-                                                    fill="hsl(var(--primary))"
-                                                    radius={[4, 4, 0, 0]}
-                                                />
-                                                </BarChart>
-                                            </ResponsiveContainer>
-                                        </div>
-                                    </CardContent>
-                                <CardFooter className="flex justify-between pt-0">
-                                    <div className="text-xs text-muted-foreground">
-                                        Based on your completed assessments
-                                    </div>
-                                    <Button
-                                        variant="outline"
-                                        onClick={handleGenerateReport}
-                                        disabled={generatingReport}
-                                    >
-                                        {generatingReport ? (
-                                            <>
-                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                {reportGenerationMessage}
-                                            </>
-                                        ) : (
-                                            "Generate Strategic Report"
-                                        )}
-                                    </Button>
-                                </CardFooter>
-                                </Card>
+                            {/* Assessment results chart using AssessmentResultsChart component */}
+                            {/* <AssessmentResultsChart
+                                data={overallData}
+                                onGenerateReport={handleGenerateReport}
+                                isGenerating={generatingReport}
+                                generationMessage={reportGenerationMessage}
+                            /> */}
 
-                            {/* Key Insights */}
-                                <Card>
-                                    <CardHeader>
-                                    <CardTitle className="flex items-center text-lg">
-                                        <Target className="h-5 w-5 mr-2 text-primary" />
-                                        Key Insights
-                                    </CardTitle>
-                                    </CardHeader>
-                                <CardContent className="space-y-4">
-                                    {getStrongestArea() && (
-                                        <div className="flex items-start">
-                                            <div className="bg-green-50 p-2 rounded-full mr-3">
-                                                <TrendingUp className="h-5 w-5 text-green-600" />
-                                            </div>
-                                            <div>
-                                                <h3 className="font-medium">Strongest Area</h3>
-                                                <p className="text-sm text-muted-foreground">
-                                                    {getStrongestArea()} ({results[getStrongestArea()!]?.overallScore}%)
-                                                </p>
-                                            </div>
-                                        </div>
-                                    )}
-                                    
-                                    {getWeakestArea() && (
-                                        <div className="flex items-start">
-                                            <div className="bg-amber-50 p-2 rounded-full mr-3">
-                                                <TrendingDown className="h-5 w-5 text-amber-600" />
-                                                    </div>
-                                            <div>
-                                                <h3 className="font-medium">Area for Improvement</h3>
-                                                <p className="text-sm text-muted-foreground">
-                                                    {getWeakestArea()} ({results[getWeakestArea()!]?.overallScore}%)
-                                                    </p>
-                                                </div>
-                                        </div>
-                                    )}
-                                    
-                                    <div className="flex items-start">
-                                        <div className="bg-blue-50 p-2 rounded-full mr-3">
-                                            <Info className="h-5 w-5 text-blue-600" />
-                                        </div>
-                                        <div>
-                                            <h3 className="font-medium">Your Readiness Level</h3>
-                                            <p className="text-sm text-muted-foreground">
-                                                {getScoreLabel(calculateOverallReadiness())}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
+                            {/* Key Insights using KeyInsights component */}
+                            <KeyInsights
+                                results={results}
+                                strongestArea={getStrongestArea()}
+                                weakestArea={getWeakestArea()}
+                                readinessLevel={getScoreLabel(calculateOverallReadiness())}
+                            />
 
-                            {/* Assessment Levels */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center text-lg">
-                                        <BarChart4 className="h-5 w-5 mr-2 text-primary" />
-                                        Assessment Levels
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <AssessmentLevelsVisual 
-                                        overallScore={calculateOverallReadiness()} 
-                                        className="max-w-md mx-auto" 
-                                    />
-                                    </CardContent>
-                                </Card>
-                            </div>
+                            {/* Assessment Levels using AssessmentLevels component */}
+                            <AssessmentLevels
+                                overallScore={calculateOverallReadiness()}
+                            />
+                        </div>
                     ) : (
                         <Card>
                             <CardHeader>
@@ -762,7 +648,7 @@ function DashboardContent() {
                             </CardContent>
                         </Card>
                     )}
-                        </TabsContent>
+                </TabsContent>
 
                 <TabsContent value="companies" className="space-y-6">
                     <h2 className="text-2xl font-semibold mb-4">
@@ -789,102 +675,24 @@ function DashboardContent() {
                         </Card>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {companies.map((company) => {
-                                const companyId = company.id || "";
-                                const status = assessmentStatuses[companyId];
-                                const completionPercentage = getCompanyCompletionPercentage(companyId);
-                                const overallScore = getCompanyOverallScore(companyId);
-
-                                    return (
-                                    <Card key={companyId} className="hover:shadow-md transition-all">
-                                            <CardHeader>
-                                            <CardTitle className="flex items-center text-lg">
-                                                <Building className="h-5 w-5 mr-2 text-primary" />
-                                                {company.name}
-                                            </CardTitle>
-                                            <CardDescription>
-                                                {company.industry} • {company.size}
-                                            </CardDescription>
-                                        </CardHeader>
-                                        <CardContent className="space-y-4">
-                                            <div>
-                                                <div className="flex justify-between mb-1">
-                                                    <span className="text-sm text-muted-foreground">Assessments Completed</span>
-                                                    <span className="text-sm font-medium">{completionPercentage}%</span>
-                                                </div>
-                                                <Progress value={completionPercentage} className="h-2" />
-                                                </div>
-                                            
-                                            {status && (
-                                                <div className="grid grid-cols-3 gap-2 pt-2">
-                                                    <div className="flex flex-col items-center">
-                                                        <Badge variant="default" className="bg-green-600 mb-1">
-                                                            <CheckCircle className="h-3 w-3 mr-1" />
-                                                            {status.assessments.filter(a => a.status === "completed").length}
-                                                        </Badge>
-                                                        <span className="text-xs text-muted-foreground">Completed</span>
-                                                                </div>
-                                                    <div className="flex flex-col items-center">
-                                                        <Badge variant="secondary" className="mb-1">
-                                                            <Clock className="h-3 w-3 mr-1" />
-                                                            {status.assessments.filter(a => a.status === "in-progress").length}
-                                                        </Badge>
-                                                        <span className="text-xs text-muted-foreground">In Progress</span>
-                                                            </div>
-                                                    <div className="flex flex-col items-center">
-                                                        <Badge variant="outline" className="mb-1">
-                                                            <XCircle className="h-3 w-3 mr-1 text-muted-foreground" />
-                                                            {status.assessments.filter(a => a.status === "not-started").length}
-                                                        </Badge>
-                                                        <span className="text-xs text-muted-foreground">Not Started</span>
-                                                    </div>
-                                                </div>
-                                            )}
-                                            
-                                            {overallScore > 0 && (
-                                                <div className="flex items-center justify-between pt-2">
-                                                    <span className="text-sm text-muted-foreground">Overall Score:</span>
-                                                    <span className="text-sm font-medium">{overallScore}%</span>
-                                                </div>
-                                            )}
-                                            </CardContent>
-                                        <CardFooter className="flex justify-between pt-0">
-                                            <Button 
-                                                variant="outline" 
-                                                onClick={() => handleViewCompany(companyId)}
-                                            >
-                                                View Details
-                                            </Button>
-                                            
-                                            {user?.role === 'admin' ? (
-                                                <Button 
-                                                    variant="default"
-                                                    onClick={() => router.push(`/admin/companies/${companyId}/assessments`)}
-                                                >
-                                                    Manage Assessments
-                                                </Button>
-                                            ) : (
-                                                <Button
-                                                    variant="default"
-                                                    onClick={() => {
-                                                        // Find the assessment type for this user based on role
-                                                        const assessmentType = user?.role ? ROLE_TO_PILLAR[user.role] : null;
-                                                        if (assessmentType) {
-                                                            handleStartAssessment(assessmentType, companyId);
-                                                        }
-                                                    }}
-                                                >
-                                                    Start Assessment
-                                                </Button>
-                                            )}
-                                            </CardFooter>
-                                        </Card>
-                                    );
-                                })}
+                            {companies.map((company) => (
+                                <CompanyCard
+                                    key={company.id}
+                                    company={company}
+                                    status={assessmentStatuses[company.id || ""]}
+                                    completionPercentage={getCompanyCompletionPercentage(company.id || "")}
+                                    overallScore={getCompanyOverallScore(company.id || "")}
+                                    onViewDetails={handleViewCompany}
+                                    onManageAssessments={(id: string) => router.push(`/admin/companies/${id}/assessments`)}
+                                    onStartAssessment={handleStartAssessment}
+                                    isAdmin={user?.role === 'admin'}
+                                    userAssessmentType={userAssessmentType}
+                                />
+                            ))}
                         </div>
                     )}
-                        </TabsContent>
-                    </Tabs>
+                </TabsContent>
+            </Tabs>
         </div>
     );
 }
