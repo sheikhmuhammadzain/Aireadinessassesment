@@ -69,21 +69,71 @@ export function CompanyCard({
             <div className="flex flex-col items-center">
               <Badge variant="default" className="bg-green-600 mb-1">
                 <CheckCircle className="h-3 w-3 mr-1" />
-                {status.assessments.filter(a => a.status === "completed").length}
+                {(() => {
+                  // Count unique completed assessment types
+                  const completedTypes = new Set();
+                  status.assessments
+                    .filter(a => a.status === "completed")
+                    .forEach(a => completedTypes.add(a.type));
+                  return completedTypes.size;
+                })()}
               </Badge>
               <span className="text-xs text-muted-foreground">Completed</span>
             </div>
             <div className="flex flex-col items-center">
               <Badge variant="secondary" className="mb-1">
                 <Clock className="h-3 w-3 mr-1" />
-                {status.assessments.filter(a => a.status === "in-progress").length}
+                {(() => {
+                  // For in-progress, only count a type if it's not already completed
+                  const completedTypes = new Set(
+                    status.assessments
+                      .filter(a => a.status === "completed")
+                      .map(a => a.type)
+                  );
+                  
+                  const inProgressTypes = new Set();
+                  status.assessments
+                    .filter(a => a.status === "in-progress" && !completedTypes.has(a.type))
+                    .forEach(a => inProgressTypes.add(a.type));
+                  
+                  return inProgressTypes.size;
+                })()}
               </Badge>
               <span className="text-xs text-muted-foreground">In Progress</span>
             </div>
             <div className="flex flex-col items-center">
               <Badge variant="outline" className="mb-1">
                 <XCircle className="h-3 w-3 mr-1 text-muted-foreground" />
-                {status.assessments.filter(a => a.status === "not-started").length}
+                {(() => {
+                  // Count types that are neither completed nor in-progress
+                  const completedTypes = new Set(
+                    status.assessments
+                      .filter(a => a.status === "completed")
+                      .map(a => a.type)
+                  );
+                  
+                  const inProgressTypes = new Set(
+                    status.assessments
+                      .filter(a => a.status === "in-progress")
+                      .map(a => a.type)
+                  );
+                  
+                  // Expected total assessment types
+                  const expectedTypes = [
+                    "AI Governance", 
+                    "AI Culture", 
+                    "AI Infrastructure", 
+                    "AI Strategy", 
+                    "AI Data", 
+                    "AI Talent", 
+                    "AI Security"
+                  ];
+                  
+                  // Count types that don't appear in either completed or in-progress
+                  return expectedTypes.filter(type => 
+                    !completedTypes.has(type) && !inProgressTypes.has(type)
+                  ).length;
+                })()}
               </Badge>
               <span className="text-xs text-muted-foreground">Not Started</span>
             </div>

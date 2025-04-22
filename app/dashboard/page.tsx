@@ -471,8 +471,28 @@ function DashboardContent() {
         const status = assessmentStatuses[companyId];
         if (!status) return 0;
         
-        const completed = status.assessments.filter(a => a.status === "completed").length;
-        const total = status.assessments.length;
+        // Define the complete list of expected assessment types
+        const expectedAssessmentTypes = [
+          "AI Governance", 
+          "AI Culture", 
+          "AI Infrastructure", 
+          "AI Strategy", 
+          "AI Data", 
+          "AI Talent", 
+          "AI Security"
+        ];
+        
+        // Count unique completed assessment types
+        const completedTypes = new Set();
+        status.assessments
+          .filter(a => a.status === "completed")
+          .forEach(a => completedTypes.add(a.type));
+        
+        // Calculate percentage based on the 7 expected assessment types
+        const completed = completedTypes.size;
+        const total = expectedAssessmentTypes.length;
+        
+        console.log(`Dashboard: Company ${companyId}: ${completed} out of ${total} assessment types completed`);
         return Math.round((completed / total) * 100);
     };
     

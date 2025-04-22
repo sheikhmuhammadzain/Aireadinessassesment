@@ -369,7 +369,17 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
           
           if (assessmentData && assessmentData.assessments && assessmentData.assessments.length > 0) {
             console.log("Successfully fetched assessment data:", assessmentData);
-            setAssessmentStatus(assessmentData);
+            
+            // De-duplicate assessments: keep only the most recent status for each type
+            const deduplicatedAssessments = deduplicateAssessments(assessmentData.assessments);
+            
+            // Create a new assessment status with deduplicated data
+            const dedupedAssessmentStatus = {
+              ...assessmentData,
+              assessments: deduplicatedAssessments
+            };
+            
+            setAssessmentStatus(dedupedAssessmentStatus);
           } else {
             console.log("No assessment data found, creating default status");
             // Create default assessment status
@@ -646,8 +656,28 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
   const getCompletionPercentage = () => {
     if (!assessmentStatus) return 0;
     
-    const completed = assessmentStatus.assessments.filter(a => a.status === "completed").length;
-    const total = assessmentStatus.assessments.length;
+    // Define the complete list of expected assessment types
+    const expectedAssessmentTypes = [
+      "AI Governance", 
+      "AI Culture", 
+      "AI Infrastructure", 
+      "AI Strategy", 
+      "AI Data", 
+      "AI Talent", 
+      "AI Security"
+    ];
+    
+    // Count unique completed assessment types
+    const completedTypes = new Set();
+    assessmentStatus.assessments
+      .filter(a => a.status === "completed")
+      .forEach(a => completedTypes.add(a.type));
+    
+    // Calculate percentage based on the 7 expected assessment types
+    const completed = completedTypes.size;
+    const total = expectedAssessmentTypes.length;
+    
+    console.log(`Completion: ${completed} out of ${total} assessment types completed`);
     return Math.round((completed / total) * 100);
   };
 
@@ -868,6 +898,55 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
     </div>
   );
 
+  // De-duplicate assessments function - keeps only the most recent status for each type
+  const deduplicateAssessments = (assessments: Assessment[]): Assessment[] => {
+    // Group assessments by type
+    const assessmentsByType: Record<string, Assessment[]> = {};
+    
+    assessments.forEach(assessment => {
+      if (!assessmentsByType[assessment.type]) {
+        assessmentsByType[assessment.type] = [];
+      }
+      assessmentsByType[assessment.type].push(assessment);
+    });
+    
+    // For each type, select the best assessment
+    // Priority: completed > in-progress > not-started 
+    // For completed ones with same status, pick the most recent one
+    const deduplicated = Object.values(assessmentsByType).map(typeAssessments => {
+      // Sort first by status priority
+      typeAssessments.sort((a, b) => {
+        // Custom status priority sorting
+        const statusPriority = {
+          "completed": 3,
+          "in-progress": 2, 
+          "not-started": 1
+        };
+        
+        const priorityA = statusPriority[a.status] || 0;
+        const priorityB = statusPriority[b.status] || 0;
+        
+        // If status is the same, sort by completion date (most recent first)
+        if (priorityA === priorityB && a.status === "completed" && b.status === "completed") {
+          // Handle null completedAt values
+          if (!a.completedAt) return 1;
+          if (!b.completedAt) return -1;
+          
+          return new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime();
+        }
+        
+        // Otherwise sort by status priority
+        return priorityB - priorityA;
+      });
+      
+      // Return the first (highest priority) assessment
+      return typeAssessments[0];
+    });
+    
+    console.log("De-duplicated assessments:", deduplicated);
+    return deduplicated;
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto py-8 px-4">
@@ -918,10 +997,10 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsList className="  max-w-md ">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           {/* <TabsTrigger value="assessments">Assessments</TabsTrigger> */}
-          <TabsTrigger value="team">Team</TabsTrigger>
+          {/* <TabsTrigger value="team">Team</TabsTrigger> */}
         </TabsList>
 
         {/* Overview Tab */}
@@ -987,9 +1066,9 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
                       <span className="font-medium">{calculateOverallScore()}%</span>
                     </div>
                     <div className="flex flex-wrap gap-2 mt-3">
-                      {assessmentStatus.assessments.map(assessment => (
+                      {assessmentStatus.assessments.map((assessment, index) => (
                         assessment.status === "completed" && (
-                          <div key={`score-bar-${assessment.type}`} className="flex-1 min-w-[120px]">
+                          <div key={`score-bar-${assessment.type}-${index}`} className="flex-1 min-w-[120px]">
                             <div className="text-xs text-muted-foreground mb-1">{assessment.type}</div>
                             <div className="flex items-center gap-1">
                               <div 
@@ -1065,8 +1144,8 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
                   .filter(a => a.status === "completed" && a.completedAt)
                   .sort((a, b) => new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime())
                   .slice(0, 3)
-                  .map(assessment => (
-                    <div key={`recent-completed-${assessment.type}`} className="flex items-start gap-3">
+                  .map((assessment, index) => (
+                    <div key={`recent-completed-${assessment.type}-${index}-${assessment.completedAt}`} className="flex items-start gap-3">
                       <div className="bg-primary/10 p-2 rounded-full">
                         <CheckCircle className="h-5 w-5 text-primary" />
                       </div>

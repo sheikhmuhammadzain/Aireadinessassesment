@@ -299,11 +299,11 @@ export default function AdminCompaniesPage() {
   };
 
   const handleViewAssessments = (id: string) => {
-    const { completedCount, totalCount } = getCompletionStatus(id);
+    const { completed, total } = getCompletionStatus(id);
     
     toast({
       title: "View Assessments",
-      description: `This company has completed ${completedCount} out of ${totalCount} assessments.`,
+      description: `This company has completed ${completed} out of ${total} assessments.`,
       variant: "default"
     });
     
@@ -316,9 +316,29 @@ export default function AdminCompaniesPage() {
     const status = assessmentStatuses.find(s => s.companyId === companyId);
     if (!status) return { completed: 0, total: 0, percentage: 0 };
     
-    const completed = status.assessments.filter(a => a.status === "completed").length;
-    const total = status.assessments.length;
+    // Define the complete list of expected assessment types
+    const expectedAssessmentTypes = [
+      "AI Governance", 
+      "AI Culture", 
+      "AI Infrastructure", 
+      "AI Strategy", 
+      "AI Data", 
+      "AI Talent", 
+      "AI Security"
+    ];
+    
+    // Count unique completed assessment types
+    const completedTypes = new Set();
+    status.assessments
+      .filter(a => a.status === "completed")
+      .forEach(a => completedTypes.add(a.type));
+    
+    // Calculate percentage based on the 7 expected assessment types
+    const completed = completedTypes.size;
+    const total = expectedAssessmentTypes.length;
     const percentage = Math.round((completed / total) * 100);
+    
+    console.log(`Company ${companyId}: ${completed} out of ${total} assessment types completed (${percentage}%)`);
     
     return { completed, total, percentage };
   };
@@ -340,10 +360,13 @@ export default function AdminCompaniesPage() {
         const { completed, total } = getCompletionStatus(company.id || "");
         
         if (assessmentStatusFilter === "completed" && completed !== total) {
+          // Only match companies that have completed all 7 assessments
           matchesAssessmentStatus = false;
         } else if (assessmentStatusFilter === "in-progress" && (completed === 0 || completed === total)) {
+          // Match companies that have completed at least one but not all assessments
           matchesAssessmentStatus = false;
         } else if (assessmentStatusFilter === "not-started" && completed > 0) {
+          // Match companies that haven't completed any assessments
           matchesAssessmentStatus = false;
         }
       }
