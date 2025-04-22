@@ -1,5 +1,5 @@
 # PowerShell script to check if the backend API is running and accessible
-Write-Host "Checking connection to backend API at http://127.0.0.1:8000..." -ForegroundColor Yellow
+Write-Host "Checking connection to backend API at http://103.18.20.205:8090..." -ForegroundColor Yellow
 
 # Test network connectivity to the port
 try {
@@ -18,10 +18,10 @@ try {
 }
 
 # Now try to fetch the questionnaires endpoint
-Write-Host "Testing API endpoint: http://127.0.0.1:8000/questionnaires" -ForegroundColor Yellow
+Write-Host "Testing API endpoint: http://103.18.20.205:8090/questionnaires" -ForegroundColor Yellow
 
 try {
-    $response = Invoke-WebRequest -Uri "http://127.0.0.1:8000/questionnaires" -UseBasicParsing -TimeoutSec 5 -Method Get
+    $response = Invoke-WebRequest -Uri "http://103.18.20.205:8090/questionnaires" -UseBasicParsing -TimeoutSec 5 -Method Get
     
     Write-Host "✓ API returned status code: $($response.StatusCode) $($response.StatusDescription)" -ForegroundColor Green
     
@@ -56,4 +56,4 @@ Write-Host "`nAPI Connection Check Complete" -ForegroundColor Green
 Write-Host "If your application is still having trouble connecting, please check:"
 Write-Host "1. The server is running on the correct port (8000)"
 Write-Host "2. There are no firewall or antivirus blocking the connection"
-Write-Host "3. The API_URL in .env.local is set to http://127.0.0.1:8000" 
+Write-Host "3. The API_URL in .env.local is set to http://103.18.20.205:8090" 

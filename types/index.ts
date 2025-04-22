@@ -23,6 +23,7 @@ export interface User {
 
 // Define assessment status types
 export interface Assessment {
+  id?: string;
   type: string;
   status: "not-started" | "in-progress" | "completed";
   score?: number | null;

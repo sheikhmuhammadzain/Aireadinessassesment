@@ -1,39 +1,36 @@
 import { AssessmentResponse, AssessmentResult, CompanyInfo, CategoryWeights, SubcategoryWeights } from "@/types";
+import axios from "axios";
 
-// Use a proxy URL for API requests to avoid CORS issues
-// This points to our Next.js API route that will forward requests to the actual backend
-const USE_PROXY = false; // Disable proxy
-const API_PROXY_URL = '/api/backend';
-const API_DIRECT_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"; // Ensure localhost is used
+// API configuration
+const API_DIRECT_URL = process.env.NEXT_PUBLIC_API_URL || "http://103.18.20.205:8090";
 
-// Simple request deduplication to prevent multiple identical requests at the same time
+// Request cache to prevent duplicate requests
 const pendingRequests = new Map();
 
 /**
- * Create API URL using either direct backend URL or proxy URL
- * @param path API path (should start with a slash)
- * @returns Properly formatted URL
+ * Initialize axios instance with default configuration
+ */
+const apiClient = axios.create({
+  baseURL: API_DIRECT_URL,
+  timeout: 30000, // 30 seconds timeout
+  headers: {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json'
+  }
+});
+
+/**
+ * Helper function to create an API URL
  */
 function createApiUrl(path: string): string {
-  // Ensure path starts with a slash
-  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  
-  if (USE_PROXY) {
-    // When using proxy, we need to keep the full path after /api/backend
-    return `${API_PROXY_URL}${normalizedPath}`;
-  } else {
-    // When accessing directly, add path to backend URL
-    return `${API_DIRECT_URL}${normalizedPath}`;
-  }
+  return path.startsWith('/') ? path : `/${path}`;
 }
 
 /**
  * Fetch a questionnaire by slug
- * @param slug Questionnaire slug
- * @returns Promise with questionnaire data
  */
 export async function fetchQuestionnaire(slug: string) {
-  // Try to deduplicate identical requests
+  // Deduplicate identical requests
   const cacheKey = `questionnaire_${slug}`;
   if (pendingRequests.has(cacheKey)) {
     return pendingRequests.get(cacheKey);
@@ -41,44 +38,30 @@ export async function fetchQuestionnaire(slug: string) {
   
   const requestPromise = (async () => {
     try {
-      // Use createApiUrl instead of direct URL
       const apiUrl = createApiUrl(`/questionnaire/${encodeURIComponent(slug)}`);
       console.log(`Fetching questionnaire from ${apiUrl}`);
       
-      // Using fetch with better timeout handling
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-      
-      const response = await fetch(apiUrl, {
-        signal: controller.signal,
+      const response = await apiClient.get(apiUrl, {
+        timeout: 15000, // 15 second timeout
         headers: {
-          'Accept': 'application/json',
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
         }
       });
       
-      clearTimeout(timeoutId);
+      console.log(`Successfully fetched questionnaire data`);
       
-      if (!response.ok) {
-        console.error(`API Error: Status ${response.status} ${response.statusText}`);
-        throw new Error(`Error fetching questionnaire: ${response.status} ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      console.log(`Successfully fetched questionnaire data:`, data);
-      
-      // Fix data structure - if the response is not in the expected format with slug as the key
-      if (data && typeof data === 'object' && !data[slug]) {
+      // Fix data structure if needed
+      if (response.data && typeof response.data === 'object' && !response.data[slug]) {
         // Wrap the response in the expected format
-        return { [slug]: data };
+        return { [slug]: response.data };
       }
       
-      return data;
+      return response.data;
     } catch (error) {
       console.error(`Error fetching questionnaire ${slug}:`, error);
-      // Provide more detailed error information
-      if (error instanceof Error) {
+      
+      if (axios.isAxiosError(error)) {
         throw new Error(`Error fetching questionnaire: ${error.message}`);
       }
       throw error;
@@ -94,7 +77,6 @@ export async function fetchQuestionnaire(slug: string) {
 
 /**
  * Fetch all questionnaires
- * @returns Promise with all questionnaires data
  */
 export async function fetchAllQuestionnaires() {
   const cacheKey = 'all_questionnaires';
@@ -107,36 +89,19 @@ export async function fetchAllQuestionnaires() {
     try {
       console.log('Fetching all questionnaires...');
       
-      // Direct API call to backend
       const apiUrl = createApiUrl('/questionnaires');
       console.log(`Fetching from: ${apiUrl}`);
       
-      // Add a timeout to prevent hanging requests
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-      
-      const response = await fetch(apiUrl, {
-        method: "GET",
-        headers: {
-          "Accept": "application/json",
-        },
-        signal: controller.signal
+      const response = await apiClient.get(apiUrl, {
+        timeout: 30000 // 30 second timeout
       });
       
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch questionnaires: ${response.status} ${response.statusText}`);
-      }
-      
-      const data = await response.json();
       console.log(`Successfully fetched all questionnaires`);
-      return data;
+      return response.data;
     } catch (error) {
       console.error("Error fetching questionnaires:", error);
       
-      // Provide more detailed error information
-      if (error instanceof Error) {
+      if (axios.isAxiosError(error)) {
         throw new Error(`Error fetching questionnaires: ${error.message}`);
       }
       throw error;
@@ -152,8 +117,6 @@ export async function fetchAllQuestionnaires() {
 
 /**
  * Submit assessment responses and get results
- * @param payload Assessment response data
- * @returns Promise with assessment results
  */
 export async function submitAssessment(payload: AssessmentResponse): Promise<AssessmentResult> {
   try {
@@ -171,7 +134,7 @@ export async function submitAssessment(payload: AssessmentResponse): Promise<Ass
         throw new Error(`Invalid category data for "${category.category || 'unnamed category'}"`);
       }
       
-      // Check if any response is invalid (null or undefined)
+      // Check if any response is invalid
       const invalidResponses = category.responses.filter(r => 
         r.answer === null || r.answer === undefined || r.answer < 1 || r.answer > 4);
       
@@ -210,72 +173,40 @@ export async function submitAssessment(payload: AssessmentResponse): Promise<Ass
       console.log('Adjusted weights to total 100%');
     }
     
-    // Log the payload structure to help with debugging
-    console.log('Assessment payload structure:', {
+    // Simplify the payload structure - create a more flat structure
+    const simplifiedPayload = {
       assessmentType: payload.assessmentType,
-      categoryCount: payload.categoryResponses?.length || 0,
-      totalWeight: payload.categoryResponses.reduce((sum, cat) => sum + cat.weight, 0).toFixed(1) + '%',
-      categories: payload.categoryResponses?.map(c => ({
-        category: c.category,
+      // Create a more direct structure for categories and responses
+      categoryData: payload.categoryResponses.map(category => ({
+        name: category.category,
+        weight: category.weight,
+        answers: category.responses.map(response => ({
+          question: response.question,
+          value: response.answer
+        }))
+      }))
+    };
+    
+    // Log the simplified payload structure
+    console.log('Simplified assessment payload structure:', {
+      assessmentType: simplifiedPayload.assessmentType,
+      categoryCount: simplifiedPayload.categoryData.length,
+      categories: simplifiedPayload.categoryData.map(c => ({
+        name: c.name,
         weight: c.weight,
-        responseCount: c.responses.length
+        answerCount: c.answers.length
       }))
     });
     
-    // Add a timeout to prevent hanging requests
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-    
-    // Use createApiUrl instead of direct URL
     const apiUrl = createApiUrl('/calculate-results');
     console.log(`Submitting to: ${apiUrl}`);
     
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-      },
-      body: JSON.stringify(payload),
-      signal: controller.signal
+    // Use the original payload structure for the calculation API
+    const response = await apiClient.post(apiUrl, payload, {
+      timeout: 30000 // 30 second timeout
     });
     
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      let errorMessage = `Error ${response.status}: ${response.statusText}`;
-      let errorDetail = '';
-      
-      try {
-        const errorData = await response.json();
-        errorDetail = JSON.stringify(errorData);
-        console.log('Error response from server:', errorDetail);
-        
-        if (errorData.error) {
-          if (typeof errorData.error === 'string') {
-            errorMessage = errorData.error;
-          } else if (errorData.error.detail) {
-            errorMessage = errorData.error.detail;
-          }
-        } else if (errorData.detail) {
-          errorMessage = errorData.detail;
-        }
-      } catch (e) {
-        // If we can't parse JSON, try to get text
-        try {
-          const errorText = await response.text();
-          if (errorText) errorDetail = errorText;
-          console.log('Error text from server:', errorDetail);
-        } catch (textError) {
-          // If text extraction fails, stick with the status message
-        }
-      }
-      
-      console.error(`API Error: ${errorMessage}`, errorDetail);
-      throw new Error(errorMessage);
-    }
-    
-    const result = await response.json();
+    const result = response.data;
     console.log('Assessment submission successful with result:', result);
     
     // Save assessment to database if user is logged in
@@ -294,17 +225,25 @@ export async function submitAssessment(payload: AssessmentResponse): Promise<Ass
           const apiModule = await import('@/lib/api/client');
           const api = apiModule.default;
           
-          // Format assessment data for the backend API
+          // Format assessment data for the backend API using the simplified structure
           const assessmentData = {
             company_id: companyId,
             assessment_type: payload.assessmentType,
             status: "completed",
             score: result.overallScore,
             data: {
-              responses: payload.categoryResponses,
-              results: result
+              categoryScores: result.categoryScores || {},
+              userWeights: Object.fromEntries(payload.categoryResponses.map(cat => [cat.category, cat.weight])),
+              adjustedWeights: result.adjustedWeights || {},
+              qValues: result.qValues || {},
+              responses: payload.categoryResponses.map(category => ({
+                category: category.category,
+                weight: category.weight,
+                responses: category.responses
+              }))
             },
-            completed_at: new Date().toISOString()
+            completed_at: new Date().toISOString(),
+            completed_by_id: localStorage.getItem('user_id') || null
           };
           
           // First check if assessment exists for this company
@@ -319,15 +258,19 @@ export async function submitAssessment(payload: AssessmentResponse): Promise<Ass
                 const existing = existingAssessments.find((a: any) => 
                   a.assessment_type === payload.assessmentType
                 );
-                if (existing && existing.id) {
-                  existingId = existing.id;
+                // Cast to any to avoid type errors
+                const existingAny = existing as any;
+                if (existingAny && existingAny.id) {
+                  existingId = existingAny.id;
                 }
               } else if (existingAssessments.assessments) {
                 const existing = existingAssessments.assessments.find((a: any) => 
                   a.type === payload.assessmentType
                 );
-                if (existing && existing.id) {
-                  existingId = existing.id;
+                // Cast to any to avoid type errors
+                const existingAny = existing as any;
+                if (existingAny && existingAny.id) {
+                  existingId = existingAny.id;
                 }
               }
             }
@@ -338,8 +281,9 @@ export async function submitAssessment(payload: AssessmentResponse): Promise<Ass
               await api.assessments.updateAssessment(existingId, assessmentData);
               console.log('Assessment updated successfully in database');
             } else {
-              console.log('Creating new assessment in database');
-              await api.assessments.createAssessment(companyId, payload.assessmentType);
+              console.log('Creating new assessment in database with complete data');
+              // Use the function that accepts full data
+              await api.assessments.createAssessmentWithData(assessmentData);
               console.log('Assessment created successfully in database');
             }
           } catch (apiError) {
@@ -360,12 +304,10 @@ export async function submitAssessment(payload: AssessmentResponse): Promise<Ass
   } catch (error) {
     console.error("Error submitting assessment:", error);
     
-    // If it's an abort error (timeout), provide a clearer message
-    if (error instanceof DOMException && error.name === 'AbortError') {
+    if (axios.isAxiosError(error) && error.code === 'ECONNABORTED') {
       throw new Error('Request timed out while submitting assessment. The server may be overloaded or not responding.');
     }
     
-    // Provide more detailed error information
     if (error instanceof Error) {
       throw new Error(`Error submitting assessment: ${error.message}`);
     }
@@ -375,8 +317,6 @@ export async function submitAssessment(payload: AssessmentResponse): Promise<Ass
 
 /**
  * Get recommended weights based on company information
- * @param companyInfo Company information
- * @returns Promise with recommended weights
  */
 export async function getRecommendedWeights(companyInfo: CompanyInfo) {
   try {
@@ -386,18 +326,10 @@ export async function getRecommendedWeights(companyInfo: CompanyInfo) {
     if (companyInfo.id) {
       try {
         const apiUrl = createApiUrl(`/companies/${encodeURIComponent(companyInfo.id)}/weights`);
-        const response = await fetch(apiUrl, {
-          method: "GET",
-          headers: {
-            "Accept": "application/json",
-          }
-        });
+        const response = await apiClient.get(apiUrl);
         
-        if (response.ok) {
-          const weights = await response.json();
-          console.log(`Successfully fetched weights from backend for company: ${companyInfo.name}`);
-          return weights;
-        }
+        console.log(`Successfully fetched weights from backend for company: ${companyInfo.name}`);
+        return response.data;
       } catch (apiError) {
         console.warn("Could not fetch weights from backend:", apiError);
       }
@@ -420,18 +352,10 @@ export async function getRecommendedWeights(companyInfo: CompanyInfo) {
     // Try to get default weights from backend
     try {
       const apiUrl = createApiUrl(`/weights/defaults`);
-      const response = await fetch(apiUrl, {
-        method: "GET",
-        headers: {
-          "Accept": "application/json",
-        }
-      });
+      const response = await apiClient.get(apiUrl);
       
-      if (response.ok) {
-        const weights = await response.json();
-        console.log(`Successfully fetched default weights from backend`);
-        return weights;
-      }
+      console.log(`Successfully fetched default weights from backend`);
+      return response.data;
     } catch (apiError) {
       console.warn("Could not fetch default weights from backend:", apiError);
     }
@@ -440,7 +364,7 @@ export async function getRecommendedWeights(companyInfo: CompanyInfo) {
     console.log("Using fallback defaults for weights");
     
     // Default weights with equal distribution
-    const defaultWeights = {
+    return {
       "AI Governance": 14.3,
       "AI Culture": 14.3,
       "AI Infrastructure": 14.3,
@@ -449,8 +373,6 @@ export async function getRecommendedWeights(companyInfo: CompanyInfo) {
       "AI Talent": 14.3,
       "AI Security": 14.2
     };
-    
-    return defaultWeights;
   } catch (error) {
     console.error("Error getting recommended weights:", error);
     throw error;
@@ -459,9 +381,6 @@ export async function getRecommendedWeights(companyInfo: CompanyInfo) {
 
 /**
  * Save company weights to the backend
- * @param companyId Company ID
- * @param weights Weights to save
- * @returns Promise with saved weights
  */
 export async function saveCompanyWeights(companyId: string, weights: CategoryWeights) {
   try {
@@ -477,86 +396,40 @@ export async function saveCompanyWeights(companyId: string, weights: CategoryWei
     const isNumericId = /^\d+$/.test(companyId);
     if (!isNumericId) {
       console.warn(`Company ID "${companyId}" is not in the expected numeric format. Attempting to find a valid ID...`);
-      
-      // Try to get companies from localStorage to find a numeric ID match
-      const storedCompanies = localStorage.getItem('companies');
-      let updatedCompanyId = companyId;
-      
-      if (storedCompanies) {
-        try {
-          const companies = JSON.parse(storedCompanies);
-          // Find company by string ID and get its numeric ID if exists
-          const company = companies.find((c: any) => c.id === companyId || c.stringId === companyId);
-          if (company && /^\d+$/.test(company.id)) {
-            updatedCompanyId = company.id;
-            console.log(`Found numeric ID "${updatedCompanyId}" for company "${companyId}"`);
-          } else {
-            // Try the first company as fallback
-            if (companies.length > 0 && companies[0].id && /^\d+$/.test(companies[0].id)) {
-              updatedCompanyId = companies[0].id;
-              console.log(`Using first available company ID: ${updatedCompanyId}`);
-            } else {
-              throw new Error(`Cannot find a valid numeric ID for company "${companyId}". The backend requires numeric IDs (e.g. "1", "2").`);
-            }
-          }
-        } catch (parseError) {
-          console.error("Error parsing companies from localStorage:", parseError);
-          throw new Error(`Invalid company ID format "${companyId}". Backend requires numeric IDs (e.g. "1", "2").`);
-        }
-      } else {
-        // Default to ID "1" as a last resort
-        updatedCompanyId = "1";
-        console.warn(`No companies found in localStorage. Using default company ID "1".`);
-      }
-      
-      companyId = updatedCompanyId;
+      companyId = await getValidCompanyId(companyId);
     }
     
     const apiUrl = createApiUrl(`/companies/${encodeURIComponent(companyId)}/weights`);
     console.log(`Making API request to: ${apiUrl}`);
     
-    const response = await fetch(apiUrl, {
-      method: "PUT",
+    const response = await apiClient.put(apiUrl, { weights }, {
       headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-        "Authorization": `Bearer ${token}`  // Add auth token
-      },
-      body: JSON.stringify({ weights })
+        "Authorization": `Bearer ${token}`
+      }
     });
     
-    if (!response.ok) {
-      const errorText = await response.text();
-      let errorMessage = `Failed to save weights: ${response.status} ${response.statusText}`;
-      
-      try {
-        const errorData = JSON.parse(errorText);
-        if (errorData.detail) {
-          errorMessage = errorData.detail;
-        }
-      } catch (e) {
-        // If not JSON, use the raw text
-        if (errorText) errorMessage += ` - ${errorText}`;
-      }
-      
+    console.log(`Successfully saved weights for company: ${companyId}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error saving company weights:", error);
+    
+    if (axios.isAxiosError(error) && error.response?.data) {
+      const errorMessage = typeof error.response.data === 'object' 
+        ? error.response.data.detail || JSON.stringify(error.response.data)
+        : error.response.data;
       throw new Error(errorMessage);
     }
     
-    const result = await response.json();
-    console.log(`Successfully saved weights for company: ${companyId}`);
-    return result;
-  } catch (error) {
-    console.error("Error saving company weights:", error);
-    throw error;
+    if (error instanceof Error) {
+      throw error;
+    }
+    
+    throw new Error('Unknown error occurred while saving weights');
   }
 }
 
 /**
- * Save category weights to the backend for a specific assessment type
- * @param companyId Company ID
- * @param assessmentType Assessment type (pillar)
- * @param weights Weights to save (can be a SubcategoryWeights object or just a Record<string, number>)
- * @returns Promise with saved weights
+ * Save category weights to the backend
  */
 export async function saveCategoryWeights(companyId: string, assessmentType: string, weights: SubcategoryWeights | Record<string, number>) {
   try {
@@ -588,90 +461,73 @@ export async function saveCategoryWeights(companyId: string, assessmentType: str
     const isNumericId = /^\d+$/.test(companyId);
     if (!isNumericId) {
       console.warn(`Company ID "${companyId}" is not in the expected numeric format. Attempting to find a valid ID...`);
-      
-      // Try to get companies from localStorage to find a numeric ID match
-      const storedCompanies = localStorage.getItem('companies');
-      let updatedCompanyId = companyId;
-      
-      if (storedCompanies) {
-        try {
-          const companies = JSON.parse(storedCompanies);
-          // Find company by string ID and get its numeric ID if exists
-          const company = companies.find((c: any) => c.id === companyId || c.stringId === companyId);
-          if (company && /^\d+$/.test(company.id)) {
-            updatedCompanyId = company.id;
-            console.log(`Found numeric ID "${updatedCompanyId}" for company "${companyId}"`);
-          } else {
-            // Try the first company as fallback
-            if (companies.length > 0 && companies[0].id && /^\d+$/.test(companies[0].id)) {
-              updatedCompanyId = companies[0].id;
-              console.log(`Using first available company ID: ${updatedCompanyId}`);
-            } else {
-              throw new Error(`Cannot find a valid numeric ID for company "${companyId}". The backend requires numeric IDs (e.g. "1", "2").`);
-            }
-          }
-        } catch (parseError) {
-          console.error("Error parsing companies from localStorage:", parseError);
-          throw new Error(`Invalid company ID format "${companyId}". Backend requires numeric IDs (e.g. "1", "2").`);
-        }
-      } else {
-        // Default to ID "1" as a last resort
-        updatedCompanyId = "1";
-        console.warn(`No companies found in localStorage. Using default company ID "1".`);
-      }
-      
-      companyId = updatedCompanyId;
+      companyId = await getValidCompanyId(companyId);
     }
     
     const apiUrl = createApiUrl(`/companies/${encodeURIComponent(companyId)}/weights/${encodeURIComponent(assessmentType)}`);
     console.log(`Making API request to: ${apiUrl}`);
     console.log(`Request payload:`, { weights: weightsToSend });
     
-    const response = await fetch(apiUrl, {
-      method: "PUT",
+    const response = await apiClient.put(apiUrl, { weights: weightsToSend }, {
       headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-        "Authorization": `Bearer ${token}`  // Add auth token
-      },
-      body: JSON.stringify({ weights: weightsToSend })  // Wrap in weights object to match backend expectation
+        "Authorization": `Bearer ${token}`
+      }
     });
     
-    console.log(`API response status: ${response.status} ${response.statusText}`);
+    console.log(`Successfully saved ${assessmentType} weights for company: ${companyId}`);
+    return response.data;
+  } catch (error) {
+    console.error(`Error saving ${assessmentType} weights:`, error);
     
-    // Handle error responses
-    if (!response.ok) {
-      const errorText = await response.text();
-      let errorMessage = `Failed to save category weights: ${response.status} ${response.statusText}`;
-      
-      try {
-        const errorData = JSON.parse(errorText);
-        if (errorData.detail) {
-          errorMessage = errorData.detail;
-        }
-      } catch (e) {
-        // If not JSON, use the raw text
-        if (errorText) errorMessage += ` - ${errorText}`;
-      }
-      
+    if (axios.isAxiosError(error) && error.response?.data) {
+      const errorMessage = typeof error.response.data === 'object' 
+        ? error.response.data.detail || JSON.stringify(error.response.data)
+        : error.response.data;
       throw new Error(errorMessage);
     }
     
-    const result = await response.json();
-    console.log(`Successfully saved ${assessmentType} weights for company: ${companyId}`);
-    return result;
-  } catch (error) {
-    console.error(`Error saving ${assessmentType} weights:`, error);
-    throw error;
+    if (error instanceof Error) {
+      throw error;
+    }
+    
+    throw new Error('Unknown error occurred while saving weights');
   }
 }
 
 /**
+ * Helper function to find a valid company ID
+ */
+async function getValidCompanyId(companyId: string): Promise<string> {
+  // Try to get companies from localStorage to find a numeric ID match
+  const storedCompanies = localStorage.getItem('companies');
+  
+  if (storedCompanies) {
+    try {
+      const companies = JSON.parse(storedCompanies);
+      // Find company by string ID and get its numeric ID if exists
+      const company = companies.find((c: any) => c.id === companyId || c.stringId === companyId);
+      if (company && /^\d+$/.test(company.id)) {
+        console.log(`Found numeric ID "${company.id}" for company "${companyId}"`);
+        return company.id;
+      } else {
+        // Try the first company as fallback
+        if (companies.length > 0 && companies[0].id && /^\d+$/.test(companies[0].id)) {
+          console.log(`Using first available company ID: ${companies[0].id}`);
+          return companies[0].id;
+        }
+      }
+    } catch (parseError) {
+      console.error("Error parsing companies from localStorage:", parseError);
+    }
+  }
+  
+  // Default to ID "1" as a last resort
+  console.warn(`No valid company ID found. Using default company ID "1".`);
+  return "1";
+}
+
+/**
  * Get recommendations for a specific category based on score
- * @param assessmentType Assessment type
- * @param category Category name
- * @param score Category score
- * @returns Promise with recommendations
  */
 export async function getRecommendations(assessmentType: string, category: string, score: number) {
   try {
@@ -682,14 +538,8 @@ export async function getRecommendations(assessmentType: string, category: strin
     const apiUrl = createApiUrl(`/recommendations/${encodedType}/${encodedCategory}?score=${score}`);
     console.log(`Fetching recommendations from: ${apiUrl}`);
     
-    const response = await fetch(apiUrl);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to get recommendations: ${response.status} ${response.statusText} - ${errorText}`);
-    }
-    
-    return response.json();
+    const response = await apiClient.get(apiUrl);
+    return response.data;
   } catch (error) {
     console.error("Error getting recommendations:", error);
     // Simple fallback recommendations for UI display
@@ -704,8 +554,7 @@ export async function getRecommendations(assessmentType: string, category: strin
 }
 
 /**
- * Prefetch and normalize questionnaire data for common assessment types
- * This helps ensure data is ready when needed and in the correct format
+ * Prefetch common questionnaires
  */
 export function prefetchCommonQuestionnaires() {
   // Only run this on the client side
@@ -716,75 +565,52 @@ export function prefetchCommonQuestionnaires() {
   console.log('Prefetching common questionnaire data');
   
   commonTypes.forEach(type => {
-    // Use setTimeout to stagger requests and not block initial page load
+    // Stagger requests and not block initial page load
     setTimeout(() => {
       fetchQuestionnaire(type)
-        .then(data => {
-          console.log(`Successfully prefetched ${type} questionnaire data`);
-        })
+        .then(() => console.log(`Successfully prefetched ${type} questionnaire data`))
         .catch(err => console.warn(`Prefetch failed for ${type}:`, err));
     }, Math.random() * 2000); // Random delay between 0-2 seconds
   });
 }
 
 /**
- * Fetches questionnaires directly from the backend
- * @returns Promise with questionnaire data
+ * Fetch questionnaires directly from the backend
  */
 export const fetchQuestionnairesDirectly = async (): Promise<Record<string, any>> => {
-  console.log('Fetching questionnaires directly from backend (now via proxy)...');
+  console.log('Fetching questionnaires directly from backend...');
   
   try {
-    // Use createApiUrl instead of direct URL
     const requestUrl = createApiUrl('/questionnaires');
+    console.log(`Making request to: ${requestUrl}`);
     
-    console.log(`Making request via proxy to: ${requestUrl}`);
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout
-    
-    const response = await fetch(requestUrl, {
-      method: 'GET',
+    const response = await apiClient.get(requestUrl, {
+      timeout: 20000, // 20 second timeout
       headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Cache-Control': 'no-cache',
-      },
-      signal: controller.signal,
+        'Cache-Control': 'no-cache'
+      }
     });
     
-    clearTimeout(timeoutId);
-    
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => 'No error details available');
-      throw new Error(`Backend API returned ${response.status}: ${response.statusText}. Details: ${errorText}`);
-    }
-    
-    const data = await response.json();
     console.log('Successfully fetched questionnaires from backend directly');
-    return data;
-  } catch (directError: unknown) {
-    console.error('Failed to fetch questionnaires from backend:', directError);
+    return response.data;
+  } catch (error) {
+    console.error('Failed to fetch questionnaires from backend:', error);
     
-    // Provide more specific error information based on the error type
-    if (directError instanceof Error) {
-      if (directError.name === 'AbortError') {
+    if (axios.isAxiosError(error)) {
+      if (error.code === 'ECONNABORTED') {
         console.error('Request timed out after 20 seconds. The backend server might be running slowly or not responding.');
-      } else if (directError.message.includes('Failed to fetch')) {
+      } else if (!error.response) {
         console.error('Network error: Failed to fetch. The backend server might not be running.');
         console.error('Please run the backend server using: python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000');
       }
     }
     
-    throw directError; // Re-throw the error since we're not using fallbacks anymore
+    throw error;
   }
 };
 
 /**
  * Synchronize category weights between backend and frontend
- * @param companyId Company ID
- * @param assessmentType Assessment type (pillar)
- * @returns Promise with synchronized weights
  */
 export async function syncCategoryWeights(companyId: string, assessmentType: string): Promise<Record<string, number>> {
   try {
@@ -800,62 +626,18 @@ export async function syncCategoryWeights(companyId: string, assessmentType: str
     const isNumericId = /^\d+$/.test(companyId);
     if (!isNumericId) {
       console.warn(`Company ID "${companyId}" is not in the expected numeric format. Attempting to find a valid ID...`);
-      
-      // Try to get companies from localStorage to find a numeric ID match
-      const storedCompanies = localStorage.getItem('companies');
-      let updatedCompanyId = companyId;
-      
-      if (storedCompanies) {
-        try {
-          const companies = JSON.parse(storedCompanies);
-          // Find company by string ID and get its numeric ID if exists
-          const company = companies.find((c: any) => c.id === companyId || c.stringId === companyId);
-          if (company && /^\d+$/.test(company.id)) {
-            updatedCompanyId = company.id;
-            console.log(`Found numeric ID "${updatedCompanyId}" for company "${companyId}"`);
-          } else {
-            // Try the first company as fallback
-            if (companies.length > 0 && companies[0].id && /^\d+$/.test(companies[0].id)) {
-              updatedCompanyId = companies[0].id;
-              console.log(`Using first available company ID: ${updatedCompanyId}`);
-            } else {
-              console.warn(`Cannot find a valid numeric ID for company "${companyId}". Will use default weights.`);
-              // Generate default weights without throwing an error
-              return getDefaultEqualSubcategoryWeights(assessmentType);
-            }
-          }
-        } catch (parseError) {
-          console.error("Error parsing companies from localStorage:", parseError);
-          return getDefaultEqualSubcategoryWeights(assessmentType);
-        }
-      } else {
-        // Default to ID "1" as a last resort
-        updatedCompanyId = "1";
-        console.warn(`No companies found in localStorage. Using default company ID "1".`);
-      }
-      
-      companyId = updatedCompanyId;
+      companyId = await getValidCompanyId(companyId);
     }
     
     // Step 1: Get weights from backend
     let backendWeights: Record<string, number> = {};
     try {
       const apiUrl = createApiUrl(`/companies/${encodeURIComponent(companyId)}/weights/${encodeURIComponent(assessmentType)}`);
-      const response = await fetch(apiUrl, {
-        method: "GET",
-        headers: {
-          "Accept": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {}) // Add auth token if available
-        }
-      });
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
       
-      if (response.ok) {
-        const data = await response.json();
-        backendWeights = data[assessmentType] || {};
-        console.log(`Successfully fetched weights from backend:`, backendWeights);
-      } else {
-        console.warn(`Backend returned ${response.status}, using fallback weights`);
-      }
+      const response = await apiClient.get(apiUrl, { headers });
+      backendWeights = response.data[assessmentType] || {};
+      console.log(`Successfully fetched weights from backend:`, backendWeights);
     } catch (error) {
       console.warn("Could not fetch weights from backend:", error);
     }
@@ -883,7 +665,7 @@ export async function syncCategoryWeights(companyId: string, assessmentType: str
     }
     
     // Step 3: Determine the most up-to-date weights
-    let finalWeights: Record<string, number> = {};
+    let finalWeights: Record<string, number>;
     
     // If backend has weights, prioritize those
     if (Object.keys(backendWeights).length > 0) {
@@ -898,12 +680,6 @@ export async function syncCategoryWeights(companyId: string, assessmentType: str
         const weightsToSave: Record<string, Record<string, number>> = {
           [assessmentType]: localWeights
         };
-        
-        // Use the same token for consistency
-        const token = localStorage.getItem('token');
-        if (!token) {
-          throw new Error('Not authenticated: No token found in localStorage');
-        }
         
         await saveCategoryWeights(companyId, assessmentType, weightsToSave);
         console.log(`Successfully saved local weights to backend`);
@@ -920,12 +696,6 @@ export async function syncCategoryWeights(companyId: string, assessmentType: str
         const weightsToSave: Record<string, Record<string, number>> = {
           [assessmentType]: finalWeights
         };
-        
-        // Use the same token for consistency
-        const token = localStorage.getItem('token');
-        if (!token) {
-          throw new Error('Not authenticated: No token found in localStorage');
-        }
         
         await saveCategoryWeights(companyId, assessmentType, weightsToSave);
         console.log(`Successfully saved default weights to backend`);
@@ -998,7 +768,9 @@ async function getDefaultEqualSubcategoryWeights(assessmentType: string): Promis
   };
 }
 
-// Helper function to convert subcategory weights to category weights
+/**
+ * Convert subcategory weights to category weights
+ */
 function convertSubcategoryToCategory(subcategoryWeights: Record<string, Record<string, number>>): Record<string, number> {
   const categoryWeights: Record<string, number> = {};
   
@@ -1015,9 +787,7 @@ function convertSubcategoryToCategory(subcategoryWeights: Record<string, Record<
 }
 
 /**
- * Synchronize company pillar weights between backend and frontend
- * @param companyId Company ID
- * @returns Promise with synchronized weights
+ * Synchronize company pillar weights
  */
 export async function syncCompanyWeights(companyId: string): Promise<Record<string, number>> {
   try {
@@ -1033,61 +803,18 @@ export async function syncCompanyWeights(companyId: string): Promise<Record<stri
     const isNumericId = /^\d+$/.test(companyId);
     if (!isNumericId) {
       console.warn(`Company ID "${companyId}" is not in the expected numeric format. Attempting to find a valid ID...`);
-      
-      // Try to get companies from localStorage to find a numeric ID match
-      const storedCompanies = localStorage.getItem('companies');
-      let updatedCompanyId = companyId;
-      
-      if (storedCompanies) {
-        try {
-          const companies = JSON.parse(storedCompanies);
-          // Find company by string ID and get its numeric ID if exists
-          const company = companies.find((c: any) => c.id === companyId || c.stringId === companyId);
-          if (company && /^\d+$/.test(company.id)) {
-            updatedCompanyId = company.id;
-            console.log(`Found numeric ID "${updatedCompanyId}" for company "${companyId}"`);
-          } else {
-            // Try the first company as fallback
-            if (companies.length > 0 && companies[0].id && /^\d+$/.test(companies[0].id)) {
-              updatedCompanyId = companies[0].id;
-              console.log(`Using first available company ID: ${updatedCompanyId}`);
-            } else {
-              console.warn(`Cannot find a valid numeric ID for company "${companyId}". Will use default weights.`);
-              // Return default weights instead of throwing an error
-              return getDefaultEqualWeights();
-            }
-          }
-        } catch (parseError) {
-          console.error("Error parsing companies from localStorage:", parseError);
-          return getDefaultEqualWeights();
-        }
-      } else {
-        // Default to ID "1" as a last resort
-        updatedCompanyId = "1";
-        console.warn(`No companies found in localStorage. Using default company ID "1".`);
-      }
-      
-      companyId = updatedCompanyId;
+      companyId = await getValidCompanyId(companyId);
     }
     
     // Step 1: Get weights from backend
     let backendWeights: Record<string, number> = {};
     try {
       const apiUrl = createApiUrl(`/companies/${encodeURIComponent(companyId)}/weights`);
-      const response = await fetch(apiUrl, {
-        method: "GET",
-        headers: {
-          "Accept": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {}) // Add auth token if available
-        }
-      });
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
       
-      if (response.ok) {
-        backendWeights = await response.json();
-        console.log(`Successfully fetched pillar weights from backend:`, backendWeights);
-      } else {
-        console.warn(`Backend returned ${response.status}, using fallback weights`);
-      }
+      const response = await apiClient.get(apiUrl, { headers });
+      backendWeights = response.data;
+      console.log(`Successfully fetched pillar weights from backend:`, backendWeights);
     } catch (error) {
       console.warn("Could not fetch pillar weights from backend:", error);
     }
@@ -1111,7 +838,7 @@ export async function syncCompanyWeights(companyId: string): Promise<Record<stri
     }
     
     // Step 3: Determine the most up-to-date weights
-    let finalWeights: Record<string, number> = {};
+    let finalWeights: Record<string, number>;
     
     // If backend has weights, prioritize those
     if (Object.keys(backendWeights).length > 0) {
@@ -1168,7 +895,7 @@ export async function syncCompanyWeights(companyId: string): Promise<Record<stri
 function getDefaultEqualWeights(): Record<string, number> {
   // Default pillars with equal distribution
   const defaultPillars = ["AI Governance", "AI Culture", "AI Infrastructure", "AI Strategy", 
-                        "AI Data", "AI Talent", "AI Security"];
+                         "AI Data", "AI Talent", "AI Security"];
   const equalWeight = Number((100 / defaultPillars.length).toFixed(1));
   
   const weights: Record<string, number> = {};

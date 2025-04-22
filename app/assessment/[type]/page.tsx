@@ -239,7 +239,7 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
         const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
         
         // Use direct backend connection instead of proxy
-        const response = await fetch('http://127.0.0.1:8000/questionnaires', {
+        const response = await fetch('http://103.18.20.205:8090/questionnaires', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -270,7 +270,7 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
           if (error.name === 'AbortError') {
             errorMessage = 'Request timed out after 15 seconds';
           } else if (error.message.includes('Failed to fetch')) {
-            errorMessage = 'Network error - Cannot connect to backend API (http://127.0.0.1:8000). Check if the server is running.';
+            errorMessage = 'Network error - Cannot connect to backend API (http://103.18.20.205:8090). Check if the server is running.';
           }
         }
         
@@ -792,7 +792,7 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
       
       // Otherwise, fetch companies from the backend using the public endpoint that doesn't require auth
       console.log('Fetching public company list from backend');
-      const apiUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/companies/public`;
+      const apiUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://103.18.20.205:8090'}/companies/public`;
       const response = await fetch(apiUrl, {
         headers: {
           "Accept": "application/json"
@@ -833,7 +833,7 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
           }
           
           console.log("Creating a new company in the backend", info);
-          const apiUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/companies`;
+          const apiUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://103.18.20.205:8090'}/companies`;
           
           const response = await fetch(apiUrl, {
             method: 'POST',
@@ -876,7 +876,7 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
         try {
           const token = localStorage.getItem('token');
           if (token) {
-            const apiUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/companies/${encodeURIComponent(companyId)}`;
+            const apiUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://103.18.20.205:8090'}/companies/${encodeURIComponent(companyId)}`;
             const response = await fetch(apiUrl, {
               headers: {
                 'Accept': 'application/json',
@@ -1182,11 +1182,22 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
           } else {
             console.log("Creating new assessment in backend database");
             try {
-              // For create, we need to pass the correct parameters
-              const { error: createError } = await api.assessments.createAssessment(
-                companyInfo.id,
-                assessmentType
-              );
+              // Create assessment with complete data in one step
+              const { error: createError } = await api.assessments.createAssessmentWithData({
+                company_id: companyInfo.id,
+                assessment_type: assessmentType,
+                status: "completed",
+                score: result.overallScore,
+                data: {
+                  categoryScores: result.categoryScores,
+                  userWeights: result.userWeights || result.adjustedWeights,
+                  adjustedWeights: result.adjustedWeights,
+                  qValues: result.qValues,
+                  responses: categoryResponses
+                },
+                completed_at: new Date().toISOString(),
+                completed_by_id: user?.id || null
+              });
               
               if (createError) {
                 console.error("Failed to create assessment in database:", createError);
@@ -1196,34 +1207,7 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
                   variant: "default"
                 });
               } else {
-                console.log("Assessment successfully saved to database");
-                
-                // If the assessment was created successfully, try to update it with the complete data
-                const { data: assessments } = await api.assessments.getCompanyAssessments(companyInfo.id);
-                if (assessments && Array.isArray(assessments)) {
-                  const newAssessment = assessments.find((a: any) => a.assessment_type === assessmentType);
-                  if (newAssessment && newAssessment.id) {
-                    console.log("Updating newly created assessment with results");
-                    await api.assessments.updateAssessment(
-                      newAssessment.id,
-                      {
-                        company_id: companyInfo.id,
-                        assessment_type: assessmentType,
-                        status: "completed",
-                        score: result.overallScore,
-                        data: {
-                          categoryScores: result.categoryScores,
-                          userWeights: result.userWeights || result.adjustedWeights,
-                          adjustedWeights: result.adjustedWeights,
-                          qValues: result.qValues,
-                          responses: categoryResponses
-                        },
-                        completed_at: new Date().toISOString(),
-                        completed_by_id: user.id || null
-                      }
-                    );
-                  }
-                }
+                console.log("Assessment successfully created in database with complete data");
               }
             } catch (createApiError) {
               console.error("API error when creating assessment:", createApiError);

@@ -1,8 +1,8 @@
 # PowerShell script to fetch questionnaires directly from local endpoint
-Write-Host "Fetching questionnaires from http://127.0.0.1:8000/questionnaires..."
+Write-Host "Fetching questionnaires from http://103.18.20.205:8090/questionnaires..."
 
 try {
-    $response = Invoke-RestMethod -Uri "http://127.0.0.1:8000/questionnaires" -Method Get -Headers @{
+    $response = Invoke-RestMethod -Uri "http://103.18.20.205:8090/questionnaires" -Method Get -Headers @{
         "Accept" = "application/json"
         "Content-Type" = "application/json"
         "Cache-Control" = "no-cache"

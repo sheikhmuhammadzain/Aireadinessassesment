@@ -2,7 +2,7 @@
 Write-Host "Checking AI Readiness Assessment Backend API status..." -ForegroundColor Cyan
 
 # Define the API endpoint to check
-$apiEndpoint = "http://127.0.0.1:8000"
+$apiEndpoint = "http://103.18.20.205:8090"
 
 # Check for Python processes
 function Check-BackendProcess {

@@ -30,7 +30,7 @@ try {
 }
 
 # Start the backend server
-Write-Host "Starting FastAPI server at http://127.0.0.1:8000..." -ForegroundColor Yellow
+Write-Host "Starting FastAPI server at http://103.18.20.205:8090..." -ForegroundColor Yellow
 Write-Host "Press Ctrl+C to stop the server" -ForegroundColor Yellow
 
 # Run the FastAPI server with uvicorn

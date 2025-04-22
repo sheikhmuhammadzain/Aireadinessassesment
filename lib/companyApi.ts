@@ -1,6 +1,6 @@
 import { CompanyInfo } from "@/types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://103.18.20.205:8090';
 
 /**
  * Get company information for a user

@@ -1,8 +1,9 @@
 import { User, CompanyInfo, CompanyAssessmentStatus } from "@/types";
+import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
 
 // Base API URL
-// const API_BASE_URL = '/api/backend'; // Changed to use Next.js API proxy instead of direct backend URL
-const API_BASE_URL = 'http://127.0.0.1:8000'; // Point directly to the backend
+const API_BASE_URL = '/api/backend'; // Use Next.js API proxy instead of direct backend URL
+// const API_BASE_URL = 'http://103.18.20.205:8090'; // Point directly to the backend
 
 // Response type wrapper
 interface ApiResponse<T> {
@@ -30,140 +31,124 @@ const getToken = (): string | null => {
   return null;
 };
 
-// Base fetch wrapper with error handling
-async function apiFetch<T>(
+// Initialize axios instance with default config
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 30000, // 30 seconds default timeout
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  }
+});
+
+// Add request interceptor to include auth token
+apiClient.interceptors.request.use((config) => {
+  const token = getToken();
+  if (token && config.headers) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Base API call wrapper with error handling
+async function apiCall<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: AxiosRequestConfig = {}
 ): Promise<ApiResponse<T>> {
   try {
-    console.log(`Making API request to: ${API_BASE_URL}${endpoint}`);
-    const token = getToken();
+    console.log(`Making API request to: ${endpoint}`);
     
-    // Default headers
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...(options.headers as Record<string, string> || {}),
-    };
+    const response = await apiClient({
+      url: endpoint,
+      ...options
+    });
     
-    // Add auth token if available
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
+    return { data: response.data };
+  } catch (error) {
+    console.error(`API error for ${endpoint}:`, error);
     
-    // Add timeout signal (30 seconds)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
-    
-    try {
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        ...options,
-        headers,
-        signal: controller.signal,
-      });
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError;
       
-      // Clear timeout
-      clearTimeout(timeoutId);
-      
-      console.log(`Response status: ${response.status} for ${endpoint}`);
-      
-      // Handle non-JSON responses
-      const contentType = response.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        const data = await response.json();
-        
-        // Handle error responses from the API proxy
-        if (!response.ok) {
-          console.error(`API Error (${response.status}):`, data);
-          
-          // Try to extract detailed error message
-          const errorMessage = data.error || data.detail || (typeof data === 'object' ? JSON.stringify(data) : `Error ${response.status}: ${response.statusText}`);
-          return { error: errorMessage };
-        }
-        
-        return { data };
-      } else {
-        const text = await response.text();
-        
-        if (!response.ok) {
-          console.error(`API Text Error (${response.status}):`, text);
-          
-          // For 422 errors, try to provide more helpful information
-          if (response.status === 422) {
-            return { error: `Validation error (422): ${text}. Please check the data format.` };
-          }
-          
-          return { error: text || `Error ${response.status}: ${response.statusText}` };
-        }
-        
-        return { data: text as unknown as T };
-      }
-    } catch (fetchError) {
-      clearTimeout(timeoutId);
-      
-      if (fetchError instanceof DOMException && fetchError.name === 'AbortError') {
-        console.error(`Request timeout for ${endpoint}`);
+      // Handle timeout errors
+      if (axiosError.code === 'ECONNABORTED') {
         return { error: 'Request timed out. Please check if the backend server is running.' };
       }
       
-      console.error(`Fetch error for ${endpoint}:`, fetchError);
-      
-      // Check if it's a network error (backend not running)
-      if (fetchError instanceof TypeError && fetchError.message.includes('Failed to fetch')) {
-        return { error: `Connection error: Could not connect to backend at ${API_BASE_URL}. Please ensure the backend server is running.` };
+      // Handle network errors
+      if (!axiosError.response) {
+        return { error: `Connection error: Could not connect to backend server. Please ensure the backend is running.` };
       }
       
-      return { error: fetchError instanceof Error ? fetchError.message : 'Network error' };
+      // Handle error response with data
+      if (axiosError.response?.data) {
+        const errorData = axiosError.response.data as any;
+        
+        if (typeof errorData === 'string') {
+          return { error: errorData };
+        }
+        
+        const errorMessage = errorData.detail || 
+                             errorData.error || 
+                             (typeof errorData === 'object' ? JSON.stringify(errorData) : 
+                             `Error ${axiosError.response.status}: ${axiosError.response.statusText}`);
+        
+        return { error: errorMessage };
+      }
+      
+      // Generic error with status code
+      return { error: `Error ${axiosError.response?.status || 'unknown'}: ${axiosError.message}` };
     }
-  } catch (error) {
-    console.error('API wrapper error:', error);
-    return { error: error instanceof Error ? error.message : 'Network error' };
+    
+    // Non-axios errors
+    return { error: error instanceof Error ? error.message : 'Unknown error occurred' };
   }
 }
 
 // Auth API
 export const authApi = {
-  login: async (email: string, password: string): Promise<ApiResponse<LoginResponse>> => {
+  login: async (email: string, password: string): Promise<ApiResponse<any>> => {
     // Convert to form data for OAuth2 endpoint
     const formData = new URLSearchParams();
     formData.append('username', email);
     formData.append('password', password);
     
-    return apiFetch<LoginResponse>('/token', {
+    return apiCall('/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: formData.toString(),
+      data: formData.toString(),
     });
   },
   
   signup: async (email: string, name: string, password: string, role: string): Promise<ApiResponse<User>> => {
-    return apiFetch<User>('/users', {
+    return apiCall<User>('/users', {
       method: 'POST',
-      body: JSON.stringify({ email, name, password, role }),
+      data: { email, name, password, role }
     });
   },
   
   getCurrentUser: async (): Promise<ApiResponse<User>> => {
-    return apiFetch<User>('/users/me');
+    return apiCall<User>('/users/me');
   },
 };
 
 // Users API
 export const usersApi = {
   getUsers: async (): Promise<ApiResponse<User[]>> => {
-    return apiFetch<User[]>('/users');
+    return apiCall<User[]>('/users');
   },
   
   getUser: async (userId: string): Promise<ApiResponse<User>> => {
-    return apiFetch<User>(`/users/${userId}`);
+    return apiCall<User>(`/users/${userId}`);
   },
 };
 
 // Companies API
 export const companiesApi = {
   getCompanies: async (): Promise<ApiResponse<CompanyInfo[]>> => {
-    const response = await apiFetch<any[]>('/companies');
+    const response = await apiCall<any[]>('/companies');
     
     // Convert the data to match expected format if needed
     if (response.data && Array.isArray(response.data)) {
@@ -189,7 +174,7 @@ export const companiesApi = {
   },
   
   getCompany: async (companyId: string): Promise<ApiResponse<CompanyInfo>> => {
-    const response = await apiFetch<any>(`/companies/${companyId}`);
+    const response = await apiCall<any>(`/companies/${companyId}`);
     
     if (response.data) {
       // Convert snake_case to camelCase
@@ -223,9 +208,9 @@ export const companiesApi = {
       notes: company.notes || ""
     };
     
-    return apiFetch<CompanyInfo>('/companies', {
+    return apiCall<CompanyInfo>('/companies', {
       method: 'POST',
-      body: JSON.stringify(backendCompany),
+      data: backendCompany
     });
   },
   
@@ -240,26 +225,26 @@ export const companiesApi = {
       notes: company.notes || ""
     };
     
-    return apiFetch<CompanyInfo>(`/companies/${companyId}`, {
+    return apiCall<CompanyInfo>(`/companies/${companyId}`, {
       method: 'PUT',
-      body: JSON.stringify(backendCompany),
+      data: backendCompany
     });
   },
   
   deleteCompany: async (companyId: string): Promise<ApiResponse<void>> => {
-    return apiFetch<void>(`/companies/${companyId}`, {
-      method: 'DELETE',
+    return apiCall<void>(`/companies/${companyId}`, {
+      method: 'DELETE'
     });
   },
   
   getCompanyUsers: async (companyId: string): Promise<ApiResponse<User[]>> => {
-    return apiFetch<User[]>(`/companies/${companyId}/users`);
+    return apiCall<User[]>(`/companies/${companyId}/users`);
   },
   
   assignUsers: async (companyId: string, userIds: string[]): Promise<ApiResponse<void>> => {
-    return apiFetch<void>(`/companies/${companyId}/assign-users`, {
+    return apiCall<void>(`/companies/${companyId}/assign-users`, {
       method: 'POST',
-      body: JSON.stringify({ company_id: companyId, user_ids: userIds }),
+      data: { company_id: companyId, user_ids: userIds }
     });
   },
 };
@@ -267,7 +252,7 @@ export const companiesApi = {
 // Assessments API
 export const assessmentsApi = {
   getCompanyAssessments: async (companyId: string): Promise<ApiResponse<CompanyAssessmentStatus>> => {
-    const response = await apiFetch<any>(`/companies/${companyId}/assessments`);
+    const response = await apiCall<any>(`/companies/${companyId}/assessments`);
     
     // Handle backend format mismatch
     if (response.data && Array.isArray(response.data)) {
@@ -296,154 +281,215 @@ export const assessmentsApi = {
   },
   
   getAssessment: async (assessmentId: string): Promise<ApiResponse<any>> => {
-    return apiFetch<any>(`/assessments/${assessmentId}`);
+    return apiCall<any>(`/assessments/${assessmentId}`);
   },
   
   createAssessment: async (companyId: string, assessmentType: string): Promise<ApiResponse<any>> => {
+    const requestData = {
+      company_id: companyId,
+      assessment_type: assessmentType,
+      status: 'not-started',
+      score: 0,
+      data: {
+        categoryScores: {},
+        userWeights: {},
+        adjustedWeights: {},
+        qValues: {},
+        responses: []
+      },
+      completed_at: null,
+      completed_by_id: null
+    };
+    
+    console.log(`Creating assessment for company ${companyId}, type ${assessmentType}`);
+    
+    return apiCall<any>('/assessments', {
+      method: 'POST',
+      data: requestData
+    });
+  },
+  
+  createAssessmentWithData: async (assessmentData: any): Promise<ApiResponse<any>> => {
+    console.log(`Creating assessment with complete data for company ${assessmentData.company_id} - sending direct to backend`);
+    
     try {
-      // Construct proper API request body
-      const requestData = {
-        company_id: companyId,
-        assessment_type: assessmentType,
-        status: 'not-started'
-      };
+      // Get the authentication token from localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.log("No auth token found, falling back to API proxy");
+        return apiCall<any>('/assessments', {
+          method: 'POST',
+          data: assessmentData
+        });
+      }
       
-      console.log(`Creating assessment for company ${companyId}, type ${assessmentType}`);
-      
-      return await apiFetch<any>('/assessments', {
+      // Direct fetch to backend instead of using the proxy
+      const response = await fetch('http://103.18.20.205:8090/assessments', {
         method: 'POST',
-        body: JSON.stringify(requestData),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(assessmentData)
       });
+      
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error(`Backend error: ${response.status} ${response.statusText}`, errorData);
+        
+        // If the error is unauthorized, try the API proxy as fallback
+        if (response.status === 401) {
+          console.log("Auth error with direct backend access, falling back to API proxy");
+          return apiCall<any>('/assessments', {
+            method: 'POST',
+            data: assessmentData
+          });
+        }
+        
+        return { 
+          error: `Backend error: ${response.status} ${response.statusText} - ${errorData}`
+        };
+      }
+      
+      const data = await response.json();
+      console.log('Successfully created assessment directly on backend');
+      return { data };
     } catch (error) {
-      console.error("Error creating assessment:", error);
-      return { error: error instanceof Error ? error.message : String(error) };
+      console.error('Error creating assessment:', error);
+      
+      // On any error, try the API proxy as fallback
+      console.log("Error with direct backend access, falling back to API proxy");
+      return apiCall<any>('/assessments', {
+        method: 'POST',
+        data: assessmentData
+      });
     }
   },
   
   updateAssessment: async (assessmentId: string, data: any): Promise<ApiResponse<any>> => {
+    // Ensure data has the required fields and right format
+    const requestData = {
+      company_id: data.company_id || "",
+      assessment_type: data.assessment_type || "", 
+      status: data.status || "in-progress",
+      score: data.score ?? null, // Use nullish coalescing to handle 0 scores correctly
+      data: data.data || {},
+      completed_at: data.completed_at || null,
+      completed_by_id: data.completed_by_id || null
+    };
+    
+    console.log(`Updating assessment ${assessmentId} with data - sending direct to backend`);
+    
     try {
-      // Ensure data has the required fields and right format
-      const requestData = {
-        company_id: data.company_id || "",
-        assessment_type: data.assessment_type || "", 
-        status: data.status || "in-progress",
-        score: data.score || null,
-        data: data.data || null,
-        completed_at: data.completed_at || null
-      };
+      // Get the authentication token from localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.log("No auth token found, falling back to API proxy");
+        return apiCall<any>(`/assessments/${assessmentId}`, {
+          method: 'PUT',
+          data: requestData
+        });
+      }
       
-      console.log(`Updating assessment ${assessmentId} with data:`, requestData);
-      
-      return await apiFetch<any>(`/assessments/${assessmentId}`, {
+      // Direct fetch to backend instead of using the proxy
+      const response = await fetch(`http://103.18.20.205:8090/assessments/${assessmentId}`, {
         method: 'PUT',
-        body: JSON.stringify(requestData),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(requestData)
       });
+      
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error(`Backend error: ${response.status} ${response.statusText}`, errorData);
+        
+        // If the error is unauthorized, try the API proxy as fallback
+        if (response.status === 401) {
+          console.log("Auth error with direct backend access, falling back to API proxy");
+          return apiCall<any>(`/assessments/${assessmentId}`, {
+            method: 'PUT',
+            data: requestData
+          });
+        }
+        
+        return { 
+          error: `Backend error: ${response.status} ${response.statusText} - ${errorData}`
+        };
+      }
+      
+      const data = await response.json();
+      console.log('Successfully updated assessment directly on backend');
+      return { data };
     } catch (error) {
-      console.error(`Error updating assessment ${assessmentId}:`, error);
-      return { error: error instanceof Error ? error.message : String(error) };
+      console.error('Error updating assessment:', error);
+      
+      // On any error, try the API proxy as fallback
+      console.log("Error with direct backend access, falling back to API proxy");
+      return apiCall<any>(`/assessments/${assessmentId}`, {
+        method: 'PUT',
+        data: requestData
+      });
     }
   },
   
   submitAssessment: async (assessmentId: string, data: any): Promise<ApiResponse<any>> => {
-    return apiFetch<any>(`/assessments/${assessmentId}`, {
+    return apiCall<any>(`/assessments/${assessmentId}`, {
       method: 'PUT',
-      body: JSON.stringify({
+      data: {
         ...data,
-        status: 'completed',
-      }),
+        status: 'completed'
+      }
     });
   },
 };
 
-// Questionnaires API with specialized handling
+// Questionnaires API
 export const questionnairesApi = {
   getQuestionnaires: async (): Promise<ApiResponse<any>> => {
-    try {
-      // Use a longer timeout for questionnaires (could be larger data)
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000);
-      
-      const response = await fetch(`${API_BASE_URL}/questionnaires`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        signal: controller.signal,
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        return { error: errorText || `Error ${response.status}: ${response.statusText}` };
-      }
-      
-      const data = await response.json();
-      return { data };
-    } catch (error) {
-      console.error('Error fetching questionnaires:', error);
-      return { error: error instanceof Error ? error.message : 'Network error' };
-    }
+    return apiCall<any>('/questionnaires', {
+      timeout: 60000 // 60 second timeout for questionnaires
+    });
   },
   
   getQuestionnaire: async (assessmentType: string): Promise<ApiResponse<any>> => {
-    try {
-      // Use a longer timeout for questionnaires (could be larger data)
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000);
-      
-      const response = await fetch(`${API_BASE_URL}/questionnaire/${assessmentType}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        signal: controller.signal,
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        return { error: errorText || `Error ${response.status}: ${response.statusText}` };
-      }
-      
-      const data = await response.json();
-      return { data };
-    } catch (error) {
-      console.error('Error fetching questionnaire:', error);
-      return { error: error instanceof Error ? error.message : 'Network error' };
-    }
+    return apiCall<any>(`/questionnaire/${assessmentType}`, {
+      timeout: 60000 // 60 second timeout for questionnaires
+    });
   },
 };
 
 // Weights API for managing pillar and category weights
 export const weightApi = {
   getCompanyWeights: async (companyId: string): Promise<ApiResponse<any>> => {
-    return apiFetch<any>(`/companies/${companyId}/weights`);
+    return apiCall<any>(`/companies/${companyId}/weights`);
   },
   
   updateCompanyWeights: async (companyId: string, weights: any): Promise<ApiResponse<any>> => {
-    return apiFetch<any>(`/companies/${companyId}/weights`, {
+    return apiCall<any>(`/companies/${companyId}/weights`, {
       method: 'PUT',
-      body: JSON.stringify(weights),
+      data: weights
     });
   },
   
   updateCategoryWeights: async (companyId: string, assessmentType: string, weights: any): Promise<ApiResponse<any>> => {
-    return apiFetch<any>(`/companies/${companyId}/weights/${assessmentType}`, {
+    return apiCall<any>(`/companies/${companyId}/weights/${assessmentType}`, {
       method: 'PUT',
-      body: JSON.stringify(weights),
+      data: weights
     });
   },
   
   getDefaultWeights: async (): Promise<ApiResponse<any>> => {
-    return apiFetch<any>(`/weights/defaults`);
+    return apiCall<any>(`/weights/defaults`);
   },
   
   updateDefaultWeights: async (weights: any): Promise<ApiResponse<any>> => {
-    return apiFetch<any>(`/weights/defaults`, {
+    return apiCall<any>(`/weights/defaults`, {
       method: 'PUT',
-      body: JSON.stringify(weights),
+      data: weights
     });
   },
 };

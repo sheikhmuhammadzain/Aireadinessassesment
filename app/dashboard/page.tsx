@@ -131,6 +131,8 @@ function DashboardContent() {
                         
                         // Fetch assessment status for each company
                         const statusesMap: Record<string, CompanyAssessmentStatus> = {};
+                        const assessmentResultsMap: Record<string, AssessmentResult> = {};
+                        const chartDataArray: { name: string; score: number }[] = [];
                         
                         for (const company of companiesData) {
                             if (company.id) {
@@ -140,6 +142,42 @@ function DashboardContent() {
                                     
                                     if (!assessmentError && assessmentData) {
                                         statusesMap[company.id] = assessmentData;
+                                        
+                                        // Process completed assessments and add them to the results map
+                                        if (assessmentData.assessments) {
+                                            for (const assessment of assessmentData.assessments) {
+                                                if (assessment.status === 'completed' && assessment.score) {
+                                                    // Find assessment details if they exist
+                                                    try {
+                                                        if (assessment.id) {
+                                                            const { data: assessmentDetails } = await api.assessments.getAssessment(assessment.id);
+                                                            
+                                                            if (assessmentDetails && assessmentDetails.data) {
+                                                                // Extract the full result data
+                                                                const resultData = {
+                                                                    assessmentType: assessment.type,
+                                                                    categoryScores: assessmentDetails.data.categoryScores || {},
+                                                                    qValues: assessmentDetails.data.qValues || {},
+                                                                    overallScore: assessment.score,
+                                                                    // Handle softmaxWeights field
+                                                                    softmaxWeights: assessmentDetails.data.adjustedWeights || {}
+                                                                };
+                                                                
+                                                                assessmentResultsMap[assessment.type] = resultData;
+                                                                
+                                                                // Add to chart data
+                                                                chartDataArray.push({
+                                                                    name: assessment.type,
+                                                                    score: assessment.score
+                                                                });
+                                                            }
+                                                        }
+                                                    } catch (assessmentDetailError) {
+                                                        console.warn(`Error fetching assessment details for ${assessment.type}:`, assessmentDetailError);
+                                                    }
+                                                }
+                                            }
+                                        }
                                     } else {
                                         // Create default assessment status if not found
                                         statusesMap[company.id] = {
@@ -158,24 +196,43 @@ function DashboardContent() {
                         }
                         
                         setAssessmentStatuses(statusesMap);
+                        
+                        // If we found results from the API, use them
+                        if (Object.keys(assessmentResultsMap).length > 0) {
+                            setResults(assessmentResultsMap);
+                            setOverallData(chartDataArray);
+                        } else {
+                            // Fallback to localStorage
+                            loadResultsFromLocalStorage(filteredAssessmentTypes);
+                        }
                     }
                 } else if (user?.id) {
                     // Regular user sees only assigned companies
                     try {
                         // Try to get user companies directly if available
-                        const { data: userCompanies, error: companiesError } = await api.companies.getUserCompanies?.(user.id) || {};
+                        const { data: userCompanies, error: companiesError } = await api.companies.getCompanies();
+                        
+                        // Filter companies for this user
+                        const filteredCompanies = userCompanies ? userCompanies.filter(company => {
+                            // In a real app, you would have a proper way to determine if the user is assigned to this company
+                            // This is a simplified version
+                            return company.hasOwnProperty('users') ? 
+                                ((company as any).users as any[]).some(u => u.id === user.id) : true;
+                        }) : [];
                         
                         if (companiesError) {
                             console.warn("Error fetching user companies:", companiesError);
                         }
                         
-                        if (userCompanies && Array.isArray(userCompanies)) {
-                            setCompanies(userCompanies);
+                        if (filteredCompanies.length > 0) {
+                            setCompanies(filteredCompanies);
                             
                             // Fetch assessment status for each assigned company
                             const statusesMap: Record<string, CompanyAssessmentStatus> = {};
+                            const assessmentResultsMap: Record<string, AssessmentResult> = {};
+                            const chartDataArray: { name: string; score: number }[] = [];
                             
-                            for (const company of userCompanies) {
+                            for (const company of filteredCompanies) {
                                 if (company.id) {
                                     try {
                                         const { data: assessmentData, error: assessmentError } = 
@@ -183,6 +240,44 @@ function DashboardContent() {
                                         
                                         if (!assessmentError && assessmentData) {
                                             statusesMap[company.id] = assessmentData;
+                                            
+                                            // Process completed assessments and add them to the results map
+                                            if (assessmentData.assessments) {
+                                                for (const assessment of assessmentData.assessments) {
+                                                    if (assessment.status === 'completed' && assessment.score) {
+                                                        // Only care about assessments this role can access
+                                                        if (user.role && ROLE_TO_PILLAR[user.role] === assessment.type) {
+                                                            try {
+                                                                if (assessment.id) {
+                                                                    const { data: assessmentDetails } = await api.assessments.getAssessment(assessment.id);
+                                                                    
+                                                                    if (assessmentDetails && assessmentDetails.data) {
+                                                                        // Extract the full result data
+                                                                        const resultData = {
+                                                                            assessmentType: assessment.type,
+                                                                            categoryScores: assessmentDetails.data.categoryScores || {},
+                                                                            qValues: assessmentDetails.data.qValues || {},
+                                                                            overallScore: assessment.score,
+                                                                            // Handle softmaxWeights field
+                                                                            softmaxWeights: assessmentDetails.data.adjustedWeights || {}
+                                                                        };
+                                                                        
+                                                                        assessmentResultsMap[assessment.type] = resultData;
+                                                                        
+                                                                        // Add to chart data
+                                                                        chartDataArray.push({
+                                                                            name: assessment.type,
+                                                                            score: assessment.score
+                                                                        });
+                                                                    }
+                                                                }
+                                                            } catch (assessmentDetailError) {
+                                                                console.warn(`Error fetching assessment details for ${assessment.type}:`, assessmentDetailError);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                     } catch (error) {
                                         console.warn(`Error fetching assessments for company ${company.id}:`, error);
@@ -191,6 +286,15 @@ function DashboardContent() {
                             }
                             
                             setAssessmentStatuses(statusesMap);
+                            
+                            // If we found results from the API, use them
+                            if (Object.keys(assessmentResultsMap).length > 0) {
+                                setResults(assessmentResultsMap);
+                                setOverallData(chartDataArray);
+                            } else {
+                                // Fallback to localStorage
+                                loadResultsFromLocalStorage(filteredAssessmentTypes);
+                            }
                         } else {
                             // Fallback to localStorage if API fails
                             const storedCompanyInfo = localStorage.getItem('company_info');
@@ -213,9 +317,15 @@ function DashboardContent() {
                                         };
                                         setAssessmentStatuses(statusesMap);
                                     }
+                                    
+                                    // Fallback to localStorage for assessment results
+                                    loadResultsFromLocalStorage(filteredAssessmentTypes);
                                 } catch (error) {
                                     console.error("Error parsing stored company info:", error);
                                 }
+                            } else {
+                                // No companies at all - fallback to localStorage
+                                loadResultsFromLocalStorage(filteredAssessmentTypes);
                             }
                         }
                     } catch (error) {
@@ -227,46 +337,13 @@ function DashboardContent() {
                             try {
                                 const company = JSON.parse(storedCompanyInfo);
                                 setCompanies([company]);
+                                loadResultsFromLocalStorage(filteredAssessmentTypes);
                             } catch (error) {
                                 console.error("Error parsing stored company info:", error);
                             }
                         }
                     }
                 }
-                
-                // Also load assessment results from localStorage for backward compatibility
-        const loadedResults: Record<string, AssessmentResult> = {};
-
-        filteredAssessmentTypes.forEach(type => {
-                    const storageKey = `assessment_result_${type.id}`;
-                    const storedResult = localStorage.getItem(storageKey);
-                    
-            if (storedResult) {
-                try {
-                            const parsedResult = JSON.parse(storedResult);
-                            loadedResults[type.id] = parsedResult;
-                } catch (error) {
-                    console.error(`Error parsing stored result for ${type.id}:`, error);
-                }
-            }
-        });
-
-                if (Object.keys(loadedResults).length > 0) {
-            setResults(loadedResults);
-                    
-                    // Prepare overall data for bar chart
-                    const overallScores = Object.entries(loadedResults).map(([type, result]) => {
-                        const score = typeof result.overallScore === 'number' ? 
-                            Math.round(result.overallScore * 100) / 100 : 0;
-                        
-                        return {
-                            name: type,
-                            score: score
-                        };
-                    }).filter(item => item.score > 0);
-                    
-            setOverallData(overallScores);
-        }
             } catch (error) {
                 console.error("Error loading dashboard data:", error);
                 toast({
@@ -274,8 +351,48 @@ function DashboardContent() {
                     description: "Failed to load dashboard data. Please try again.",
                     variant: "destructive",
                 });
+                
+                // Final fallback - try localStorage
+                loadResultsFromLocalStorage(filteredAssessmentTypes);
             } finally {
-        setLoading(false);
+                setLoading(false);
+            }
+        };
+
+        // Helper function to load results from localStorage
+        const loadResultsFromLocalStorage = (filteredTypes: typeof assessmentTypes) => {
+            console.log("Falling back to localStorage for assessment results");
+            const loadedResults: Record<string, AssessmentResult> = {};
+
+            filteredTypes.forEach(type => {
+                const storageKey = `assessment_result_${type.id}`;
+                const storedResult = localStorage.getItem(storageKey);
+                
+                if (storedResult) {
+                    try {
+                        const parsedResult = JSON.parse(storedResult);
+                        loadedResults[type.id] = parsedResult;
+                    } catch (error) {
+                        console.error(`Error parsing stored result for ${type.id}:`, error);
+                    }
+                }
+            });
+
+            if (Object.keys(loadedResults).length > 0) {
+                setResults(loadedResults);
+                
+                // Prepare overall data for bar chart
+                const overallScores = Object.entries(loadedResults).map(([type, result]) => {
+                    const score = typeof result.overallScore === 'number' ? 
+                        Math.round(result.overallScore * 100) / 100 : 0;
+                    
+                    return {
+                        name: type,
+                        score: score
+                    };
+                }).filter(item => item.score > 0);
+                
+                setOverallData(overallScores);
             }
         };
 
@@ -363,7 +480,7 @@ function DashboardContent() {
             });
             return;
         }
-
+        
         setGeneratingReport(true);
         try {
             const mainReport = await generateDeepResearchReport(
@@ -624,7 +741,7 @@ function DashboardContent() {
                                 </CardHeader>
                                 <CardContent>
                                     <AssessmentLevelsVisual 
-                                        score={calculateOverallReadiness()} 
+                                        overallScore={calculateOverallReadiness()} 
                                         className="max-w-md mx-auto" 
                                     />
                                     </CardContent>

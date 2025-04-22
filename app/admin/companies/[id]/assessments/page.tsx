@@ -7,11 +7,12 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, CheckCircle, BarChart2, FileText, Clock, XCircle, ArrowRight, User, Users, Calendar } from "lucide-react";
+import { ArrowLeft, CheckCircle, BarChart2, FileText, Clock, XCircle, ArrowRight, User, Users, Calendar, FileDown } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { CompanyInfo, CompanyAssessmentStatus } from "@/types";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/lib/auth-context";
+import { generateDeepResearchReport } from "@/lib/openai";
 
 // Sample data for demo purposes (same as in companies page)
 const SAMPLE_COMPANIES: CompanyInfo[] = [
@@ -497,9 +498,9 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
         } else {
           // Company not found anywhere
           setError(`Company not found with ID: ${companyId}`);
-        toast({
-          title: "Company Not Found",
-          description: "The requested company could not be found.",
+          toast({
+            title: "Company Not Found",
+            description: "The requested company could not be found.",
             variant: "destructive",
           });
           setTimeout(() => router.push("/admin/companies"), 2000);
@@ -555,6 +556,81 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
     });
     
     router.push(`/results/${encodeURIComponent(assessmentType)}`);
+  };
+
+  const handleGenerateDeepResearchReport = async () => {
+    if (!assessmentStatus) return;
+
+    toast({
+      title: "Generating Report",
+      description: "Preparing the Deep Research Report. This may take a moment...",
+    });
+
+    try {
+      // Create a record of all assessment results to pass to the API
+      const assessmentResults: Record<string, any> = {};
+      
+      // Create a formatted record for each assessment type
+      assessmentStatus.assessments.forEach(assessment => {
+        if (assessment.status === "completed" && assessment.score) {
+          // For each completed assessment, create a structured record
+          assessmentResults[assessment.type] = {
+            overallScore: assessment.score,
+            categoryScores: {}, // Would be populated with subcategory scores in a real implementation
+            qValues: {},        // Would be populated with actual Q-values in a real implementation
+            adjustedWeights: {}, // Would be populated with actual weights in a real implementation
+            userWeights: {},    // Would be populated with user-defined weights
+            softmaxWeights: {}  // Would be populated with calculated softmax weights
+          };
+          
+          // In a real implementation, you would fetch detailed subcategory data here
+        }
+      });
+      
+      // If we have no completed assessments, show a message
+      if (Object.keys(assessmentResults).length === 0) {
+        toast({
+          title: "Cannot Generate Report",
+          description: "At least one completed assessment is required to generate a Deep Research Report.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Generate the HTML report
+      const htmlReport = await generateDeepResearchReport(assessmentResults);
+      
+      // Create a Blob from the HTML content
+      const blob = new Blob([htmlReport], { type: 'text/html' });
+      
+      // Create a URL for the Blob
+      const url = URL.createObjectURL(blob);
+      
+      // Create a temporary link element
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${company?.name}_Deep_Research_Report_${new Date().toISOString().split('T')[0]}.html`;
+      
+      // Add the link to the document and click it
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Report Generated",
+        description: "Deep Research Report has been downloaded successfully.",
+      });
+    } catch (error) {
+      console.error("Error generating deep research report:", error);
+      toast({
+        title: "Error Generating Report",
+        description: "There was a problem generating the Deep Research Report.",
+        variant: "destructive",
+      });
+    }
   };
 
   const getCompletionPercentage = () => {
@@ -720,7 +796,7 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
                     <div className="flex flex-wrap gap-2 mt-3">
                       {assessmentStatus.assessments.map(assessment => (
                         assessment.status === "completed" && (
-                          <div key={assessment.type} className="flex-1 min-w-[120px]">
+                          <div key={`score-bar-${assessment.type}`} className="flex-1 min-w-[120px]">
                             <div className="text-xs text-muted-foreground mb-1">{assessment.type}</div>
                             <div className="flex items-center gap-1">
                               <div 
@@ -764,6 +840,22 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
                       </div>
                     </div>
                   </div>
+                  
+                  {assessmentStatus.assessments.some(a => a.status === "completed") && (
+                    <div className="mt-6 text-center">
+                      <Button
+                        onClick={handleGenerateDeepResearchReport}
+                        className="flex items-center gap-2 w-full"
+                        variant="secondary"
+                      >
+                        <FileDown className="h-4 w-4" />
+                        Generate Deep Research Report
+                      </Button>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Generates a comprehensive analysis based on all completed assessments
+                      </p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -781,7 +873,7 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
                   .sort((a, b) => new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime())
                   .slice(0, 3)
                   .map(assessment => (
-                    <div key={assessment.type} className="flex items-start gap-3">
+                    <div key={`recent-completed-${assessment.type}`} className="flex items-start gap-3">
                       <div className="bg-primary/10 p-2 rounded-full">
                         <CheckCircle className="h-5 w-5 text-primary" />
                       </div>
@@ -802,7 +894,7 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
                 {assessmentStatus.assessments
                   .filter(a => a.status === "in-progress")
                   .map(assessment => (
-                    <div key={assessment.type} className="flex items-start gap-3">
+                    <div key={`recent-progress-${assessment.type}`} className="flex items-start gap-3">
                       <div className="bg-secondary/20 p-2 rounded-full">
                         <Clock className="h-5 w-5 text-secondary-foreground" />
                       </div>
@@ -847,7 +939,7 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
             <CardContent>
               <div className="space-y-6">
                 {assessmentStatus.assessments.map((assessment) => (
-                  <div key={assessment.type} className="space-y-2">
+                  <div key={`assessment-row-${assessment.type}`} className="space-y-2">
                     <div className="flex justify-between items-center">
                       <h3 className="font-medium text-lg">{assessment.type}</h3>
                       {assessment.status === 'completed' ? (
@@ -913,6 +1005,18 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
                 ))}
               </div>
             </CardContent>
+            <CardFooter className="flex justify-center pt-2">
+              {assessmentStatus.assessments.some(a => a.status === "completed") && (
+                <Button 
+                  variant="outline"
+                  onClick={handleGenerateDeepResearchReport}
+                  className="flex items-center gap-2"
+                >
+                  <FileDown className="h-4 w-4" />
+                  Generate Deep Research Report
+                </Button>
+              )}
+            </CardFooter>
           </Card>
         </TabsContent>
 
@@ -936,14 +1040,17 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
                 </div>
               ) : (
               <div className="space-y-6">
-                  {assessmentStatus && assessmentStatus.assessments.map((assessment) => {
-                  const users = getAssignedUsers(assessment.type);
+                  {assessmentStatus && Object.entries(teamMembers).map(([assessmentType, users], index) => {
                   if (users.length === 0) return null;
                   
+                  // Look up the assessment to get its status
+                  const assessment = assessmentStatus.assessments.find(a => a.type === assessmentType);
+                  if (!assessment) return null;
+                  
                   return (
-                    <div key={assessment.type} className="space-y-3">
+                    <div key={`team-section-${index}-${assessmentType}`} className="space-y-3">
                       <h3 className="font-medium text-lg flex items-center">
-                        {assessment.type}
+                        {assessmentType}
                         {assessment.status === 'completed' && (
                           <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-200">
                             Completed
@@ -952,8 +1059,8 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
                       </h3>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {users.map(user => (
-                          <div key={user.id} className="flex items-center gap-3 border rounded-md p-3">
+                        {users.map((user, userIndex) => (
+                          <div key={`user-${index}-${assessmentType}-${user.id || userIndex}`} className="flex items-center gap-3 border rounded-md p-3">
                             <div className="bg-muted rounded-full p-2">
                               <User className="h-5 w-5" />
                             </div>
@@ -976,7 +1083,7 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
                   );
                 })}
                 
-                  {(!assessmentStatus || assessmentStatus.assessments.every(a => getAssignedUsers(a.type).length === 0)) && (
+                  {(!assessmentStatus || Object.values(teamMembers).every(users => users.length === 0)) && (
                   <div className="text-center py-6">
                     <p className="text-muted-foreground">No team members have been assigned yet</p>
                     <Button 

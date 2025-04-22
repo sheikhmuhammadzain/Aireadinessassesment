@@ -55,9 +55,10 @@ const totalBasisPoints = assessmentLevels.reduce((sum, level) => sum + level.bas
 
 interface AssessmentLevelsVisualProps {
   overallScore: number;
+  className?: string;
 }
 
-export function AssessmentLevelsVisual({ overallScore }: AssessmentLevelsVisualProps) {
+export function AssessmentLevelsVisual({ overallScore, className }: AssessmentLevelsVisualProps) {
   // Determine the current level index based on the score
   const currentLevelIndex = assessmentLevels.findIndex(
     level => overallScore >= level.minScore && overallScore <= level.maxScore
@@ -70,10 +71,7 @@ export function AssessmentLevelsVisual({ overallScore }: AssessmentLevelsVisualP
   const scorePercentage = Math.min(100, Math.max(0, overallScore));
 
   return (
-    // Removed Card wrapper if parent already provides it.
-    // If this component IS the card, keep <Card className="overflow-hidden">
-    // Assuming parent handles the Card structure for now.
-    <div className="p-6 bg-card rounded-lg border">
+    <div className={cn("p-6 bg-card rounded-lg border", className)}>
       {/* Visualization Container */}
       <div className="relative mb-4">
         {/* Segmented Background Bar */}

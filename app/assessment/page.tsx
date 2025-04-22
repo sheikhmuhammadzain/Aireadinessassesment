@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,12 +8,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CompanySelector } from "@/components/CompanySelector";
 import { CompanyInfo } from "@/types";
 import { toast } from "@/hooks/use-toast";
-import { Shield, Users, Layers, BarChart4, Database, Brain, Lock } from "lucide-react";
+import { Shield, Users, Layers, BarChart4, Database, Brain, Lock, ShieldAlert } from "lucide-react";
 import { ProtectedRoute } from "@/components/protected-route";
 import { useAuth } from "@/lib/auth-context";
 
-// List of assessment types with their icons and descriptions
-const assessmentTypes = [
+// Default assessment types with their icons and descriptions
+// This will be used as fallback if API fails
+const defaultAssessmentTypes = [
   {
     id: "AI Governance",
     name: "AI Governance", 
@@ -49,8 +50,36 @@ const assessmentTypes = [
     name: "AI Talent", 
     icon: Brain,
     description: "Assess skills, roles, and capabilities for AI implementation"
+  },
+  {
+    id: "AI Security",
+    name: "AI Security", 
+    icon: ShieldAlert,
+    description: "Evaluate security measures for AI systems, models, and data"
   }
 ];
+
+// Map pillar names to their icons
+const iconMap: Record<string, React.ElementType> = {
+  "AI Governance": Shield,
+  "AI Culture": Users,
+  "AI Infrastructure": Layers,
+  "AI Strategy": BarChart4,
+  "AI Data": Database,
+  "AI Talent": Brain,
+  "AI Security": ShieldAlert
+};
+
+// Map pillar names to their descriptions
+const descriptionMap: Record<string, string> = {
+  "AI Governance": "Evaluate policies, oversight mechanisms, and accountability for AI systems",
+  "AI Culture": "Assess organizational awareness, attitudes, and adoption of AI technologies",
+  "AI Infrastructure": "Evaluate technical foundations, platforms, and tools for AI development",
+  "AI Strategy": "Assess alignment of AI initiatives with business goals and vision",
+  "AI Data": "Evaluate data quality, management practices, and governance",
+  "AI Talent": "Assess skills, roles, and capabilities for AI implementation",
+  "AI Security": "Evaluate security measures for AI systems, models, and data"
+};
 
 export default function AssessmentHomePage() {
   return (
@@ -66,6 +95,50 @@ function AssessmentContent() {
   const [selectedCompany, setSelectedCompany] = useState<CompanyInfo | null>(null);
   const [companySelected, setCompanySelected] = useState(false);
   const [selectedType, setSelectedType] = useState<string>("AI Governance");
+  const [assessmentTypes, setAssessmentTypes] = useState(defaultAssessmentTypes);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch assessment types from the backend
+  useEffect(() => {
+    async function fetchAssessmentTypes() {
+      try {
+        setIsLoading(true);
+        
+        // Dynamically import the API client
+        const { default: api } = await import('@/lib/api/client');
+        
+        const response = await api.questionnaires.getQuestionnaires();
+        
+        if (response.error) {
+          console.error("Error fetching assessment types:", response.error);
+          // Fallback to default assessment types
+          return;
+        }
+        
+        if (response.data) {
+          // Transform the data into the format we need
+          // Backend returns an object with pillar names as keys
+          const pillars = Object.keys(response.data);
+          
+          const mappedTypes = pillars.map(pillar => ({
+            id: pillar,
+            name: pillar,
+            icon: iconMap[pillar] || Shield, // Default to Shield if no icon mapping exists
+            description: descriptionMap[pillar] || `Assessment for ${pillar}`
+          }));
+          
+          setAssessmentTypes(mappedTypes);
+        }
+      } catch (error) {
+        console.error("Failed to fetch assessment types:", error);
+        // Keep using default assessment types
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    
+    fetchAssessmentTypes();
+  }, []);
 
   const handleSelectCompany = (company: CompanyInfo) => {
     setSelectedCompany(company);
@@ -74,7 +147,7 @@ function AssessmentContent() {
     // Save to localStorage for backwards compatibility
     localStorage.setItem('company_info', JSON.stringify(company));
     
-        toast({
+    toast({
       title: "Company Selected",
       description: `Selected ${company.name} for assessment.`
     });
@@ -133,35 +206,41 @@ function AssessmentContent() {
               </TabsList>
               
               <TabsContent value="assessments" className="mt-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {assessmentTypes.map((type) => {
-              const Icon = type.icon;
-                    const canAccess = canEditPillar(type.id);
-                    
-              return (
-                      <Card 
-                        key={type.id} 
-                        className={`cursor-pointer transition-all hover:shadow-md ${
-                          selectedType === type.id ? 'ring-2 ring-primary' : ''
-                        } ${!canAccess ? 'opacity-60' : ''}`}
-                        onClick={() => canAccess && setSelectedType(type.id)}
-                      >
-                        <CardHeader className="pb-2">
-                          <div className="flex justify-between items-start">
-                            <div className="flex items-center gap-2">
-                              <Icon className="h-5 w-5 text-primary" />
-                              <CardTitle className="text-lg">{type.name}</CardTitle>
+                {isLoading ? (
+                  <div className="flex justify-center items-center p-10">
+                    <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {assessmentTypes.map((type) => {
+                      const Icon = type.icon;
+                      const canAccess = canEditPillar(type.id);
+                      
+                      return (
+                        <Card 
+                          key={type.id} 
+                          className={`cursor-pointer transition-all hover:shadow-md ${
+                            selectedType === type.id ? 'ring-2 ring-primary' : ''
+                          } ${!canAccess ? 'opacity-60' : ''}`}
+                          onClick={() => canAccess && setSelectedType(type.id)}
+                        >
+                          <CardHeader className="pb-2">
+                            <div className="flex justify-between items-start">
+                              <div className="flex items-center gap-2">
+                                <Icon className="h-5 w-5 text-primary" />
+                                <CardTitle className="text-lg">{type.name}</CardTitle>
+                              </div>
+                              {!canAccess && <Lock className="h-4 w-4 text-muted-foreground" />}
                             </div>
-                            {!canAccess && <Lock className="h-4 w-4 text-muted-foreground" />}
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <CardDescription>{type.description}</CardDescription>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
+                          </CardHeader>
+                          <CardContent>
+                            <CardDescription>{type.description}</CardDescription>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
                 
                 <div className="mt-8 flex justify-end">
                   <Button onClick={handleStartAssessment} size="lg">
@@ -178,38 +257,15 @@ function AssessmentContent() {
                   <CardContent className="space-y-4">
                     <p>
                       The AI Readiness Assessment framework evaluates your organization's preparedness
-                      for AI adoption across six key dimensions:
+                      for AI adoption across seven key dimensions:
                     </p>
                     <ul className="list-disc pl-5 space-y-2">
-                      <li>
-                        <span className="font-semibold">AI Governance:</span> Examines the policies, 
-                        oversight mechanisms, and accountability structures in place for AI systems.
-                      </li>
-                      <li>
-                        <span className="font-semibold">AI Culture:</span> Evaluates organizational 
-                        awareness, attitudes, and adoption practices for AI technologies.
-                      </li>
-                      <li>
-                        <span className="font-semibold">AI Infrastructure:</span> Assesses the technical 
-                        foundations, platforms, and tools supporting AI development.
-                      </li>
-                      <li>
-                        <span className="font-semibold">AI Strategy:</span> Examines how well AI initiatives 
-                        align with business goals and organizational vision.
-                      </li>
-                      <li>
-                        <span className="font-semibold">AI Data:</span> Evaluates data quality, management 
-                        practices, governance, and accessibility for AI systems.
-                      </li>
-                      <li>
-                        <span className="font-semibold">AI Talent:</span> Assesses skills, roles, training, 
-                        and capabilities needed for successful AI implementation.
-                      </li>
+                      {assessmentTypes.map(type => (
+                        <li key={type.id}>
+                          <span className="font-semibold">{type.name}:</span> {type.description}
+                        </li>
+                      ))}
                     </ul>
-                    <p>
-                      Each assessment takes approximately 15-20 minutes to complete and provides 
-                      targeted recommendations for improvement.
-                    </p>
                   </CardContent>
                 </Card>
               </TabsContent>

@@ -22,13 +22,13 @@ python setup_db.py
 uvicorn main:app --reload
 ```
 
-The API will be available at http://127.0.0.1:8000
+The API will be available at http://103.18.20.205:8090
 
 ## API Documentation
 
 Once the server is running, you can access the API documentation at:
-- Swagger UI: http://127.0.0.1:8000/docs
-- ReDoc: http://127.0.0.1:8000/redoc
+- Swagger UI: http://103.18.20.205:8090/docs
+- ReDoc: http://103.18.20.205:8090/redoc
 
 ## Available Endpoints
 

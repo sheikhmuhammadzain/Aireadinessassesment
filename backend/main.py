@@ -14,6 +14,8 @@ from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
+from sqlalchemy import Column, String, Float, DateTime, JSON, ForeignKey, func
+from sqlalchemy.orm import relationship
 
 # Import models
 from models import Base, User, Company, Assessment
@@ -534,6 +536,22 @@ def create_assessment(assessment: AssessmentCreate, db: Session = Depends(get_db
     if db_company is None:
         raise HTTPException(status_code=404, detail="Company not found")
     
+    # Simplify data structure if it's provided
+    simplified_data = None
+    if assessment.data:
+        # Create a more simplified structure
+        simplified_data = {
+            "assessment_type": assessment.assessment_type,
+            "score": assessment.score
+        }
+        
+        # Extract basic response data if available
+        if isinstance(assessment.data, dict):
+            if "responses" in assessment.data:
+                simplified_data["responses"] = assessment.data["responses"]
+            if "results" in assessment.data and "categoryScores" in assessment.data["results"]:
+                simplified_data["category_scores"] = assessment.data["results"]["categoryScores"]
+    
     assessment_id = f"assessment_{uuid.uuid4()}"
     db_assessment = Assessment(
         id=assessment_id,
@@ -541,7 +559,7 @@ def create_assessment(assessment: AssessmentCreate, db: Session = Depends(get_db
         assessment_type=assessment.assessment_type,
         status=assessment.status,
         score=assessment.score,
-        data=assessment.data,
+        data=simplified_data,
         completed_at=assessment.completed_at,
         completed_by_id=current_user.id if assessment.status == "completed" else None
     )
@@ -625,7 +643,22 @@ def update_assessment(assessment_id: str, assessment: AssessmentCreate, db: Sess
     db_assessment.assessment_type = assessment.assessment_type
     db_assessment.status = assessment.status
     db_assessment.score = assessment.score
-    db_assessment.data = assessment.data
+    
+    # Simplify data structure if it's provided
+    if assessment.data:
+        # Flatten the structure if needed
+        if isinstance(assessment.data, dict) and "responses" in assessment.data:
+            # Extract only what's needed from the complex structure
+            simplified_data = {
+                "responses": assessment.data["responses"],
+                "overall_score": assessment.score
+            }
+            if "results" in assessment.data and "categoryScores" in assessment.data["results"]:
+                simplified_data["category_scores"] = assessment.data["results"]["categoryScores"]
+            
+            db_assessment.data = simplified_data
+        else:
+            db_assessment.data = assessment.data
     
     if assessment.status == "completed" and db_assessment.status != "completed":
         db_assessment.completed_at = datetime.now()

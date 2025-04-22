@@ -77,7 +77,7 @@ if (-not $skipBackend) {
         $retry++
         
         try {
-            $response = Invoke-WebRequest -Uri "http://127.0.0.1:8000" -Method GET -TimeoutSec 1 -ErrorAction SilentlyContinue
+            $response = Invoke-WebRequest -Uri "http://103.18.20.205:8090" -Method GET -TimeoutSec 1 -ErrorAction SilentlyContinue
             if ($response.StatusCode -eq 200) {
                 $backendReady = $true
                 Write-Host "Backend is ready!" -ForegroundColor Green
@@ -116,7 +116,7 @@ if (-not $skipFrontend) {
 
 # Print information
 Write-Host "Applications started successfully!" -ForegroundColor Green
-Write-Host "Backend API: http://127.0.0.1:8000" -ForegroundColor Cyan
+Write-Host "Backend API: http://103.18.20.205:8090" -ForegroundColor Cyan
 Write-Host "Frontend: http://localhost:3000" -ForegroundColor Cyan
-Write-Host "API Documentation: http://127.0.0.1:8000/docs" -ForegroundColor Cyan
+Write-Host "API Documentation: http://103.18.20.205:8090/docs" -ForegroundColor Cyan
 Write-Host "To stop the servers, close the terminal windows or press Ctrl+C in each window" -ForegroundColor Yellow 

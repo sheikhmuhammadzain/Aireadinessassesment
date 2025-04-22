@@ -61,7 +61,7 @@ export default function LoginPage() {
       console.error("Login error:", error);
       toast({
         title: "Login error",
-        description: error instanceof Error ? error.message : "Connection error. Please ensure the backend is running at http://127.0.0.1:8000",
+        description: error instanceof Error ? error.message : "Connection error. Please ensure the backend is running at http://103.18.20.205:8090",
         variant: "destructive",
       });
     } finally {

@@ -424,7 +424,7 @@ sequenceDiagram
 ### 10.1 Development Environment
 
 - **Frontend**: Next.js development server (`localhost:3000`)
-- **Backend**: Uvicorn dev server (`127.0.0.1:8000`)
+- **Backend**: Uvicorn dev server (`103.18.20.205:8090`)
 - **Database**: SQLite file (`app.db`)
 
 ### 10.2 Production Environment
