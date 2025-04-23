@@ -135,12 +135,12 @@ export default function LoginPage() {
           </Form>
           
           <div className="mt-6 text-center text-sm">
-            <p className="text-muted-foreground">
+            {/* <p className="text-muted-foreground">
               Don't have an account?{" "}
               <Link href="/signup" className="text-primary hover:underline">
                 Sign up
               </Link>
-            </p>
+            </p> */}
           </div>
           
           <div className="mt-4 border-t pt-4">
@@ -156,7 +156,7 @@ export default function LoginPage() {
               <div>• security@cybergen.com</div>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              Use any password for these accounts
+              
             </p>
           </div>
         </CardContent>

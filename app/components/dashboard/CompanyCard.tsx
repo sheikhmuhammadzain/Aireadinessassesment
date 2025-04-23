@@ -148,12 +148,12 @@ export function CompanyCard({
         )}
       </CardContent>
       <CardFooter className="flex justify-between pt-0">
-        <Button 
+        {/* <Button 
           variant="outline" 
           onClick={() => onViewDetails(companyId)}
         >
-          View Details
-        </Button>
+          View Detailss
+        </Button> */}
         
         {isAdmin ? (
           <Button 

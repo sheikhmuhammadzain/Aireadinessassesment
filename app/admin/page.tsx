@@ -83,6 +83,7 @@ export default function AdminPage() {
   // Form state
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [role, setRole] = useState<UserRole>("ai_culture"); // Default role example
 
   // Report generation states
@@ -192,6 +193,7 @@ export default function AdminPage() {
   const resetForm = () => {
     setName("");
     setEmail("");
+    setPassword("");
     // Set a sensible default role if needed, e.g., the first non-admin role
     const firstNonAdminRole = Object.keys(ROLE_TO_PILLAR).find(r => r !== 'admin') as UserRole | undefined;
     setRole(firstNonAdminRole || 'ai_culture');
@@ -208,6 +210,12 @@ export default function AdminPage() {
       toast({ title: "Invalid Email", description: "Please enter a valid email address.", variant: "destructive" });
       return;
     }
+    
+    // Password validation (only required for new users)
+    if (dialogMode === "add" && !password.trim()) {
+      toast({ title: "Password Required", description: "Please enter a password for the new user.", variant: "destructive" });
+      return;
+    }
 
     try {
       if (dialogMode === "add") {
@@ -215,6 +223,7 @@ export default function AdminPage() {
         const { data, error } = await api.users.createUser({
           name: name.trim(),
           email: email.trim(),
+          password: password.trim(),
           role
         });
         
@@ -232,7 +241,8 @@ export default function AdminPage() {
         const { data, error } = await api.users.updateUser(currentUser.id, {
           name: name.trim(),
           email: email.trim(),
-          role
+          role,
+          ...(password.trim() && { password: password.trim() })
         });
         
         if (error) {
@@ -617,6 +627,17 @@ export default function AdminPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   className="col-span-3"
                   placeholder="user@example.com"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="password" className="text-right">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="col-span-3"
+                  placeholder={dialogMode === "edit" ? "Leave blank to keep current" : "Enter password"}
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
