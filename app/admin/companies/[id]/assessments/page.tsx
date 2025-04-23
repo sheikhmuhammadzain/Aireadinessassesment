@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -168,12 +168,40 @@ const PillarAssignments = ({
   );
 };
 
+// Helper function to get color based on score
+const getColorForScore = (score: number): string => {
+  if (score < 30) return "var(--color-danger)"; // Red for AI Dormant
+  if (score < 60) return "var(--color-warning)"; // Amber for AI Aware
+  if (score < 85) return "var(--color-info)"; // Blue for AI Rise
+  return "var(--color-success)"; // Green for AI Ready
+};
+
+// Helper function to get maturity level text based on score
+const getMaturityLevel = (score: number): string => {
+  if (score < 30) return "AI Dormant (Unprepared)";
+  if (score < 60) return "AI Aware (Somewhat Ready)";
+  if (score < 85) return "AI Rise (Moderately Prepared)";
+  return "AI Ready (Fully Prepared)";
+};
+
 export default function CompanyAssessmentsPage({ params }: { params: Promise<{ id: string }> }) {
+  const filterRef = useRef<HTMLDivElement>(null);
+  const [companyName, setCompanyName] = useState("");
+  const [filteredAssessments, setFilteredAssessments] = useState<Assessment[]>([]);
+  const [selectedStatus, setSelectedStatus] = useState("all");
+  const [selectedScore, setSelectedScore] = useState("all");
+  const [isLoading, setIsLoading] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [assessmentToDelete, setAssessmentToDelete] = useState<Assessment | null>(null);
+  const router = useRouter();
+
   // Unwrap the params Promise
   const unwrappedParams = use(params);
   const companyId = unwrappedParams.id;
   
-  const router = useRouter();
   const { isAuthenticated, user } = useAuth();
   const [company, setCompany] = useState<CompanyInfo | null>(null);
   const [assessmentStatus, setAssessmentStatus] = useState<CompanyAssessmentStatus | null>(null);
@@ -786,7 +814,7 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
       // Remove any ```html text that might appear at the beginning
       const cleanedReport = htmlReport.replace(/```html\s*/, '');
       
-      // Determine AI maturity level based on overall readiness score
+      // Determine AI maturity level based on score
       const determineMaturityLevel = (score: number): string => {
         if (score < 30) return "AI Dormant";
         if (score < 60) return "AI Aware";
@@ -809,14 +837,29 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
       const maturityLevel = determineMaturityLevel(overallReadiness);
       const maturityDescription = getMaturityDescription(maturityLevel);
 
-      // Insert maturity level below the overall score by replacing the score section
-      const updatedReport = cleanedReport.replace(
+      // Insert maturity level below the overall score
+      let updatedReport = cleanedReport.replace(
         /<p class="score-value">(\d+)%<\/p>\s*<\/section>/,
         `<p class="score-value">$1%</p>
         <p class="score-label" style="margin-top: 10px; font-size: 18px; color: #ffffff;">
           <span style="font-weight: 600;">${maturityLevel}</span> - ${maturityDescription}
         </p>
         </section>`
+      );
+
+      // Add maturity level to each category card
+      // This uses regex to find each category card and add the maturity level text
+      updatedReport = updatedReport.replace(
+        /<div class="category-score-card">([\s\S]*?)<div class="category-score" style="color: [^"]*;">(\d+)%<\/div>([\s\S]*?)<p style="font-size: 0\.85em; color: var\(--color-text-muted\); text-align: center; margin-top: 10px;">Readiness Level<\/p>/g,
+        (match, prefix, score, suffix) => {
+          const scoreNum = parseInt(score, 10);
+          const catMaturityLevel = determineMaturityLevel(scoreNum);
+          const catMaturityDesc = getMaturityDescription(catMaturityLevel);
+          
+          return `<div class="category-score-card">${prefix}<div class="category-score" style="color: ${getColorForScore(scoreNum)};">${score}%</div>${suffix}<p style="font-size: 0.85em; color: var(--color-text-muted); text-align: center; margin-top: 10px;">
+            <span style="font-weight: 600;">${catMaturityLevel}</span> - ${catMaturityDesc}
+          </p>`;
+        }
       );
 
       // Make sure company name is correct by using the actual company name from state

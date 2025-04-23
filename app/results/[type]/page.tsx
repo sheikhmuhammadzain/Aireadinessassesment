@@ -225,16 +225,29 @@
         .section { margin-bottom: 2.5rem; padding: 0 2rem; }
         .section-title { font-size: 1.75rem; color: var(--primary-color); padding-bottom: 0.75rem; border-bottom: 2px solid var(--secondary-color); margin-bottom: 1.5rem; }
         .category-scores { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem; }
-        .category-card { border: 1px solid var(--border-color); border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .category-name { font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--accent-color); }
-        .progress-container { height: 10px; background-color: var(--secondary-color); border-radius: 5px; margin-bottom: 0.5rem; overflow: hidden; }
-        .progress-bar { height: 100%; border-radius: 5px; background-color: var(--primary-color); } /* Simplified progress bar color */
-        .score-value { display: flex; justify-between; font-size: 0.9rem; }
+        .category-card { border: 1px solid var(--border-color); border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; flex-direction: column; }
+        .category-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .category-name { font-size: 1.25rem; font-weight: 600; color: var(--accent-color); }
+        .category-badge { font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; color: white; font-weight: 500; }
+        .category-score-circle { position: relative; width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 1rem auto; display: flex; align-items: center; justify-content: center; }
+        .category-score-inner { width: 60px; height: 60px; border-radius: 50%; background: white; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; font-weight: bold; color: var(--accent-color); }
+        .progress-container { height: 8px; background-color: var(--secondary-color); border-radius: 4px; margin-bottom: 0.75rem; overflow: hidden; }
+        .progress-bar { height: 100%; border-radius: 4px; }
+        .score-value { display: flex; justify-content: center; font-size: 0.9rem; color: var(--accent-color); margin-bottom: 0.75rem; }
+        .category-recommendation { font-size: 0.85rem; color: var(--text-color); text-align: center; background-color: var(--light-gray); padding: 0.75rem; border-radius: 4px; margin-top: auto; }
         .weights-section { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem; }
         .weight-card { border: 1px solid var(--border-color); border-radius: 8px; padding: 1.5rem; background-color: var(--light-gray); }
-        .weight-name { font-size: 1.2rem; font-weight: 600; margin-bottom: 1rem; color: var(--accent-color); }
-        .weight-details { margin-bottom: 0.5rem; }
-        .weight-label { font-weight: 600; display: inline-block; width: 120px; }
+        .weight-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; }
+        .weight-name { font-size: 1.2rem; font-weight: 600; color: var(--accent-color); }
+        .weight-score { font-size: 0.9rem; font-weight: 500; color: var(--accent-color); }
+        .weight-details-container { display: flex; flex-direction: column; gap: 0.75rem; }
+        .weight-details { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem; }
+        .weight-label { font-weight: 600; color: var(--text-color); font-size: 0.9rem; width: 120px; }
+        .weight-value-container { display: flex; align-items: center; gap: 0.5rem; flex: 1; }
+        .weight-progress-container { flex: 1; height: 6px; background-color: var(--secondary-color); border-radius: 3px; overflow: hidden; }
+        .weight-progress-bar { height: 100%; border-radius: 3px; }
+        .weight-value { font-weight: 500; min-width: 50px; text-align: right; font-size: 0.9rem; }
+        .weight-contribution { display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed var(--border-color); }
         .gap-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
         .gap-table th, .gap-table td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border-color); }
         .gap-table th { background-color: var(--secondary-color); color: var(--accent-color); font-weight: 600; }
@@ -244,6 +257,27 @@
         .recommendation-item { display: flex; align-items: flex-start; margin-bottom: 1rem; }
         .recommendation-icon { margin-right: 0.75rem; color: var(--primary-color); font-size: 1.25rem; flex-shrink: 0; line-height: 1.6; }
         .report-footer { margin-top: 3rem; padding: 2rem; background: linear-gradient(to right, var(--secondary-color), white); text-align: center; border-top: 1px solid var(--border-color); font-size: 0.9rem; color: var(--accent-color); }
+        .section-description { margin-bottom: 1.5rem; color: var(--accent-color); font-size: 1rem; }
+        .gap-analysis-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem; }
+        .gap-analysis-card { border: 1px solid var(--border-color); border-radius: 8px; padding: 1.5rem; background-color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .gap-card-header { display: flex; align-items: center; margin-bottom: 1.25rem; gap: 0.75rem; }
+        .gap-rank { display: flex; align-items: center; justify-content: center; width: 1.75rem; height: 1.75rem; background-color: var(--accent-color); color: white; border-radius: 50%; font-weight: bold; font-size: 0.9rem; flex-shrink: 0; }
+        .gap-category { font-size: 1.1rem; font-weight: 600; color: var(--accent-color); flex: 1; }
+        .gap-priority-badge { padding: 0.25rem 0.5rem; border-radius: 4px; color: white; font-size: 0.7rem; font-weight: 500; }
+        .gap-metrics { display: flex; flex-direction: column; gap: 0.75rem; }
+        .gap-metric { margin-bottom: 0.5rem; }
+        .gap-metric-label { font-size: 0.8rem; color: var(--text-color); margin-bottom: 0.25rem; }
+        .gap-metric-value { font-size: 1rem; font-weight: 600; color: var(--accent-color); margin-bottom: 0.25rem; }
+        .gap-metric-bar-container { width: 100%; height: 6px; background-color: var(--secondary-color); border-radius: 3px; overflow: hidden; }
+        .gap-metric-bar { height: 100%; border-radius: 3px; }
+        .gap-bar { background-color: var(--primary-color); }
+        .gap-impact { margin-top: 1rem; display: flex; flex-wrap: wrap; align-items: center; padding-top: 0.75rem; border-top: 1px dashed var(--border-color); }
+        .gap-impact-label { font-size: 0.9rem; font-weight: 600; margin-right: auto; color: var(--text-color); }
+        .gap-impact-value { font-size: 1.25rem; font-weight: 700; color: var(--accent-color); }
+        .gap-quick-win { background-color: #e6a700; color: white; font-size: 0.7rem; font-weight: 500; padding: 0.25rem 0.5rem; border-radius: 4px; margin-left: 0.75rem; }
+        .gap-analysis-info { background-color: var(--light-gray); padding: 1rem; border-radius: 8px; font-size: 0.85rem; color: var(--accent-color); }
+        .gap-analysis-info p { margin-bottom: 0.5rem; }
+        .gap-analysis-info p:last-child { margin-bottom: 0; }
       </style>
     </head>
     <body>
@@ -283,18 +317,46 @@
       <div class="section">
         <h2 class="section-title">Category Scores</h2>
         <div class="category-scores">
-          ${sortedCategories.map(([category, score], index) => `
+          ${sortedCategories.map(([category, score], index) => {
+            // Determine category maturity level
+            const maturityLevel = score <= 30 ? "AI Dormant" :
+                                 score <= 60 ? "AI Aware" :
+                                 score <= 85 ? "AI Rise" : "AI Ready";
+            
+            // Determine category color based on score
+            const categoryColor = score <= 30 ? "#73BFDC" : 
+                                 score <= 60 ? "#5BA3C6" : 
+                                 score <= 85 ? "#2C6F9B" : "#0A4570";
+            
+            return `
             <div class="category-card">
-              <div class="category-name">${category}</div>
+              <div class="category-header">
+                <div class="category-name">${category}</div>
+                <div class="category-badge" style="background-color: ${categoryColor};">
+                  ${maturityLevel}
+                </div>
+              </div>
+              <div class="category-score-circle" style="background: conic-gradient(${categoryColor} ${score}%, var(--secondary-color) 0%);">
+                <div class="category-score-inner">${Math.round(score)}%</div>
+              </div>
               <div class="progress-container">
-                <div class="progress-bar" style="width: ${score}%;"></div>
+                <div class="progress-bar" style="width: ${score}%; background-color: ${categoryColor};"></div>
               </div>
               <div class="score-value">
-                <span>Score: ${Math.round(score)}%</span>
                 <span>${score < 60 ? "Needs Improvement" : score < 85 ? "Good" : "Excellent"}</span>
               </div>
+              <div class="category-recommendation">
+                ${score <= 30 ? 
+                  "Establish foundational elements and initiate formal planning." :
+                  score <= 60 ? 
+                  "Focus on expanding capabilities and addressing key gaps." :
+                  score <= 85 ? 
+                  "Enhance current practices and move toward optimization." : 
+                  "Maintain excellence and explore innovative approaches."}
+              </div>
             </div>
-          `).join('')}
+          `;
+          }).join('')}
         </div>
       </div>
 
@@ -303,14 +365,48 @@
         <div class="weights-section">
           ${Object.entries(result.userWeights).map(([category, weight]) => {
             const adjustedWeight = result.adjustedWeights[category] || 0;
+            const categoryScore = result.categoryScores[category] || 0;
+            
+            // Determine category color based on score
+            const categoryColor = categoryScore <= 30 ? "#73BFDC" : 
+                                 categoryScore <= 60 ? "#5BA3C6" : 
+                                 categoryScore <= 85 ? "#2C6F9B" : "#0A4570";
+            
+            // Calculate the weight's contribution to overall score
+            const scoreContribution = (categoryScore * adjustedWeight) / 100;
+                
             return `
               <div class="weight-card">
-                <div class="weight-name">${category}</div>
-                <div class="weight-details">
-                  <span class="weight-label">User Weight:</span> ${Math.round(weight * 10) / 10}%
+                <div class="weight-header">
+                  <div class="weight-name">${category}</div>
+                  <div class="weight-score">Score: ${Math.round(categoryScore)}%</div>
                 </div>
-                <div class="weight-details">
-                  <span class="weight-label">Adjusted Weight:</span> ${Math.round(adjustedWeight * 10) / 10}%
+                
+                <div class="weight-details-container">
+                  <div class="weight-details">
+                    <span class="weight-label">User Weight:</span> 
+                    <div class="weight-value-container">
+                      <div class="weight-progress-container">
+                        <div class="weight-progress-bar" style="width: ${weight}%; background-color: ${categoryColor};"></div>
+                      </div>
+                      <span class="weight-value">${Math.round(weight * 10) / 10}%</span>
+                    </div>
+                  </div>
+                  
+                  <div class="weight-details">
+                    <span class="weight-label">Adjusted Weight:</span>
+                    <div class="weight-value-container">
+                      <div class="weight-progress-container">
+                        <div class="weight-progress-bar" style="width: ${adjustedWeight}%; background-color: ${categoryColor};"></div>
+                      </div>
+                      <span class="weight-value">${Math.round(adjustedWeight * 10) / 10}%</span>
+                    </div>
+                  </div>
+                  
+                  <div class="weight-contribution">
+                    <span class="weight-label">Impact on Overall:</span>
+                    <span class="weight-value">${Math.round(scoreContribution * 10) / 10} points</span>
+                  </div>
                 </div>
               </div>
             `;
@@ -320,28 +416,71 @@
 
       <div class="section">
         <h2 class="section-title">Gap Analysis</h2>
-        <table class="gap-table">
-          <thead>
-            <tr>
-              <th>Category</th>
-              <th>Current Score</th>
-              <th>Gap</th>
-              <th>Weight</th>
-              <th>Impact Score</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${gapAnalysis.map(gap => `
-              <tr>
-                <td>${gap.category}</td>
-                <td>${Math.round(gap.score)}%</td>
-                <td>${Math.round(gap.gap)}%</td>
-                <td>${Math.round(gap.weight)}%</td>
-                <td>${Math.round(gap.impact)}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
+        <p class="section-description">
+          The analysis below highlights areas with the greatest potential for improvement, based on both their current scores and assigned weights.
+        </p>
+        <div class="gap-analysis-grid">
+          ${gapAnalysis.map((gap, index) => {
+            // Get priority level based on impact
+            const priorityLevel = gap.impact > 15 ? "High Priority" :
+                                 gap.impact > 7 ? "Medium Priority" : "Lower Priority";
+            
+            // Determine color based on priority
+            const priorityColor = gap.impact > 15 ? "#d64545" :
+                                 gap.impact > 7 ? "#e6a700" : "#5BA3C6";
+            
+            // Get quick-win status (high impact, smaller gap is a "quick win")
+            const isQuickWin = gap.impact > 7 && gap.gap < 50;
+            
+            return `
+              <div class="gap-analysis-card">
+                <div class="gap-card-header">
+                  <div class="gap-rank">${index + 1}</div>
+                  <div class="gap-category">${gap.category}</div>
+                  <div class="gap-priority-badge" style="background-color: ${priorityColor};">
+                    ${priorityLevel}
+                  </div>
+                </div>
+                
+                <div class="gap-metrics">
+                  <div class="gap-metric">
+                    <div class="gap-metric-label">Current Score</div>
+                    <div class="gap-metric-value">${Math.round(gap.score)}%</div>
+                    <div class="gap-metric-bar-container">
+                      <div class="gap-metric-bar" style="width: ${gap.score}%; background-color: #4389B0;"></div>
+                    </div>
+                  </div>
+                  
+                  <div class="gap-metric">
+                    <div class="gap-metric-label">Gap</div>
+                    <div class="gap-metric-value">${Math.round(gap.gap)}%</div>
+                    <div class="gap-metric-bar-container">
+                      <div class="gap-metric-bar gap-bar" style="width: ${gap.gap}%; background-color: ${priorityColor};"></div>
+                    </div>
+                  </div>
+                  
+                  <div class="gap-metric">
+                    <div class="gap-metric-label">Category Weight</div>
+                    <div class="gap-metric-value">${Math.round(gap.weight)}%</div>
+                    <div class="gap-metric-bar-container">
+                      <div class="gap-metric-bar" style="width: ${gap.weight}%; background-color: #2C6F9B;"></div>
+                    </div>
+                  </div>
+                  
+                  <div class="gap-impact">
+                    <div class="gap-impact-label">Impact Score</div>
+                    <div class="gap-impact-value">${Math.round(gap.impact)}</div>
+                    ${isQuickWin ? `<div class="gap-quick-win">Potential Quick Win</div>` : ''}
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+        <div class="gap-analysis-info">
+          <p><strong>Impact Score</strong> = Gap × Weight ÷ 100. Higher scores suggest higher priority areas to focus on.</p>
+          <p><strong>Quick Wins</strong> are areas with significant impact that may require less effort to improve.</p>
+        </div>
       </div>
 
       <div class="section">
@@ -765,23 +904,42 @@
           <CardContent className="pt-4 space-y-4">
             {Object.entries(result.categoryScores || {})
               .sort(([catA], [catB]) => catA.localeCompare(catB)) // Sort alphabetically for consistency
-              .map(([category, score]) => (
-              <div key={category}>
-                <div className="flex justify-between mb-1 text-sm">
-                  <div className="flex items-center gap-2">
-                      {/* Optional: Add a generic icon per category if desired */}
-                      <span className="font-medium text-foreground">{category}</span>
+              .map(([category, score]) => {
+                // Get maturity level for this category
+                const maturityLevel = score <= 30 ? "AI Dormant" :
+                                    score <= 60 ? "AI Aware" :
+                                    score <= 85 ? "AI Rise" : "AI Ready";
+                                    
+                // Get recommendation based on score
+                const recommendation = score <= 30 ? 
+                  "Establish foundational elements and initiate formal planning." :
+                  score <= 60 ? 
+                  "Focus on expanding capabilities and addressing key gaps." :
+                  score <= 85 ? 
+                  "Enhance current practices and move toward optimization." : 
+                  "Maintain excellence and explore innovative approaches.";
+                  
+                return (
+                  <div key={category} className="border rounded-lg p-4 bg-muted/30 hover:bg-muted/50 transition-colors">
+                    <div className="flex justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-foreground">{category}</span>
+                        <Badge variant={score < 30 ? "destructive" : score < 60 ? "secondary" : score >= 85 ? "default" : "outline"} className="text-xs">
+                          {maturityLevel}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-foreground">{Math.round(score)}%</span>
+                        <Badge variant={score < 30 ? "destructive" : score < 60 ? "secondary" : "outline"} className="text-xs hidden sm:inline-block">
+                          {score < 30 ? "Low" : score < 60 ? "Medium" : score < 85 ? "Good" : "Excellent"}
+                        </Badge>
+                      </div>
+                    </div>
+                    <Progress value={score} className="h-2 mb-3" />
+                    <p className="text-xs text-muted-foreground mt-2">{recommendation}</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                      <span className="font-semibold text-foreground">{Math.round(score)}%</span>
-                      <Badge variant={score < 30 ? "destructive" : score < 60 ? "secondary" : "outline"} className="text-xs hidden sm:inline-block">
-                        {score < 30 ? "Low" : score < 60 ? "Medium" : score < 85 ? "Good" : "Excellent"}
-                      </Badge>
-                  </div>
-                </div>
-                <Progress value={score} className="h-2" />
-              </div>
-            ))}
+                );
+              })}
           </CardContent>
         </Card>
 
@@ -794,50 +952,101 @@
                 Gap Analysis & Focus Areas
               </CardTitle>
               <CardDescription>
-                Prioritized areas for improving your {assessmentType.toLowerCase()} readiness, based on impact.
+                Prioritized areas for improving your {assessmentType.toLowerCase()} readiness, based on potential impact.
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-4 space-y-4">
-              {gapAnalysisData.map((item, index) => (
-                <div key={item.category} className="border rounded-lg p-4 bg-muted/30 hover:bg-muted/50 transition-colors">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-2 gap-2">
-                    <div className="font-semibold text-foreground flex items-center gap-2">
-                      {/* Priority Ranking */}
-                      <span className={`flex items-center justify-center h-6 w-6 rounded-full text-xs font-bold ${
-                          item.impact > 15 ? 'bg-destructive text-destructive-foreground' :
-                          item.impact > 7 ? 'bg-yellow-500 text-black' :
-                          'bg-secondary text-secondary-foreground'
+              {gapAnalysisData.map((item, index) => {
+                // Determine priority level based on impact
+                const priorityLevel = item.impact > 15 ? "High Priority" :
+                                    item.impact > 7 ? "Medium Priority" : "Lower Priority";
+                                    
+                // Check if this could be a "quick win" - high impact with relatively smaller gap
+                const isQuickWin = item.impact > 7 && item.gap < 50;
+                
+                return (
+                  <div key={item.category} className="border rounded-lg p-4 bg-muted/30 hover:bg-muted/50 transition-colors">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-3 gap-2">
+                      <div className="font-semibold text-foreground flex items-center gap-2">
+                        {/* Priority Ranking */}
+                        <span className={`flex items-center justify-center h-6 w-6 rounded-full text-xs font-bold ${
+                            item.impact > 15 ? 'bg-destructive text-destructive-foreground' :
+                            item.impact > 7 ? 'bg-yellow-500 text-black' :
+                            'bg-secondary text-secondary-foreground'
+                        }`}>
+                          {index + 1}
+                        </span>
+                        {item.category}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={
+                            item.impact > 15 ? "destructive" :
+                            item.impact > 7 ? "outline" : "secondary"
+                        }>
+                          {priorityLevel}
+                        </Badge>
+                        {isQuickWin && (
+                          <Badge variant="outline" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200">
+                            Quick Win
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+                      <div>
+                        <div className="text-muted-foreground mb-1 text-xs">Current Score</div>
+                        <div className="font-medium text-foreground">{Math.round(item.score)}%</div>
+                        <div className="mt-1.5 mb-2 bg-secondary h-1.5 w-full rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-primary rounded-full" 
+                            style={{ width: `${item.score}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground mb-1 text-xs">Gap</div>
+                        <div className="font-medium text-foreground">{Math.round(item.gap)}%</div>
+                        <div className="mt-1.5 mb-2 bg-secondary h-1.5 w-full rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full ${
+                              item.gap > 70 ? 'bg-destructive' : 
+                              item.gap > 40 ? 'bg-yellow-500' : 
+                              'bg-primary/60'
+                            }`}
+                            style={{ width: `${item.gap}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground mb-1 text-xs">Weight</div>
+                        <div className="font-medium text-foreground">{Math.round(item.weight)}%</div>
+                        <div className="mt-1.5 mb-2 bg-secondary h-1.5 w-full rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-primary/80 rounded-full" 
+                            style={{ width: `${item.weight}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-2 border-t border-border">
+                      <div className="text-xs text-muted-foreground">Impact Score</div>
+                      <div className={`text-lg font-bold ${
+                        item.impact > 15 ? 'text-destructive' : 
+                        item.impact > 7 ? 'text-yellow-600' : 
+                        'text-foreground'
                       }`}>
-                        {index + 1}
-                      </span>
-                      {item.category}
+                        {Math.round(item.impact)}
+                      </div>
                     </div>
                   </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3 text-sm">
-                    <div>
-                      <div className="text-muted-foreground mb-0.5">Score</div>
-                      <div className="font-medium text-foreground">{Math.round(item.score)}%</div>
-                    </div>
-                    <div>
-                      <div className="text-muted-foreground mb-0.5">Gap</div>
-                      <div className="font-medium text-foreground">{Math.round(item.gap)}%</div>
-                    </div>
-                    <div className="col-span-2 sm:col-span-1">
-                      <div className="text-muted-foreground mb-0.5">Impact Score</div>
-                      {/* Impact score explanation could be added via Tooltip */}
-                      <div className="font-medium text-foreground">{Math.round(item.impact)}</div>
-                    </div>
-                  </div>
-
-                  {/* Progress within Gap Analysis Item */}
-                  <Progress value={item.score} className="h-1.5" />
-
-                </div>
-              ))}
-              <p className="text-xs text-muted-foreground pt-2">
-                  Impact Score considers both the gap (100 - score) and the weight assigned to the category. Higher impact suggests a higher priority focus area.
-              </p>
+                );
+              })}
+              <div className="bg-muted/50 rounded-lg p-3 text-xs text-muted-foreground space-y-1">
+                <p><span className="font-medium">Impact Score</span> = Gap × Weight ÷ 100. Higher scores suggest higher priority focus areas.</p>
+                <p><span className="font-medium">Quick Wins</span> are areas with significant impact that may require less effort to improve.</p>
+              </div>
             </CardContent>
           </Card>
         )}
