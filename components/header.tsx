@@ -157,10 +157,7 @@ export default function Header() {
                   <DropdownMenuContent align="end">
                     <DropdownMenuLabel>My Account</DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleResetAssessments} className="cursor-pointer">
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                      Reset Assessment Data
-                    </DropdownMenuItem>
+                 
                     {isAdmin && (
                       <DropdownMenuItem onClick={() => router.push('/admin')} className="cursor-pointer">
                         Admin Panel
