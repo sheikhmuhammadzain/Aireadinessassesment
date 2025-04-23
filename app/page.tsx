@@ -45,12 +45,12 @@ export default function Home() {
       icon: <Shield className="h-6 w-6 text-primary" />, // Pass color directly
     },
     {
-      title: "AI Strategy & Vision",
+      title: "AI Strategy ",
       description: "Align AI initiatives with business goals for measurable impact and growth.",
       icon: <BarChart4 className="h-6 w-6 text-primary" />,
     },
     {
-      title: "AI Data Readiness",
+      title: "AI Data ",
       description: "Ensure high-quality, accessible, and governed data pipelines for AI success.",
       icon: <Database className="h-6 w-6 text-primary" />,
     },
@@ -60,18 +60,18 @@ export default function Home() {
       icon: <Layers className="h-6 w-6 text-primary" />,
     },
     {
-      title: "AI Talent & Skills",
+      title: "AI Talent ",
       description: "Cultivate in-house expertise and attract specialized AI talent.",
       icon: <Brain className="h-6 w-6 text-primary" />,
     },
     {
-      title: "AI Culture & Leadership",
+      title: "AI Culture ",
       description: "Foster an AI-driven mindset with strong leadership and change management.",
       icon: <Users className="h-6 w-6 text-primary" />,
     },
     {
-      title: "AI Ethics & Fairness",
-      description: "Implement processes for transparent, fair, and ethical AI systems.",
+      title: "AI Security",
+      description: "Ensure secure and ethical AI systems that protect data and uphold fairness.",
       icon: <ShieldCheck className="h-6 w-6 text-primary" />,
     },
   ];

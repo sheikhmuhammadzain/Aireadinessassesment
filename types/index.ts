@@ -88,6 +88,7 @@ export interface AssessmentResult {
   userWeights: Record<string, number>;
   qValues: Record<string, number>;
   adjustedWeights: Record<string, number>;
+  softmaxWeights?: Record<string, number>;
   overallScore: number;
 }
 

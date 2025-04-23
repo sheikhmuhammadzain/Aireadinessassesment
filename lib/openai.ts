@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { calculateSoftmaxWeights } from './utils/weight-calculator';
 
 // Initialize the OpenAI client
 const openai = new OpenAI({
@@ -381,6 +382,12 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
         userWeights: result?.userWeights ?? {},
         softmaxWeights: result?.softmaxWeights ?? {}
       };
+      
+      // If softmaxWeights is empty but we have qValues, generate them using our utility
+      if (Object.keys(safeResult.softmaxWeights).length === 0 && Object.keys(safeResult.qValues).length > 0) {
+        safeResult.softmaxWeights = calculateSoftmaxWeights(safeResult.qValues);
+      }
+      
       return {
         category: type,
         overallScore: Number(safeResult.overallScore) || 0, // Ensure score is a number, default to 0
@@ -394,7 +401,7 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
 
     // Calculate overall readiness score, ensuring division by zero is avoided
     const overallReadiness = categoriesData.length > 0
-      ? Math.round(categoriesData.reduce((sum, cat) => sum + cat.overallScore, 0) / categoriesData.length)
+      ? Math.round(categoriesData.reduce((sum: number, cat: { overallScore: number }) => sum + cat.overallScore, 0) / categoriesData.length)
       : 0; // Default to 0 if no categories
 
     // --- 2. Enhanced Prompt Engineering ---
@@ -414,14 +421,14 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
       0.  **Table of Contents**
           *   Generate automatically based on the H1 and H2 headings below. Ensure links correctly target the section IDs (using standard HTML heading IDs like \`<h1 id="executive-summary">...\`).
 
-      1.  **<h1 id="executive-summary">Executive Summary (600+ words)</h1>**
+      1.  **<h1 id="executive-summary">Executive Summary</h1>**
           *   **Comprehensive Key Findings:** Synthesize the most critical insights from the entire assessment, going beyond simple score reporting.
           *   **Detailed Overall AI Readiness Posture:** Provide a nuanced narrative of the organization's current position, integrating findings across categories.
           *   **In-depth Analysis of Major Strengths and Weaknesses:** Identify the top 3-5 core strengths and critical weaknesses, explaining their root causes by referencing specific category/subcategory scores and weights. Quantify impact where possible.
           *   **Prioritized Strategic Recommendations:** Offer 3-5 high-level strategic recommendations, clearly prioritized (e.g., Must Do, Should Do, Could Do) with suggested high-level timelines (e.g., Next 6 months, 6-18 months, 18+ months). Justify prioritization based on gap analysis and potential impact.
           *   **Business Impact Assessment:** Articulate the tangible business consequences (positive and negative) of the current AI readiness state (e.g., impact on efficiency, innovation, competitiveness, risk).
 
-      2.  **<h1 id="assessment-methodology">Assessment Methodology (450+ words)</h1>**
+      2.  **<h1 id="assessment-methodology">Assessment Methodology </h1>**
           *   **Detailed Methodology Overview:** Explain the assessment framework, data collection methods (if inferrable), and the purpose of the readiness evaluation. Describe the scoring scale (e.g., 0-100%) and what different score levels imply (e.g., Nascent, Developing, Mature, Leading).
           *   **Score Calculation and Normalization:** Detail how category overall scores are derived from subcategory scores and adjusted weights. Mention any normalization techniques applied.
           *   **Comprehensive Breakdown of Assessment Categories:** For each major category assessed (e.g., Strategy, Data, Technology, Talent, Governance), explain its significance to overall AI readiness and successful business outcomes.
@@ -435,8 +442,8 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
 
       3.  **<h1 id="detailed-analysis">Detailed Analysis by Category</h1>**
           *   For **each category** present in the \`categoriesData\`:
-              *   Create a dedicated H2 heading: **<h2 id="category-${/* Generate a slug-like ID */ cat => cat.category.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}">${/* Display Category Name */ cat => cat.category} Analysis</h2>** (Ensure the LLM generates this heading with the correct ID for each category loop).
-              *   **Current State Assessment (Score: ${/* Get score */ cat => cat.overallScore.toFixed(1)}%)**: Start with the exact overall score and provide a qualitative interpretation (e.g., "significantly underdeveloped," "moderately capable," "area of strength").
+              *   Create a dedicated H2 heading: **<h2 id="category-${/* Generate a slug-like ID */ (cat: {category: string}) => cat.category.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}">${/* Display Category Name */ (cat: {category: string}) => cat.category} Analysis</h2>** (Ensure the LLM generates this heading with the correct ID for each category loop).
+              *   **Current State Assessment (Score: ${/* Get score */ (cat: {overallScore: number}) => cat.overallScore.toFixed(1)}%)**: Start with the exact overall score and provide a qualitative interpretation (e.g., "significantly underdeveloped," "moderately capable," "area of strength").
               *   **Detailed Strengths (3-4 minimum):** Identify specific strengths *within this category*. For each strength: Reference the specific subcategory(ies), mention their **exact scores**, discuss the impact of their **adjusted weights**, and provide concrete examples.
               *   **Detailed Weaknesses (3-4 minimum):** Identify specific weaknesses *within this category*. For each weakness: Reference the specific subcategory(ies), mention their **exact scores**, analyze the **Q-value and Softmax weight**, and discuss concrete consequences.
               *   **Specific Bottlenecks and Limitations:** Detail technical or process constraints.
@@ -444,35 +451,35 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
               *   **Industry Benchmarking (Conceptual):** Compare assessed state to general industry best practices.
               *   **Potential Future Trajectory:** Describe likely evolution without intervention.
 
-      4.  **<h1 id="swot-analysis">SWOT Analysis (400+ words)</h1>**
+      4.  **<h1 id="swot-analysis">SWOT Analysis /h1>**
           *   **Synthesize Findings:** Based *directly* on the detailed category analysis (Section 3).
           *   **Strengths:** List 4-5 key internal strengths. Reference key subcategories/scores.
           *   **Weaknesses:** List 4-5 critical internal weaknesses. Reference key subcategories/scores/weights.
           *   **Opportunities:** Identify 3-4 external opportunities related to AI.
           *   **Threats:** Identify 3-4 external threats related to AI.
 
-      5.  **<h1 id="gap-analysis">Gap Analysis (500+ words)</h1>**
+      5.  **<h1 id="gap-analysis">Gap Analysis </h1>**
           *   **Detailed Capability Gaps:** Systematically identify significant gaps between current and desired states, organized by category.
           *   **Comprehensive Risk Assessment:** Assess risks associated with major gaps (Likelihood/Impact concept).
           *   **Quantifiable Impact:** Estimate quantifiable impact on business outcomes.
           *   **Competitive Disadvantages:** Link gaps to potential competitive disadvantages.
           *   **Regulatory and Compliance Implications:** Discuss risks related to regulations (e.g., GDPR, CCPA).
 
-      6.  **<h1 id="implementation-roadmap">Implementation Roadmap (600+ words)</h1>**
+      6.  **<h1 id="implementation-roadmap">Implementation Roadmap </h1>**
           *   **Phased Approach:** Structure clear phases (Short-Term: 0-6 months, Medium-Term: 6-18 months, Long-Term: 18+ months).
           *   **Detailed Actions (per phase):** List specific steps, tools, platforms, methodologies, potential ownership, resource needs.
           *   **Extensive Key Performance Indicators (KPIs):** Define SMART KPIs for tracking progress in each phase.
           *   **Cost-Benefit Analysis (Conceptual):** Discuss costs vs. benefits for major initiatives.
           *   **Risk Mitigation Strategies:** Identify implementation risks and propose mitigations.
 
-      7.  **<h1 id="tech-infra-recommendations">Technology and Infrastructure Recommendations (450+ words)</h1>**
+      7.  **<h1 id="tech-infra-recommendations">Technology and Infrastructure Recommendations </h1>**
           *   **Specific Tools and Platforms:** Recommend enterprise-grade AI/ML platforms, data tools, cloud services (e.g., AWS SageMaker, Azure ML, Google Vertex AI, Databricks, Snowflake), justifying based on gaps.
           *   **Comprehensive Integration Strategy:** Discuss integration with existing systems (ERP, CRM, etc.).
           *   **Detailed Scalability Planning:** Address scaling for future demands.
           *   **Cost Estimates and ROI Projections (High-Level):** Provide indicative costs and ROI potential.
           *   **Technical Architecture Recommendations (Text Description):** Describe a target state architecture conceptually (layers, components, data flows).
 
-      8.  **<h1 id="org-cultural-considerations">Organizational and Cultural Considerations (450+ words)</h1>**
+      8.  **<h1 id="org-cultural-considerations">Organizational and Cultural Considerations </h1>**
           *   **Required Organizational Changes:** Suggest structural adjustments (e.g., CoE, new roles, cross-functional teams).
           *   **Comprehensive Skills Development Strategy:** Outline strategy, training programs, timelines.
           *   **Detailed Change Management Approach:** Propose approach (e.g., Kotter, ADKAR), stakeholder analysis.
@@ -480,7 +487,7 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
           *   **Leadership Development:** Specify required leadership skills/mindset.
           *   **Performance Management Adaptations:** Discuss necessary changes to metrics/incentives.
 
-      9.  **<h1 id="detailed-score-breakdown-analysis">Detailed Score Breakdown and Weights Analysis (350+ words)</h1>**
+      9.  **<h1 id="detailed-score-breakdown-analysis">Detailed Score Breakdown and Weights Analysis </h1>**
           *   **(Note: The table itself is generated by the calling code, but this section requires textual analysis referencing it)**
           *   **Introduction:** Briefly introduce the purpose of the detailed breakdown table.
           *   **Deep Dive into Q-Values:** Reiterate definition, analyze 2-3 specific examples from the table where Q-values significantly influenced Adjusted Weight. Explain the implication.
@@ -549,7 +556,7 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>AI Readiness Deep Research Report - ${companyName}</title>
+      <title>AI Readiness  Report - ${companyName}</title>
       <link rel="preconnect" href="https://fonts.googleapis.com">
       <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
       <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Roboto+Slab:wght@400;700&display=swap" rel="stylesheet">
@@ -653,7 +660,7 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
         <div class="report-container">
           <header class="header">
             <div>
-              <h1 class="report-title">AI Readiness Deep Research Report</h1>
+              <h1 class="report-title">AI Readiness  Report</h1>
               <div class="report-meta">
                 <div class="meta-item"><span class="meta-label">Prepared for:</span> <span class="meta-value">${companyName}</span></div>
                 <div class="meta-item"><span class="meta-label">Assessment Date:</span> <span class="meta-value">${currentDate}</span></div>
@@ -787,9 +794,7 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
                <div class="weight-card"><h4>Adjusted Weights</h4><p>Final weights used for scoring, blending User Weights and learned importance (Softmax Weights), balancing stated priorities with data-driven significance.</p></div>
             </div>
 
-             <div class="explanation-box">
-                <strong>Score Contribution Calculation:</strong> This value is calculated as <code>(Raw Score × Adjusted Weight) / 100</code>. It represents the weighted contribution of each subcategory to its parent category's overall score. Summing these contributions within a category yields the Category Overall Score.
-             </div>
+           
              <!-- Interpretation guidance moved to LLM prompt Section 9 for integrated analysis -->
 
           </section>
