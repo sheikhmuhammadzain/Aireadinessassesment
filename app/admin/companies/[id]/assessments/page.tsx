@@ -64,6 +64,25 @@ const ASSESSMENT_TO_ROLES_MAP: Record<string, string[]> = {
   "AI Security": ['admin', 'security_specialist', 'ai_security']
 };
 
+// AI Maturity scores mapping
+const AI_MATURITY_SCORES = {
+  "AI Dormant": "0-30",  // Unprepared
+  "AI Aware": "30-60",   // Somewhat Ready
+  "AI Rise": "60-85",    // Moderately Prepared
+  "AI Ready": "85+"      // Fully Prepared
+};
+
+// Get color variant for AI maturity level
+const getMaturityVariant = (maturity: string) => {
+  switch (maturity) {
+    case "AI Dormant": return "outline";
+    case "AI Aware": return "secondary";
+    case "AI Rise": return "default";
+    case "AI Ready": return { base: "default", className: "bg-green-600" };
+    default: return "outline";
+  }
+};
+
 const PillarAssignments = ({ 
   assessmentTypes = EXPECTED_ASSESSMENT_TYPES,
   teamMembers
@@ -1336,13 +1355,25 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
                   <div className="flex justify-between">
                     <dt className="font-medium text-muted-foreground">AI Maturity:</dt>
                     <dd>
-                      <Badge 
-                        variant={company.aiMaturity === "Initial" ? "outline" : 
-                              company.aiMaturity === "Exploring" ? "secondary" : 
-                              "default"}
-                      >
-                        {company.aiMaturity}
-                      </Badge>
+                      <div className="flex items-center">
+                        <Badge 
+                          variant={
+                            typeof getMaturityVariant(company.aiMaturity) === 'object'
+                              ? getMaturityVariant(company.aiMaturity).base
+                              : getMaturityVariant(company.aiMaturity)
+                          }
+                          className={
+                            typeof getMaturityVariant(company.aiMaturity) === 'object'
+                              ? getMaturityVariant(company.aiMaturity).className
+                              : ''
+                          }
+                        >
+                          {company.aiMaturity}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground ml-2">
+                          Score: {AI_MATURITY_SCORES[company.aiMaturity as keyof typeof AI_MATURITY_SCORES] || "N/A"}
+                        </span>
+                      </div>
                     </dd>
                   </div>
                   

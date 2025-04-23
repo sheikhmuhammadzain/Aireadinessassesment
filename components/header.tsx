@@ -163,6 +163,12 @@ export default function Header() {
                         Admin Panel
                       </DropdownMenuItem>
                     )}
+                    
+                      <DropdownMenuItem onClick={() => router.push('/profile')} className="cursor-pointer">
+                        <User className="mr-2 h-4 w-4" />
+                        Profile
+                      </DropdownMenuItem>
+                    
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
                       <LogOut className="mr-2 h-4 w-4" />

@@ -144,11 +144,19 @@ const regionOptions = [
 
 // AI Maturity options
 const aiMaturityOptions = [
-  "Initial", // Just getting started with AI
-  "Exploring", // Exploring AI use cases
-  "Expanding", // Implementing AI in several areas
-  "Leading", // Advanced AI implementation across the organization
+  "AI Dormant", // Unprepared - AI Dormant (Score: 0-30)
+  "AI Aware", // Somewhat Ready - AI Aware (Score: 30-60)
+  "AI Rise", // Moderately Prepared - AI Rise (Score: 60-85)
+  "AI Ready", // Fully Prepared - AI Ready (Score: 85+)
 ];
+
+// AI Maturity scores mapping
+const AI_MATURITY_SCORES = {
+  "AI Dormant": "0-30",
+  "AI Aware": "30-60", 
+  "AI Rise": "60-85",
+  "AI Ready": "85+"
+};
 
 export default function EditCompanyPage({ params }: { params: { id: string } }) {
   const router = useRouter();

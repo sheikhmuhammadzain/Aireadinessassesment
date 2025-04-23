@@ -165,7 +165,6 @@ export function CompanySelector({ onSelectCompany }: CompanySelectorProps) {
                       <p><span className="font-medium">Industry:</span> {company.industry}</p>
                       <p><span className="font-medium">Size:</span> {company.size}</p>
                       <p><span className="font-medium">Region:</span> {company.region}</p>
-                      <p><span className="font-medium">AI Maturity:</span> {company.aiMaturity}</p>
                       {company.notes && <p><span className="font-medium">Notes:</span> {company.notes}</p>}
                     </div>
                   ) : null;

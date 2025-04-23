@@ -139,6 +139,14 @@ const formatDate = (dateString: string) => {
   }).format(date);
 };
 
+// AI Maturity scores mapping
+const AI_MATURITY_SCORES = {
+  "AI Dormant": "0-30",  // Unprepared
+  "AI Aware": "30-60",   // Somewhat Ready
+  "AI Rise": "60-85",    // Moderately Prepared
+  "AI Ready": "85+"      // Fully Prepared
+};
+
 interface CompanyDetailsPageProps {
   params: {
     id: string;
@@ -248,10 +256,10 @@ export default function CompanyDetailsPage({ params }: CompanyDetailsPageProps) 
   
   const getAIMaturityColor = (maturity: string) => {
     switch (maturity) {
-      case "Initial": return "bg-gray-100 text-gray-800";
-      case "Exploring": return "bg-blue-100 text-blue-800";
-      case "Expanding": return "bg-purple-100 text-purple-800";
-      case "Leading": return "bg-green-100 text-green-800";
+      case "AI Dormant": return "bg-gray-100 text-gray-800";  // Unprepared
+      case "AI Aware": return "bg-blue-100 text-blue-800";    // Somewhat Ready
+      case "AI Rise": return "bg-purple-100 text-purple-800"; // Moderately Prepared
+      case "AI Ready": return "bg-green-100 text-green-800";  // Fully Prepared
       default: return "bg-gray-100 text-gray-800";
     }
   };
@@ -323,9 +331,14 @@ export default function CompanyDetailsPage({ params }: CompanyDetailsPageProps) 
               
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground mb-1">AI Maturity Level</h3>
-                <Badge className={getAIMaturityColor(company.aiMaturity)}>
-                  {company.aiMaturity}
-                </Badge>
+                <div className="flex items-center">
+                  <Badge className={getAIMaturityColor(company.aiMaturity)}>
+                    {company.aiMaturity}
+                  </Badge>
+                  <span className="text-sm text-muted-foreground ml-2">
+                    (Score: {AI_MATURITY_SCORES[company.aiMaturity as keyof typeof AI_MATURITY_SCORES] || "N/A"})
+                  </span>
+                </div>
               </div>
             </div>
             

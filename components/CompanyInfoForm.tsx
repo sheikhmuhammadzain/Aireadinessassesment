@@ -81,7 +81,15 @@ export function CompanyInfoForm({ onSubmit, loading = false, initialData }: Comp
 
   // Default values for required fields
   const DEFAULT_REGION = "North America";
-  const DEFAULT_AI_MATURITY = "Initial";
+  const DEFAULT_AI_MATURITY = "AI Dormant";
+  
+  // AI Maturity scores mapping
+  const AI_MATURITY_SCORES = {
+    "AI Dormant": "0-30",  // Unprepared
+    "AI Aware": "30-60",   // Somewhat Ready
+    "AI Rise": "60-85",    // Moderately Prepared
+    "AI Ready": "85+"      // Fully Prepared
+  };
 
   const handleWebSearch = async () => {
     const companyName = form.getValues("name");

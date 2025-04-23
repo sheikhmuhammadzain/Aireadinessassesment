@@ -68,6 +68,14 @@ export function UserAccountMenu() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
+          <DropdownMenuItem 
+            className="cursor-pointer"
+            onClick={() => handleNavigation("/profile")}
+          >
+            <UserRound className="mr-2 h-4 w-4" />
+            <span>My Profile</span>
+          </DropdownMenuItem>
+          
           <DropdownMenuItem>
             <Shield className="mr-2 h-4 w-4" />
             <span>Role: {user.role === "admin" ? "Administrator" : ROLE_TO_PILLAR[user.role]}</span>
