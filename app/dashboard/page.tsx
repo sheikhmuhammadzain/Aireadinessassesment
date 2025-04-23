@@ -7,62 +7,19 @@ import {
     Card,
     CardContent,
     CardDescription,
-    CardFooter,
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-import {
-    ArrowRight,
-    BarChart4,
-    Brain,
-    Database,
-    FileText,
-    Layers,
-    Loader2,
-    Search,
-    Shield,
-    Users,
-    TrendingUp,
-    CheckCircle,
-    TrendingDown,
-    Target,
-    Info,
-    BarChart2,
-    Building,
-    Clock,
-    XCircle,
-} from "lucide-react";
-import {
-    BarChart,
-    Bar,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    ResponsiveContainer,
-} from "recharts";
+import { Loader2, Building } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { generateDeepResearchReport } from "@/lib/openai";
-import { AssessmentLevelsVisual } from "@/components/assessment-levels-visual";
 import { ProtectedRoute } from "@/components/protected-route";
 import { useAuth, ROLE_TO_PILLAR } from "@/lib/auth-context";
-import { cn } from "@/lib/utils";
 import { CompanyInfo, CompanyAssessmentStatus } from "@/types";
 import { AssessmentResult, AssessmentType, ChartDataItem } from "../types/dashboard";
 import React from "react";
 
 // Import dashboard components
-import {
-    // AssessmentResultsChart, - Commented out as not being used
-    KeyInsights,
-    DashboardStats,
-    CompanyCard,
-    AssessmentLevels
-} from "../components/dashboard";
+import { CompanyCard } from "../components/dashboard";
 
 // Assessment Type Configuration
 const assessmentTypes: AssessmentType[] = [
@@ -94,9 +51,6 @@ function DashboardContent() {
     const [assessmentStatuses, setAssessmentStatuses] = useState<Record<string, CompanyAssessmentStatus>>({});
     const [results, setResults] = useState<Record<string, AssessmentResult>>({});
     const [overallData, setOverallData] = useState<ChartDataItem[]>([]);
-    const [generatingReport, setGeneratingReport] = useState(false);
-    const [reportGenerationMessage, setReportGenerationMessage] = useState("Generating report...");
-    const [activeTab, setActiveTab] = useState("overview");
 
     // Filter assessment types based on user role
     const filteredAssessmentTypes = React.useMemo(() => {
@@ -415,71 +369,6 @@ function DashboardContent() {
             console.log("BarChart data:", JSON.stringify(overallData));
         }
     }, [overallData]);
-
-    // Report Generation Animation Effect
-    useEffect(() => {
-        let interval: NodeJS.Timeout | undefined;
-        const messages = [
-            "Analyzing assessment data...",
-            "Scanning industry benchmarks...",
-            "Identifying key opportunities...",
-            "Compiling strategic insights...",
-            "Finalizing comprehensive report..."
-        ];
-        let messageIndex = 0;
-
-        if (generatingReport) {
-            setReportGenerationMessage(messages[0]);
-            interval = setInterval(() => {
-                messageIndex = (messageIndex + 1) % messages.length;
-                setReportGenerationMessage(messages[messageIndex]);
-            }, 3000);
-        }
-
-        return () => {
-            if (interval) clearInterval(interval);
-        };
-    }, [generatingReport]);
-
-    const getScoreLabel = (score: number): string => {
-        if (score >= 80) return "Advanced";
-        if (score >= 60) return "Developed";
-        if (score >= 40) return "Emerging";
-        return "Initial";
-    };
-
-    const calculateOverallReadiness = (): number => {
-        // Get a unique list of assessment types with their highest scores
-        const typeScores: Record<string, number> = {};
-        
-        // Process all results and keep highest score per type
-        Object.entries(results).forEach(([type, result]) => {
-            if (!typeScores[type] || typeScores[type] < result.overallScore) {
-                typeScores[type] = result.overallScore;
-            }
-        });
-        
-        // Get unique scores array
-        const scores = Object.values(typeScores);
-        if (scores.length === 0) return 0;
-        
-        // Calculate the average
-        const average = Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length);
-        console.log(`Overall readiness: ${average}% (averaged from ${scores.length} unique assessment types)`);
-        return average;
-    };
-
-    const getStrongestArea = (): string | null => {
-        if (Object.keys(results).length === 0) return null;
-        return Object.entries(results)
-            .sort((a, b) => b[1].overallScore - a[1].overallScore)[0][0];
-    };
-
-    const getWeakestArea = (): string | null => {
-        if (Object.keys(results).length === 0) return null;
-        return Object.entries(results)
-            .sort((a, b) => a[1].overallScore - b[1].overallScore)[0][0];
-    };
     
     // Calculate company completion percentage
     const getCompanyCompletionPercentage = (companyId: string): number => {
@@ -543,43 +432,6 @@ function DashboardContent() {
         return averageScore;
     };
 
-    const handleGenerateReport = async () => {
-        if (Object.keys(results).length === 0) {
-            toast({
-                title: "Cannot Generate Report",
-                description: "No assessment results found. Please complete at least one assessment first.",
-                variant: "destructive",
-            });
-            return;
-        }
-        
-        setGeneratingReport(true);
-        try {
-            const mainReport = await generateDeepResearchReport(
-                Object.entries(results).map(([type, result]) => ({
-                    type,
-                    result,
-                }))
-            );
-            
-            if (mainReport && mainReport.trim()) {
-                localStorage.setItem('strategic_report', mainReport);
-                router.push('/dashboard/report');
-            } else {
-                throw new Error("Report generation failed");
-            }
-        } catch (error) {
-            console.error("Error generating report:", error);
-            toast({
-                title: "Report Generation Failed",
-                description: "There was an error generating your report. Please try again.",
-                variant: "destructive",
-            });
-        } finally {
-            setGeneratingReport(false);
-        }
-    };
-
     const handleViewCompany = (companyId: string) => {
         router.push(`/admin/companies/${companyId}/assessments`);
     };
@@ -634,7 +486,7 @@ function DashboardContent() {
         <div className="container mx-auto py-8 px-4">
             <div className="flex justify-between items-center mb-6">
                 <div>
-                    <h1 className="text-3xl font-bold">{user?.role === 'admin' ? 'Admin Dashboard' : 'My Dashboard'}</h1>
+                    <h1 className="text-3xl font-bold">{user?.role === 'admin' ? 'Companies Dashboard' : 'My Companies'}</h1>
                     <p className="text-muted-foreground">
                         {user?.role === 'admin' 
                             ? 'Overview of all companies and their assessment progress' 
@@ -649,105 +501,46 @@ function DashboardContent() {
                 )}
             </div>
 
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
-                <TabsList className="grid w-full max-w-md grid-cols-2">
-                    <TabsTrigger value="overview">Dashboard Overview</TabsTrigger>
-                    <TabsTrigger value="companies">
-                        {user?.role === 'admin' ? 'All Companies' : 'My Companies'}
-                    </TabsTrigger>
-                </TabsList>
+            <div className="space-y-6">
+                <h2 className="text-2xl font-semibold mb-4">
+                    {user?.role === 'admin' ? 'All Companies' : 'Companies Assigned to You'}
+                </h2>
                 
-                <TabsContent value="overview" className="space-y-6">
-                    {/* Overall stats cards using DashboardStats component */}
-                    <DashboardStats 
-                        companies={companies}
-                        assessmentStatuses={assessmentStatuses}
-                        overallReadiness={calculateOverallReadiness()}
-                    />
-
-                    {Object.keys(results).length > 0 ? (
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            {/* Assessment results chart using AssessmentResultsChart component */}
-                            {/* <AssessmentResultsChart
-                                                data={overallData}
-                                onGenerateReport={handleGenerateReport}
-                                isGenerating={generatingReport}
-                                generationMessage={reportGenerationMessage}
-                            /> */}
-
-                            {/* Key Insights using KeyInsights component */}
-                            <KeyInsights
-                                results={results}
-                                strongestArea={getStrongestArea()}
-                                weakestArea={getWeakestArea()}
-                                readinessLevel={getScoreLabel(calculateOverallReadiness())}
+                {companies.length === 0 ? (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>No Companies Found</CardTitle>
+                            <CardDescription>
+                                {user?.role === 'admin' 
+                                    ? 'No companies have been added to the system yet.' 
+                                    : 'You have not been assigned to any companies yet.'}
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="flex justify-center py-6">
+                            <Button onClick={() => router.push('/admin/companies')}>
+                                {user?.role === 'admin' ? 'View Companies' : 'Start Assessments'}
+                            </Button>
+                        </CardContent>
+                    </Card>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {companies.map((company) => (
+                            <CompanyCard
+                                key={company.id}
+                                company={company}
+                                status={assessmentStatuses[company.id || ""]}
+                                completionPercentage={getCompanyCompletionPercentage(company.id || "")}
+                                overallScore={getCompanyOverallScore(company.id || "")}
+                                onViewDetails={handleViewCompany}
+                                onManageAssessments={(id: string) => router.push(`/admin/companies/${id}/assessments`)}
+                                onStartAssessment={handleStartAssessment}
+                                isAdmin={user?.role === 'admin'}
+                                userAssessmentType={userAssessmentType}
                             />
-
-                            {/* Assessment Levels using AssessmentLevels component */}
-                            <AssessmentLevels
-                                overallScore={calculateOverallReadiness()}
-                            />
-                            </div>
-                    ) : (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>No Assessments Completed Yet</CardTitle>
-                                <CardDescription>
-                                    Complete assessments to see your results and insights.
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="flex justify-center py-6">
-                                <Button onClick={() => setActiveTab("companies")}>
-                                    {user?.role === 'admin' ? 'View Companies' : 'Start Assessments'}
-                                </Button>
-                            </CardContent>
-                        </Card>
-                    )}
-                        </TabsContent>
-
-                <TabsContent value="companies" className="space-y-6">
-                    <h2 className="text-2xl font-semibold mb-4">
-                        {user?.role === 'admin' ? 'All Companies' : 'Companies Assigned to You'}
-                    </h2>
-                    
-                    {companies.length === 0 ? (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>No Companies Found</CardTitle>
-                                <CardDescription>
-                                    {user?.role === 'admin' 
-                                        ? 'No companies have been added to the system yet.' 
-                                        : 'You have not been assigned to any companies yet.'}
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="flex justify-center py-6">
-                                {user?.role === 'admin' && (
-                                    <Button onClick={() => router.push('/admin/companies/add')}>
-                                        Add New Company
-                                    </Button>
-                                )}
-                            </CardContent>
-                        </Card>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {companies.map((company) => (
-                                <CompanyCard
-                                    key={company.id}
-                                    company={company}
-                                    status={assessmentStatuses[company.id || ""]}
-                                    completionPercentage={getCompanyCompletionPercentage(company.id || "")}
-                                    overallScore={getCompanyOverallScore(company.id || "")}
-                                    onViewDetails={handleViewCompany}
-                                    onManageAssessments={(id: string) => router.push(`/admin/companies/${id}/assessments`)}
-                                    onStartAssessment={handleStartAssessment}
-                                    isAdmin={user?.role === 'admin'}
-                                    userAssessmentType={userAssessmentType}
-                                />
-                            ))}
-                        </div>
-                    )}
-                        </TabsContent>
-                    </Tabs>
+                        ))}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
