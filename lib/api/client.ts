@@ -386,10 +386,10 @@ export const assessmentsApi = {
       
       // On any error, try the API proxy as fallback
       console.log("Error with direct backend access, falling back to API proxy");
-      return apiCall<any>('/assessments', {
-        method: 'POST',
-        data: assessmentData
-      });
+    return apiCall<any>('/assessments', {
+      method: 'POST',
+      data: assessmentData
+    });
     }
   },
   
@@ -428,7 +428,7 @@ export const assessmentsApi = {
         },
         body: JSON.stringify(requestData)
       });
-      
+    
       if (!response.ok) {
         const errorData = await response.text();
         console.error(`Backend error: ${response.status} ${response.statusText}`, errorData);
@@ -455,10 +455,10 @@ export const assessmentsApi = {
       
       // On any error, try the API proxy as fallback
       console.log("Error with direct backend access, falling back to API proxy");
-      return apiCall<any>(`/assessments/${assessmentId}`, {
-        method: 'PUT',
-        data: requestData
-      });
+    return apiCall<any>(`/assessments/${assessmentId}`, {
+      method: 'PUT',
+      data: requestData
+    });
     }
   },
   

@@ -168,35 +168,37 @@ export default function CompanyProfilePage({ params }: { params: Promise<{ id: s
       }
       
       if (suggestedWeights) {
-        // Use weights suggested by web search
+        // Use weights suggested by web search - this is the preferred source
+        console.log("Using web search suggested weights:", suggestedWeights);
         setRecommendedWeights(suggestedWeights);
         setWeights(suggestedWeights);
+        
+        // Store the weights in localStorage to preserve them
+        const companyWeightsKey = `company_weights_${companyId}`;
+        localStorage.setItem(companyWeightsKey, JSON.stringify(suggestedWeights));
+        
         toast({
           title: "Web-suggested weights applied",
           description: "We've applied the weights suggested based on your company's web profile.",
         });
       } else {
-        // First try to fetch weights from database
-        try {
-          const { data: savedWeights, error } = await api.weights.getCompanyWeights(companyId);
-          if (!error && savedWeights && savedWeights.weights) {
-            // If we have saved weights, use those
-            console.log("Using saved weights from database:", savedWeights.weights);
-            setRecommendedWeights(savedWeights.weights);
-            setWeights(savedWeights.weights);
-            toast({
-              title: "Saved weights applied",
-              description: "We've applied the previously saved weights for this company.",
-            });
-          } else {
-            // If no saved weights, fetch recommended weights based on company info
-            await fetchRecommendedWeights(info);
-          }
-        } catch (weightError) {
-          console.warn("Could not fetch saved weights, falling back to recommendations:", weightError);
-          // Fall back to recommended weights
-          await fetchRecommendedWeights(info);
-        }
+        // If no web search weights, use equal distribution for all assessment types
+        console.log("No web-suggested weights, using equal distribution");
+        const categories = assessmentTypes.map(type => type.id);
+        const defaultWeight = 100 / categories.length;
+        
+        const fallbackWeights: CategoryWeights = {};
+        categories.forEach(category => {
+          fallbackWeights[category] = defaultWeight;
+        });
+        
+        setRecommendedWeights(fallbackWeights);
+        setWeights(fallbackWeights);
+        
+        toast({
+          title: "Default weights applied",
+          description: "Using equal weights for all assessment types.",
+        });
       }
       
       setStep('weight-adjustment');
@@ -300,47 +302,34 @@ export default function CompanyProfilePage({ params }: { params: Promise<{ id: s
 
     setIsLoading(true);
     try {
-      // The recommended weights from web search result
-      const recommendedWeights = {
-        "AI Infrastructure": 20.0,
-        "AI Data": 20.0,
-        "AI Governance": 15.0,
-        "AI Strategy": 15.0,
-        "AI Culture": 10.0,
-        "AI Talent": 10.0,
-        "AI Security": 10.0
-      };
+      // Save the current weights to localStorage
+      const companyWeightsKey = `company_weights_${companyId}`;
+      localStorage.setItem(companyWeightsKey, JSON.stringify(weights));
       
-      // Format weights for the API
-      const weightsData = {
-        weights: recommendedWeights
-      };
+      // Also set as the default weights for assessments
+      localStorage.setItem('assessment_weights', JSON.stringify(weights));
       
-      console.log("Saving weights for company ID:", companyId);
-      
-      const { data, error } = await api.weights.updateCompanyWeights(companyId, weightsData);
-      
-      if (error) {
-        throw new Error(error);
+      // If you still want to save to the backend (optional)
+      try {
+        const weightsData = {
+          weights: weights
+        };
+        
+        await api.weights.updateCompanyWeights(companyId, weightsData);
+      } catch (apiError) {
+        console.warn("Could not save weights to backend, but weights are saved locally:", apiError);
+        // Continue anyway since we've saved to localStorage
       }
       
       toast({
         title: "Weights Saved",
-        description: "The recommended weights have been saved for this company.",
+        description: "The current weights have been saved for this company.",
       });
-      
-      // Update the weights in the UI to show the recommended weights immediately
-      setRecommendedWeights(recommendedWeights);
-      setWeights(recommendedWeights);
-      
-      // Also update in localStorage for fallback
-      const companyWeightsKey = `company_weights_${companyId}`;
-      localStorage.setItem(companyWeightsKey, JSON.stringify(recommendedWeights));
     } catch (error) {
       console.error("Error saving weights:", error);
       toast({
         title: "Error",
-        description: "Failed to save recommended weights. Please try again.",
+        description: "Failed to save weights. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -414,20 +403,6 @@ export default function CompanyProfilePage({ params }: { params: Promise<{ id: s
               </Button>
             </CardFooter>
           </Card>
-          <Button 
-            onClick={saveRecommendedWeights}
-            disabled={isLoading}
-            className="mt-4"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              "Save Recommended Weights"
-            )}
-          </Button>
         </div>
       )}
     </div>

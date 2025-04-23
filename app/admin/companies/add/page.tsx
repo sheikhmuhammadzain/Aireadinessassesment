@@ -40,12 +40,6 @@ const companyFormSchema = z.object({
   size: z.string().min(1, {
     message: "Please select a company size.",
   }),
-  region: z.string().min(1, {
-    message: "Please select a region.",
-  }),
-  aiMaturity: z.string().min(1, {
-    message: "Please select an AI maturity level.",
-  }),
   notes: z.string().optional(),
 });
 
@@ -74,22 +68,9 @@ const sizeOptions = [
   "Enterprise (1000+ employees)",
 ];
 
-// Region options
-const regionOptions = [
-  "North America",
-  "Europe",
-  "Asia Pacific",
-  "Latin America",
-  "Middle East & Africa",
-];
-
-// AI Maturity options
-const aiMaturityOptions = [
-  "Initial", // Just getting started with AI
-  "Exploring", // Exploring AI use cases
-  "Expanding", // Implementing AI in several areas
-  "Leading", // Advanced AI implementation across the organization
-];
+// Default values for removed fields
+const DEFAULT_REGION = "North America";
+const DEFAULT_AI_MATURITY = "Initial";
 
 export default function AddCompanyPage() {
   const router = useRouter();
@@ -102,8 +83,6 @@ export default function AddCompanyPage() {
       name: "",
       industry: "",
       size: "",
-      region: "",
-      aiMaturity: "Initial", // Default value
       notes: "",
     },
   });
@@ -117,8 +96,8 @@ export default function AddCompanyPage() {
         name: values.name,
         industry: values.industry,
         size: values.size,
-        region: values.region,
-        aiMaturity: values.aiMaturity, // Use aiMaturity to match CompanyInfo type
+        region: DEFAULT_REGION, // Use default value
+        aiMaturity: DEFAULT_AI_MATURITY, // Use default value
         notes: values.notes || "",
       });
       
@@ -241,64 +220,6 @@ export default function AddCompanyPage() {
                           {sizeOptions.map((size) => (
                             <SelectItem key={size} value={size}>
                               {size}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="region"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Region</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select region" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {regionOptions.map((region) => (
-                            <SelectItem key={region} value={region}>
-                              {region}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="aiMaturity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>AI Maturity Level</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select AI maturity" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {aiMaturityOptions.map((level) => (
-                            <SelectItem key={level} value={level}>
-                              {level}
                             </SelectItem>
                           ))}
                         </SelectContent>

@@ -1184,18 +1184,18 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
             try {
               // Create assessment with complete data in one step
               const { error: createError } = await api.assessments.createAssessmentWithData({
-                company_id: companyInfo.id,
-                assessment_type: assessmentType,
-                status: "completed",
-                score: result.overallScore,
-                data: {
-                  categoryScores: result.categoryScores,
-                  userWeights: result.userWeights || result.adjustedWeights,
-                  adjustedWeights: result.adjustedWeights,
-                  qValues: result.qValues,
-                  responses: categoryResponses
-                },
-                completed_at: new Date().toISOString(),
+                        company_id: companyInfo.id,
+                        assessment_type: assessmentType,
+                        status: "completed",
+                        score: result.overallScore,
+                        data: {
+                          categoryScores: result.categoryScores,
+                          userWeights: result.userWeights || result.adjustedWeights,
+                          adjustedWeights: result.adjustedWeights,
+                          qValues: result.qValues,
+                          responses: categoryResponses
+                        },
+                        completed_at: new Date().toISOString(),
                 completed_by_id: user?.id || null
               });
               

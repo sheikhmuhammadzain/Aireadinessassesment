@@ -8,20 +8,25 @@ const openai = new OpenAI({
 
 /**
  * Search for company information on the internet and suggest pillar weights
- * @param companyInfo Company information
+ * @param companyInfo Only company name is required now
  * @returns Promise with recommended weights and company insights
  */
 export async function searchCompanyAndSuggestWeights(companyInfo: {
   name: string;
-  size: string;
-  industry: string;
+  size?: string;
+  industry?: string;
   description?: string;
 }) {
   try {
-    // Create a prompt for the OpenAI API
+    // First, search for company information using Serper API
+    const companyDetails = await fetchCompanyDetails(companyInfo.name);
+    
+    // Then, use OpenAI to analyze the results and suggest weights
     const prompt = `
-      I need information about ${companyInfo.name}, a ${companyInfo.size} company in the ${companyInfo.industry} industry.
-      ${companyInfo.description ? `Additional context: ${companyInfo.description}` : ''}
+      I need information analysis for ${companyInfo.name}, which is a ${companyDetails.size} company in the ${companyDetails.industry} industry.
+      
+      Here's what I know about the company:
+      ${companyDetails.description}
       
       Based on this company's profile, suggest appropriate weights for an AI readiness assessment across these 7 pillars:
       1. AI Governance
@@ -73,12 +78,26 @@ export async function searchCompanyAndSuggestWeights(companyInfo: {
       throw new Error("No content in OpenAI response");
     }
 
-    return JSON.parse(content);
+    const result = JSON.parse(content);
+    
+    // Include the company details in the response
+    return {
+      companyDetails,
+      weights: result.weights,
+      explanation: result.explanation,
+      companyInsights: result.companyInsights
+    };
   } catch (error) {
     console.error("Error searching company and suggesting weights:", error);
     
     // Return default weights if the API call fails
     return {
+      companyDetails: {
+        name: companyInfo.name,
+        industry: "Technology",
+        size: "Mid-size (100-999 employees)",
+        description: "No detailed information available."
+      },
       weights: {
         "AI Governance": 14.3,
         "AI Culture": 14.3,
@@ -90,6 +109,105 @@ export async function searchCompanyAndSuggestWeights(companyInfo: {
       },
       explanation: "Using default weights due to an error in the API call.",
       companyInsights: "Could not retrieve company insights."
+    };
+  }
+}
+
+/**
+ * Fetch company details using Serper API
+ * @param companyName The company name to search for
+ * @returns Company details including industry, size, description and sources
+ */
+async function fetchCompanyDetails(companyName: string) {
+  try {
+    // Use the Serper API to search for company information
+    const response = await fetch('https://google.serper.dev/search', {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': process.env.NEXT_PUBLIC_SERPER_API_KEY || '',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        q: `${companyName} company information industry size`,
+        num: 5
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Serper API returned ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    // Extract the search results
+    const organicResults = data.organic || [];
+    const snippets = organicResults.map((result: any) => result.snippet || '').join(' ');
+    
+    // Collect sources (up to 3)
+    const sources = organicResults.slice(0, 3).map((result: any) => ({
+      title: result.title || 'Source',
+      link: result.link || '#'
+    }));
+    
+    // Use OpenAI to extract structured information from the search results
+    const extractionPrompt = `
+      Based on these search results about ${companyName}, extract the following information:
+      1. Industry: What industry is the company in?
+      2. Size: Estimate the company size (Startup, Small, Mid-size, or Enterprise)
+      3. Description: Write a brief 2-3 sentence description of what the company does
+
+      Search results:
+      ${snippets}
+
+      Format your response as a JSON object with the following structure:
+      {
+        "industry": "string - the industry name",
+        "size": "string - company size category",
+        "description": "string - brief company description"
+      }
+
+      If you can't find specific information, make your best guess based on the available data.
+    `;
+
+    const extractionResponse = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: "You are a helpful assistant that extracts structured information about companies from search results."
+        },
+        {
+          role: "user",
+          content: extractionPrompt
+        }
+      ],
+      response_format: { type: "json_object" }
+    });
+
+    const extractionContent = extractionResponse.choices[0]?.message?.content;
+    if (!extractionContent) {
+      throw new Error("No content in extraction response");
+    }
+
+    const extractedInfo = JSON.parse(extractionContent);
+    
+    return {
+      name: companyName,
+      industry: extractedInfo.industry,
+      size: extractedInfo.size,
+      description: extractedInfo.description,
+      sources: sources
+    };
+  } catch (error) {
+    console.error("Error fetching company details:", error);
+    
+    // Return default information if the API call fails
+    return {
+      name: companyName,
+      industry: "Technology", // Default assumption
+      size: "Mid-size (100-999 employees)", // Default assumption
+      description: "No detailed information available.",
+      sources: []
     };
   }
 }

@@ -420,7 +420,7 @@ function DashboardContent() {
         
         // Get array of unique scores (one per assessment type)
         const uniqueScores = Object.values(scoresByType);
-        
+            
         if (uniqueScores.length === 0) return 0;
         
         // Calculate average of the unique scores
@@ -502,28 +502,28 @@ function DashboardContent() {
             </div>
 
             <div className="space-y-6">
-                <h2 className="text-2xl font-semibold mb-4">
-                    {user?.role === 'admin' ? 'All Companies' : 'Companies Assigned to You'}
-                </h2>
-                
-                {companies.length === 0 ? (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>No Companies Found</CardTitle>
-                            <CardDescription>
-                                {user?.role === 'admin' 
-                                    ? 'No companies have been added to the system yet.' 
-                                    : 'You have not been assigned to any companies yet.'}
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="flex justify-center py-6">
+                    <h2 className="text-2xl font-semibold mb-4">
+                        {user?.role === 'admin' ? 'All Companies' : 'Companies Assigned to You'}
+                    </h2>
+                    
+                    {companies.length === 0 ? (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>No Companies Found</CardTitle>
+                                <CardDescription>
+                                    {user?.role === 'admin' 
+                                        ? 'No companies have been added to the system yet.' 
+                                        : 'You have not been assigned to any companies yet.'}
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="flex justify-center py-6">
                             <Button onClick={() => router.push('/admin/companies')}>
                                 {user?.role === 'admin' ? 'View Companies' : 'Start Assessments'}
-                            </Button>
-                        </CardContent>
-                    </Card>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    </Button>
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {companies.map((company) => (
                             <CompanyCard
                                 key={company.id}
@@ -538,9 +538,9 @@ function DashboardContent() {
                                 userAssessmentType={userAssessmentType}
                             />
                         ))}
-                    </div>
-                )}
-            </div>
+                                                </div>
+                                            )}
+                        </div>
         </div>
     );
 }

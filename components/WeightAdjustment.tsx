@@ -387,7 +387,7 @@ export function WeightAdjustment({
               Reset to Recommended
             </Button>
           )}
-          <Button 
+          {/* <Button 
             onClick={onSubmit} 
             className="w-full sm:w-auto"
             disabled={loading}
@@ -403,7 +403,7 @@ export function WeightAdjustment({
                 <BarChart3 className="ml-2 h-4 w-4" />
               </>
             )}
-          </Button>
+          </Button> */}
         </CardFooter>
       </Card>
     </div>

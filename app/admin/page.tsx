@@ -174,12 +174,12 @@ export default function AdminPage() {
       
       // Update local state after successful API call
       setUsers((prevUsers) => prevUsers.filter(u => u.id !== userId));
-      
-      toast({
-        title: "User Deleted",
-        description: "The user account has been successfully removed.",
-        variant: "default" // Use default variant for success
-      });
+
+    toast({
+      title: "User Deleted",
+      description: "The user account has been successfully removed.",
+      variant: "default" // Use default variant for success
+    });
     } catch (error) {
       console.error("Error deleting user:", error);
       toast({
@@ -210,12 +210,12 @@ export default function AdminPage() {
       toast({ title: "Invalid Email", description: "Please enter a valid email address.", variant: "destructive" });
       return;
     }
-    
+
     // Password validation (only required for new users)
     if (dialogMode === "add" && !password.trim()) {
       toast({ title: "Password Required", description: "Please enter a password for the new user.", variant: "destructive" });
-      return;
-    }
+        return;
+      }
 
     try {
       if (dialogMode === "add") {
@@ -236,7 +236,7 @@ export default function AdminPage() {
           setUsers(prev => [...prev, data]);
           toast({ title: "User Added", description: `${data.name} has been added.`});
         }
-      } else if (dialogMode === "edit" && currentUser) {
+    } else if (dialogMode === "edit" && currentUser) {
         // Update user via API
         const { data, error } = await api.users.updateUser(currentUser.id, {
           name: name.trim(),
@@ -253,11 +253,11 @@ export default function AdminPage() {
           // Update user in state
           setUsers(prev => prev.map(u => u.id === currentUser.id ? data : u));
           toast({ title: "User Updated", description: `Information for ${data.name} has been updated.`});
-        }
+    }
       }
       
-      setIsDialogOpen(false);
-      resetForm();
+    setIsDialogOpen(false);
+    resetForm();
     } catch (error) {
       console.error("Error submitting user:", error);
       toast({
@@ -386,39 +386,39 @@ export default function AdminPage() {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="inline-flex items-center gap-1">
-                              <Tooltip>
+                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Button variant="ghost" size="icon" onClick={() => handleEditUser(user)}>
-                                    <Pencil className="h-4 w-4" />
-                                    <span className="sr-only">Edit User</span>
-                                  </Button>
+                                    <Button variant="ghost" size="icon" onClick={() => handleEditUser(user)}>
+                                        <Pencil className="h-4 w-4" />
+                                        <span className="sr-only">Edit User</span>
+                                    </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>Edit User</TooltipContent>
-                              </Tooltip>
-                              <Tooltip>
+                               </Tooltip>
+                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleDeleteUser(user.id)}
-                                    disabled={user.id === "1"} // Disable deleting admin
-                                    className="text-destructive hover:bg-destructive/10 disabled:opacity-50"
-                                  >
-                                    <Trash className="h-4 w-4" />
-                                    <span className="sr-only">Delete User</span>
-                                  </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => handleDeleteUser(user.id)}
+                                        disabled={user.id === "1"} // Disable deleting admin
+                                        className="text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                                    >
+                                        <Trash className="h-4 w-4" />
+                                        <span className="sr-only">Delete User</span>
+                                    </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>Delete User</TooltipContent>
-                              </Tooltip>
+                               </Tooltip>
                             </div>
                           </TableCell>
                         </TableRow>
                       )) : (
-                        <TableRow>
-                          <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                         <TableRow>
+                            <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
                             No users found. Click "Add New User" to create one.
-                          </TableCell>
-                        </TableRow>
+                            </TableCell>
+                         </TableRow>
                       )}
                     </TableBody>
                   </Table>
