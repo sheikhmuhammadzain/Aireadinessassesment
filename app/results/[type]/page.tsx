@@ -5,16 +5,11 @@
   import { useRouter } from "next/navigation";
   import { Button } from "@/components/ui/button";
   import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-  import { ArrowLeft, Download, Home, Loader2, TrendingUp, FileText, Code, RefreshCw, BarChart2, Target, CheckCircle, AlertCircle, Info, List, Zap } from "lucide-react"; // Added more relevant icons
+  import { ArrowLeft, Download, Home, Loader2, TrendingUp, FileText, Code, RefreshCw, BarChart2, Target, CheckCircle, AlertCircle, Info, List } from "lucide-react"; // Removed Zap icon
   import { useToast } from "@/hooks/use-toast";
-  import { AIRecommendations } from "@/components/ai-recommendations";
-  // Assuming AIGapAnalysis is not used visually or is styled internally
-  // import { AIGapAnalysis } from "@/components/ai-gap-analysis";
   import { Progress } from "@/components/ui/progress";
   import { Badge } from "@/components/ui/badge";
   import { AssessmentLevelsVisual } from "@/components/assessment-levels-visual";
-  // Assuming AssessmentRecommendations is not used visually or is styled internally
-  // import { AssessmentRecommendations } from "@/components/assessment-recommendations";
   import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion"; // Keep if used, otherwise remove
   import jsPDF from 'jspdf';
   import html2canvas from 'html2canvas'; // Keep for functionality
@@ -407,74 +402,6 @@
     `;
   };
 
-  // Add a fallback component for when the Gemini API is unavailable
-  const FallbackRecommendations = ({ categoryScores }: { categoryScores: Record<string, number> }) => {
-    // Generate generic recommendations based on category names
-    const getGenericRecommendations = (category: string, score: number) => {
-      if (score < 40) {
-        return [
-          "Establish foundational capabilities and knowledge in this area",
-          "Develop clear policies and processes for implementation",
-          "Build awareness across the organization through training",
-          "Allocate dedicated resources to develop expertise"
-        ];
-      } else if (score < 70) {
-        return [
-          "Formalize and document existing practices in this area",
-          "Expand capabilities with more structured programs",
-          "Increase organizational adoption and engagement",
-          "Measure effectiveness and refine approaches"
-        ];
-      } else {
-        return [
-          "Scale successful practices throughout the organization",
-          "Innovate on existing approaches for greater impact",
-          "Share expertise and best practices with other teams",
-          "Establish leadership position in this capability area"
-        ];
-      }
-    };
-
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            Recommendations
-            <AlertCircle size={16} className="text-yellow-500" />
-          </CardTitle>
-          <CardDescription>
-            Generic recommendations based on your assessment results. 
-            Note: AI-powered recommendations are unavailable due to API limits.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-6">
-            {Object.entries(categoryScores)
-              .sort(([, scoreA], [, scoreB]) => scoreB - scoreA)
-              .map(([category, score], index) => (
-                <div key={index} className="border p-4 rounded-lg">
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="font-medium">{category}</h3>
-                    <span className="text-sm text-muted-foreground">
-                      Score: {Math.round(score)}%
-                    </span>
-                  </div>
-                  <ul className="space-y-2 mt-2">
-                    {getGenericRecommendations(category, score).map((rec, i) => (
-                      <li key={i} className="text-sm bg-muted/40 p-3 rounded">
-                        {rec}
-                      </li>
-                    ))}
-                  </ul>
-                  {index < Object.keys(categoryScores).length - 1 && <Separator className="my-4" />}
-                </div>
-              ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  };
-
   // --- React Component ---
   export default function ResultsPage({ params }: { params: Promise<{ type: string }> }) {
     const unwrappedParams = use(params);
@@ -485,11 +412,8 @@
     const [loading, setLoading] = useState(true);
     const [result, setResult] = useState<AssessmentResult | null>(null);
     const [gapAnalysisData, setGapAnalysisData] = useState<GapAnalysis[]>([]);
-    const [aiSummary, setAiSummary] = useState<string>("");
     const [showDownloadOptions, setShowDownloadOptions] = useState<boolean>(false);
     const [showResetConfirmation, setShowResetConfirmation] = useState<boolean>(false);
-    const [aiComponentKey, setAiComponentKey] = useState<string>("initial");
-    const [isAiError, setIsAiError] = useState<boolean>(false);
 
     useEffect(() => {
       // Store the current assessment type in localStorage for caching purposes
@@ -526,14 +450,6 @@
           }).sort((a, b) => b.impact - a.impact); // Sort by impact (highest first)
           
           setGapAnalysisData(gapAnalysis);
-          
-          // Generate a stable key for the AIRecommendations component based on categories and scores
-          // This ensures the component only re-renders when data actually changes
-          const categoriesKey = Object.entries(parsedResult.categoryScores || {})
-            .map(([cat, score]) => `${cat}-${Math.round(score)}`)
-            .sort()
-            .join('|');
-          setAiComponentKey(`${assessmentType}-${Math.round(parsedResult.overallScore)}-${categoriesKey}`);
           
           setLoading(false);
         } catch (error) {
@@ -628,12 +544,6 @@
         setLoading(false); // Hide loading indicator
         setShowDownloadOptions(false); // Close dropdown
       }
-    };
-
-    // Add this function to handle AI recommendations errors
-    const handleAiError = (error: any) => {
-      console.error("Error with AI recommendations:", error);
-      setIsAiError(true);
     };
 
     // --- Loading State ---
@@ -775,6 +685,22 @@
           </div>
         )}
 
+        {/* Maturity Level Card - Moved to the top */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              Maturity Level
+            </CardTitle>
+            <CardDescription>
+              Visual representation of your organization's {assessmentType.toLowerCase()} maturity.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <AssessmentLevelsVisual overallScore={result.overallScore} />
+          </CardContent>
+        </Card>
+
         {/* Overall Score Card */}
         <Card>
           <CardHeader>
@@ -848,42 +774,6 @@
                 </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* AI Recommendations Card with Fallback */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-xl">
-              <Zap className="h-5 w-5 text-primary" />
-              {isAiError ? "Recommendations" : "AI Recommendations"}
-            </CardTitle>
-            <CardDescription>
-              {isAiError
-                ? "Generic recommendations based on your assessment results"
-                : "Personalized insights based on your assessment results"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-4">
-            {/* Show fallback if AI has errored or show AI component with error handler */}
-            {!loading && result && (
-              isAiError ? (
-                <FallbackRecommendations categoryScores={result.categoryScores} />
-              ) : (
-                <AIRecommendations
-                  key={aiComponentKey}
-                  categories={Object.keys(result.categoryScores || {}).map(category => ({ 
-                    category, 
-                    score: result.categoryScores[category] 
-                  }))}
-                  overallScore={result.overallScore}
-                  categoryScores={result.categoryScores || {}}
-                  onSummaryGenerated={setAiSummary}
-                  onRecommendationsGenerated={() => {/* Handle successful recommendations */}}
-                  onError={handleAiError}
-                />
-              )
-            )}
           </CardContent>
         </Card>
 
@@ -983,24 +873,6 @@
             </CardContent>
           </Card>
         )}
-
-        {/* Maturity Level Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-xl">
-              <TrendingUp className="h-5 w-5 text-primary" />
-              Maturity Level
-            </CardTitle>
-            <CardDescription>
-              Visual representation of your organization's {assessmentType.toLowerCase()} maturity.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-4">
-            {/* Ensure AssessmentLevelsVisual is styled minimally or uses Shadcn components */}
-            <AssessmentLevelsVisual overallScore={result.overallScore} />
-          </CardContent>
-        </Card>
-
       </div>
     );
   }

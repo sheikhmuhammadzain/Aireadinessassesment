@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { CheckCircle, XCircle, Clock, Plus, Search, Filter, MoreHorizontal, Pencil, Trash, BarChart, Users } from "lucide-react";
 import { CompanyInfo, CompanyAssessmentStatus } from "@/types";
 import { toast } from "@/hooks/use-toast";
+import { AdminLayout } from "@/components/layouts/AdminLayout";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -170,6 +172,8 @@ const SAMPLE_ASSESSMENT_STATUSES: CompanyAssessmentStatus[] = [
 
 export default function AdminCompaniesPage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const isEmbedded = pathname !== "/admin/companies";
   const { user: currentUser } = useAuth();
   const [companies, setCompanies] = useState<CompanyInfo[]>([]);
   const [assessmentStatuses, setAssessmentStatuses] = useState<CompanyAssessmentStatus[]>([]);
@@ -487,7 +491,8 @@ export default function AdminCompaniesPage() {
     }
   };
 
-  return (
+  // Render the main content
+  const CompaniesContent = () => (
     <div className="container mx-auto py-8 px-4">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
@@ -574,7 +579,6 @@ export default function AdminCompaniesPage() {
                     <TableHead>Industry</TableHead>
                     <TableHead>Size</TableHead>
                     <TableHead>Assessment Status</TableHead>
-                    <TableHead>AI Maturity</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -606,15 +610,6 @@ export default function AdminCompaniesPage() {
                               </Badge>
                             )}
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge 
-                            variant={company.aiMaturity === "Initial" ? "outline" : 
-                                   company.aiMaturity === "Exploring" ? "secondary" : 
-                                   "default"}
-                          >
-                            {company.aiMaturity}
-                          </Badge>
                         </TableCell>
                         <TableCell className="text-right">
                           <DropdownMenu>
@@ -720,5 +715,14 @@ export default function AdminCompaniesPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+
+  // Return the component with or without AdminLayout wrapper based on where it's being used
+  return isEmbedded ? (
+    <CompaniesContent />
+  ) : (
+    <AdminLayout>
+      <CompaniesContent />
+    </AdminLayout>
   );
 } 

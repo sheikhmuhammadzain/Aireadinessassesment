@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { UserRole, ROLE_TO_PILLAR, PREDEFINED_USERS } from "@/lib/auth-context"; // Import PREDEFINED_USERS from auth context
 import { User } from "@/types"; // Import User type from types, not auth-context
 import { useAuth } from "@/lib/auth-context"; // Assuming paths
@@ -43,6 +44,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip"; // Import Tooltip components
+import dynamic from "next/dynamic";
 
 // Import API client
 import api from '@/lib/api/client';
@@ -69,6 +71,8 @@ const assessmentTypes = [
   "AI Security",
 ];
 
+// Dynamically import the companies page component
+const AdminCompaniesContent = dynamic(() => import("./companies/page"), { ssr: false });
 
 export default function AdminPage() {
   const router = useRouter();
@@ -79,6 +83,7 @@ export default function AdminPage() {
   const [dialogMode, setDialogMode] = useState<"add" | "edit">("add");
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("users");
 
   // Form state
   const [name, setName] = useState("");
@@ -336,7 +341,7 @@ export default function AdminPage() {
       <div className="container mx-auto py-8 px-4 md:px-6 lg:px-8">
         <h1 className="text-3xl font-bold tracking-tight mb-8">Admin Dashboard</h1>
 
-        <Tabs defaultValue="users" className="w-full">
+        <Tabs defaultValue="users" className="w-full" value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-6">
             <TabsTrigger value="users">User Management</TabsTrigger>
             <TabsTrigger value="companies">Companies</TabsTrigger>
@@ -441,37 +446,7 @@ export default function AdminPage() {
 
           {/* Companies Tab */}
           <TabsContent value="companies" className="space-y-6">
-             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-               <div>
-                 <h2 className="text-2xl font-semibold tracking-tight">Company Management</h2>
-                 <p className="text-muted-foreground mt-1">Overview and access to company administration.</p>
-              </div>
-               {/* <Button onClick={() => router.push("/admin/companies/add")} variant="outline">
-                    <Building className="mr-2 h-4 w-4" />
-                    Add Company
-                </Button> */}
-                {/* Add button can be on the companies page itself */}
-             </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Companies Dashboard</CardTitle>
-                <CardDescription>
-                  Manage company profiles, assessments, and progress.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="mb-4 text-muted-foreground">
-                    Access the dedicated dashboard to manage all company-related information and assessment activities.
-                </p>
-                 {/* Optional: Add more descriptive elements or stats here later */}
-              </CardContent>
-              <CardFooter>
-                 <Button onClick={() => router.push("/admin/companies")} className="w-full sm:w-auto">
-                     Go to Companies Dashboard
-                 </Button>
-              </CardFooter>
-            </Card>
+            <AdminCompaniesContent />
           </TabsContent>
 
           {/* Pillars Tab */}
