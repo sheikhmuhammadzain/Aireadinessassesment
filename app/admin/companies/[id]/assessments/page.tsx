@@ -649,7 +649,7 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
     
     toast({
       title: "Generating Report",
-      description: "Preparing the Deep Research Report. This may take a moment...",
+      description: "Preparing the Comprehensive Report. This may take a moment...",
     });
     
     try {
@@ -870,7 +870,7 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
     
     toast({
       title: "Generating Report",
-      description: "Preparing the Deep Research Report through our API. This may take a few minutes...",
+      description: "Preparing the Deep Research Report. This process typically takes 2-3 minutes to complete.",
     });
     
     try {
@@ -1028,11 +1028,25 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
           throw new Error(`Research process failed: ${status.message}`);
         }
         
-        // Update toast for user feedback
+        // Update toast with more professional messages without percentages
         if (attempts % 3 === 0) { // Update toast every 15 seconds
+          const statusMessages = [
+            "Analyzing assessment data...",
+            "Processing insights across pillars...",
+            "Generating executive summary...",
+            "Creating detailed analysis...",
+            "Finalizing report content...",
+            "Almost there, please wait...",
+            "This comprehensive report takes a few minutes to generate...",
+            "Working on your detailed AI readiness report..."
+          ];
+          
+          // Cycle through messages based on attempt number
+          const messageIndex = Math.floor(attempts / 3) % statusMessages.length;
+          
           toast({
             title: "Processing Report",
-            description: `Still working on your report... (${Math.round(attempts/12 * 100)}%)`,
+            description: statusMessages[messageIndex],
           });
         }
       }
@@ -1742,13 +1756,15 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
                         </Button>
                       </div>
                       {generatingReport ? (
-                        <div className="flex flex-col items-center mt-2 text-xs text-muted-foreground">
-                          <Loader2 className="h-4 w-4 animate-spin mb-1" />
-                          <span>
-                            {usingBackendApi 
-                              ? `Processing via backend API ${researchId ? `(ID: ${researchId})` : ''}...` 
-                              : "Analyzing assessment data and generating insights..."}
-                          </span>
+                        <div className="flex flex-col items-center mt-3 text-xs">
+                          <div className="flex items-center gap-2 bg-muted/50 px-3 py-2 rounded-md animate-pulse">
+                            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                            <span className="text-foreground">
+                              {usingBackendApi 
+                                ? `Generating detailed AI readiness analysis ${researchId ? `(Reference: ${researchId})` : ''}` 
+                                : "Analyzing assessment data and generating insights..."}
+                            </span>
+                          </div>
                         </div>
                       ) : (
                       <p className="text-xs text-muted-foreground mt-2">
