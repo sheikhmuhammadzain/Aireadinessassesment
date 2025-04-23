@@ -20,6 +20,8 @@ import { Label } from "@/components/ui/label";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChevronDown } from "lucide-react";
+import { Table, TableHeader, TableRow, TableCell, TableBody, TableHead } from "@/components/ui/table";
+import { Switch } from "@/components/ui/switch";
 
 // Define the seven pillars as a constant at the top of the file
 const EXPECTED_ASSESSMENT_TYPES = [
@@ -63,76 +65,15 @@ const ASSESSMENT_TO_ROLES_MAP: Record<string, string[]> = {
 };
 
 const PillarAssignments = ({ 
-  companyId, 
   assessmentTypes = EXPECTED_ASSESSMENT_TYPES,
-  teamMembers,
-  availableUsers = [],
-  onAssignUser
+  teamMembers
 }: { 
   companyId: string;
   assessmentTypes?: string[];
   teamMembers: Record<string, any[]>;
-  availableUsers: any[];
-  onAssignUser: (pillar: string, userId: string) => void;
+  availableUsers?: any[];
+  onAssignUser?: (pillar: string, userId: string) => void;
 }) => {
-  const [loadingPillar, setLoadingPillar] = useState<string | null>(null);
-
-  // Function to handle user assignment to a specific pillar
-  const handleAssignUser = async (pillar: string, userId: string) => {
-    if (!userId || !pillar) return;
-    setLoadingPillar(pillar);
-    
-    try {
-      onAssignUser(pillar, userId);
-    } finally {
-      setLoadingPillar(null);
-    }
-  };
-
-  // Filter available users by role for each pillar
-  const getAvailableUsersForPillar = (pillar: string) => {
-    // Get applicable roles for this pillar
-    const applicableRoles = ASSESSMENT_TO_ROLES_MAP[pillar] || [];
-    
-    // Filter users by role
-    return availableUsers.filter(user => {
-      const userRole = user.role?.toLowerCase().replace(/\s+/g, '_') || '';
-      
-      // Check if user's role is in the applicable roles
-      if (applicableRoles.includes(userRole)) {
-        return true;
-      }
-      
-      // Fallback: try to infer role from email or name
-      if (user.email) {
-        const emailPrefix = user.email.split('@')[0].toLowerCase();
-        
-        if (pillar === "AI Governance" && (emailPrefix.includes('govern') || emailPrefix.includes('compliance'))) {
-          return true;
-        } else if (pillar === "AI Culture" && emailPrefix.includes('culture')) {
-          return true;
-        } else if (pillar === "AI Infrastructure" && (emailPrefix.includes('infra') || emailPrefix.includes('platform'))) {
-          return true;
-        } else if (pillar === "AI Strategy" && (emailPrefix.includes('strat') || emailPrefix.includes('plan'))) {
-          return true;
-        } else if (pillar === "AI Data" && (emailPrefix.includes('data') || emailPrefix.includes('analytics'))) {
-          return true;
-        } else if (pillar === "AI Talent" && (emailPrefix.includes('talent') || emailPrefix.includes('hr'))) {
-          return true;
-        } else if (pillar === "AI Security" && (emailPrefix.includes('secur') || emailPrefix.includes('risk'))) {
-          return true;
-        }
-      }
-      
-      // If admin, include for all pillars
-      if (userRole === 'admin') {
-        return true;
-      }
-      
-      return false;
-    });
-  };
-
   return (
     <Card className="mt-4">
       <CardHeader>
@@ -141,19 +82,24 @@ const PillarAssignments = ({
           Pillar Team Assignments
         </CardTitle>
         <CardDescription>
-          Assign team members to specific assessment pillars
+          Team members assigned to assessment pillars
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Accordion type="multiple" className="w-full">
-          {assessmentTypes.map((pillar) => {
-            const assignedUsers = teamMembers[pillar] || [];
-            const pillarAvailableUsers = getAvailableUsersForPillar(pillar);
-            
-            return (
-              <AccordionItem key={pillar} value={pillar}>
-                <AccordionTrigger className="hover:bg-muted/50 px-4 rounded-md">
-                  <div className="flex w-full justify-between items-center mr-4">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Pillar</TableHead>
+              <TableHead>Assigned Team Members</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {assessmentTypes.map((pillar) => {
+              const assignedUsers = teamMembers[pillar] || [];
+              
+              return (
+                <TableRow key={pillar}>
+                  <TableCell className="font-medium">
                     <div className="flex items-center">
                       <Badge 
                         variant={assignedUsers.length > 0 ? "default" : "outline"}
@@ -163,74 +109,31 @@ const PillarAssignments = ({
                       </Badge>
                       {pillar}
                     </div>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="px-4 pt-2 pb-3">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium">Team Members</span>
-                    <div className="flex gap-2 items-center">
-                      <Select 
-                        onValueChange={(value) => handleAssignUser(pillar, value)}
-                        disabled={loadingPillar === pillar || pillarAvailableUsers.length === 0}
-                      >
-                        <SelectTrigger className="w-[220px] h-8 text-xs">
-                          <SelectValue placeholder="Assign user to this pillar" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {pillarAvailableUsers.length > 0 ? (
-                            pillarAvailableUsers.map((user) => (
-                              <SelectItem key={user.id} value={user.id}>
-                                {user.name || user.email || user.id}
-                              </SelectItem>
-                            ))
-                          ) : (
-                            <div className="px-2 py-1 text-xs text-muted-foreground">
-                              No matching users available
-                            </div>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  
-                  {assignedUsers.length > 0 ? (
-                    <div className="space-y-2 mt-3">
-                      {assignedUsers.map((user, idx) => (
-                        <div key={`${user.id || idx}`} className="flex items-center justify-between bg-muted/50 p-2 rounded-md">
-                          <div className="flex items-center gap-2">
+                  </TableCell>
+                  <TableCell>
+                    {assignedUsers.length > 0 ? (
+                      <div className="space-y-1">
+                        {assignedUsers.map((user, idx) => (
+                          <div key={`${user.id || idx}`} className="flex items-center gap-2 bg-muted/50 p-2 rounded-md">
                             <div className="bg-muted rounded-full p-1">
                               <User className="h-3 w-3" />
                             </div>
                             <span className="text-sm">{user.name}</span>
                             <span className="text-xs text-muted-foreground">({user.role})</span>
                           </div>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-6 w-6"
-                            onClick={() => {
-                              // Future implementation: Remove user from pillar
-                              toast({
-                                title: "Coming Soon",
-                                description: "Removing users will be implemented in a future update.",
-                              });
-                            }}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-muted-foreground py-2">
-                      No team members assigned to this pillar.
-                    </div>
-                  )}
-                </AccordionContent>
-              </AccordionItem>
-            );
-          })}
-        </Accordion>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">
+                        No team members assigned
+                      </span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       </CardContent>
     </Card>
   );
@@ -1815,83 +1718,73 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
             <CardHeader>
               <CardTitle className="flex items-center">
                 <Users className="mr-2 h-5 w-5" />
-                Assessment Team
+                Company Team Management
               </CardTitle>
               <CardDescription>
-                Team members assigned to {company?.name}'s assessments
+                Manage the team for {company?.name}
               </CardDescription>
             </CardHeader>
             <CardContent>
               {loadingTeam ? (
-                <div className="py-6 text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                  <p className="mt-2 text-sm text-muted-foreground">Loading team members...</p>
+                <div className="flex justify-center items-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
+              ) : Object.values(teamMembers).flat().length === 0 ? (
+                renderNoTeamMembersSection()
               ) : (
-              <div className="space-y-6">
-                  {assessmentStatus && Object.entries(teamMembers).map(([assessmentType, users], index) => {
-                  if (users.length === 0) return null;
-                  
-                  // Look up the assessment to get its status
-                  const assessment = assessmentStatus.assessments.find(a => a.type === assessmentType);
-                  if (!assessment) return null;
-                  
-                  return (
-                    <div key={`team-section-${index}-${assessmentType}`} className="space-y-3">
-                      <h3 className="font-medium text-lg flex items-center">
-                        {assessmentType}
-                        {assessment.status === 'completed' && (
-                          <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-200">
-                            Completed
-                          </Badge>
-                        )}
-                      </h3>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {users.map((user, userIndex) => (
-                          <div key={`user-${index}-${assessmentType}-${user.id || userIndex}`} className="flex items-center gap-3 border rounded-md p-3">
-                            <div className="bg-muted rounded-full p-2">
-                              <User className="h-5 w-5" />
-                            </div>
-                            <div>
-                              <div className="font-medium">{user.name}</div>
-                              <div className="text-sm text-muted-foreground flex items-center gap-2">
-                                <span>{user.role}</span>
-                                <span className="text-xs flex items-center gap-1">
-                                  <Calendar className="h-3 w-3" />
-                                  Assigned: {new Date(user.assigned).toLocaleDateString()}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      
-                      <Separator className="my-4" />
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h3 className="text-lg font-medium">Team Members</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {Object.values(teamMembers).flat().length} users assigned to this company
+                      </p>
                     </div>
-                  );
-                })}
-                
-                  {(!assessmentStatus || Object.values(teamMembers).every(users => users.length === 0)) && renderNoTeamMembersSection()}
+                  </div>
+                  
+                  {/* Simple table to show all assigned users */}
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Assignment</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {Object.values(teamMembers)
+                        .flat()
+                        // Remove duplicates by user ID
+                        .filter((user, index, self) => 
+                          index === self.findIndex(u => u.id === user.id)
+                        )
+                        .map((user, idx) => (
+                          <TableRow key={user.id || idx}>
+                            <TableCell className="font-medium">{user.name}</TableCell>
+                            <TableCell>{user.role}</TableCell>
+                            <TableCell>
+                              {Object.entries(teamMembers)
+                                .filter(([_, users]) => users.some(u => u.id === user.id))
+                                .map(([pillar]) => (
+                                  <Badge key={pillar} className="mr-1 mb-1">{pillar}</Badge>
+                                ))
+                              }
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
                 </div>
-              )}
-              
-              {/* Add a button to assign more team members even when some exist */}
-              {!loadingTeam && Object.keys(teamMembers).length > 0 && 
-               Object.values(teamMembers).some(users => users.length > 0) && (
-                <div className="mt-6 flex justify-center">
-                    <Button 
-                      variant="outline" 
-                    className="flex items-center gap-2"
-                    onClick={handleOpenAssignDialog}
-                    >
-                    <Plus className="h-4 w-4" />
-                    Assign More Team Members
-                    </Button>
-              </div>
               )}
             </CardContent>
           </Card>
+          
+          {/* Display the PillarAssignments component with simplified props */}
+          <PillarAssignments 
+            assessmentTypes={EXPECTED_ASSESSMENT_TYPES} 
+            teamMembers={teamMembers}
+            companyId={companyId}
+          />
         </TabsContent>
       </Tabs>
       
