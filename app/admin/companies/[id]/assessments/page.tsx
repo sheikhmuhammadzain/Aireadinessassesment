@@ -1348,34 +1348,6 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
                     <dt className="font-medium text-muted-foreground">Size:</dt>
                     <dd>{company.size}</dd>
                   </div>
-                  <div className="flex justify-between">
-                    <dt className="font-medium text-muted-foreground">Region:</dt>
-                    <dd>{company.region}</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="font-medium text-muted-foreground">AI Maturity:</dt>
-                    <dd>
-                      <div className="flex items-center">
-                        <Badge 
-                          variant={
-                            typeof getMaturityVariant(company.aiMaturity) === 'object'
-                              ? getMaturityVariant(company.aiMaturity).base
-                              : getMaturityVariant(company.aiMaturity)
-                          }
-                          className={
-                            typeof getMaturityVariant(company.aiMaturity) === 'object'
-                              ? getMaturityVariant(company.aiMaturity).className
-                              : ''
-                          }
-                        >
-                          {company.aiMaturity}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground ml-2">
-                          Score: {AI_MATURITY_SCORES[company.aiMaturity as keyof typeof AI_MATURITY_SCORES] || "N/A"}
-                        </span>
-                      </div>
-                    </dd>
-                  </div>
                   
                   {/* Team Members Section */}
                   <div className="pt-4">

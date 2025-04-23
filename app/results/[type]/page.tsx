@@ -40,7 +40,6 @@
     weight: number;
     gap: number;
     impact: number;
-    priority: 'High' | 'Medium' | 'Low';
   }
 
   // Add a type for gap analysis items - Keep if used internally
@@ -133,16 +132,12 @@
     });
 
     // Calculate gap analysis data for PDF (reuse logic from main component)
-      const gapAnalysisDataForPdf = Object.entries(result.categoryScores || {}).map(([category, score]) => {
-          const weight = result.userWeights?.[category] || 0;
-          const gap = 100 - score;
-          const impact = totalWeight > 0 ? (gap * weight) / 100 : 0; // Use normalized weight impact? Or raw weight? Assuming raw as before.
-          let priority: 'High' | 'Medium' | 'Low';
-          if (impact > 15) priority = 'High';
-          else if (impact > 7) priority = 'Medium';
-          else priority = 'Low';
-          return { category, score, weight, gap, impact, priority };
-      }).sort((a, b) => b.impact - a.impact);
+    const gapAnalysisDataForPdf = Object.entries(result.categoryScores || {}).map(([category, score]) => {
+        const weight = result.userWeights?.[category] || 0;
+        const gap = 100 - score;
+        const impact = totalWeight > 0 ? (gap * weight) / 100 : 0; // Use normalized weight impact? Or raw weight? Assuming raw as before.
+        return { category, score, weight, gap, impact } as GapAnalysis;
+    }).sort((a, b) => b.impact - a.impact);
 
     if (y < pageHeight - 100 && gapAnalysisDataForPdf.length > 0) {
       y += 10;
@@ -156,7 +151,6 @@
         addStyledText(`${gap.category}:`, y, 12);
         addStyledText(`  Gap: ${Math.round(gap.gap)}%`, y + 5, 10);
         addStyledText(`  Impact Score: ${Math.round(gap.impact)}`, y + 10, 10); // Renamed for clarity
-        addStyledText(`  Priority: ${gap.priority}`, y + 15, 10);
         y += 25;
       });
     }
@@ -185,11 +179,7 @@
       const weight = result.userWeights[category] || 0;
       const gap = 100 - score;
       const impact = (gap * weight) / 100;
-      let priority: 'High' | 'Medium' | 'Low';
-      if (impact > 15) priority = 'High';
-      else if (impact > 7) priority = 'Medium';
-      else priority = 'Low';
-      return { category, score, weight, gap, impact, priority };
+      return { category, score, weight, gap, impact } as GapAnalysis;
     }).sort((a, b) => b.impact - a.impact);
 
     // HTML content with original blue-themed styles (as requested)
@@ -239,7 +229,7 @@
         .category-name { font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--accent-color); }
         .progress-container { height: 10px; background-color: var(--secondary-color); border-radius: 5px; margin-bottom: 0.5rem; overflow: hidden; }
         .progress-bar { height: 100%; border-radius: 5px; background-color: var(--primary-color); } /* Simplified progress bar color */
-        .score-value { display: flex; justify-content: space-between; font-size: 0.9rem; }
+        .score-value { display: flex; justify-between; font-size: 0.9rem; }
         .weights-section { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem; }
         .weight-card { border: 1px solid var(--border-color); border-radius: 8px; padding: 1.5rem; background-color: var(--light-gray); }
         .weight-name { font-size: 1.2rem; font-weight: 600; margin-bottom: 1rem; color: var(--accent-color); }
@@ -249,10 +239,6 @@
         .gap-table th, .gap-table td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border-color); }
         .gap-table th { background-color: var(--secondary-color); color: var(--accent-color); font-weight: 600; }
         .gap-table tr:nth-child(even) { background-color: var(--light-gray); }
-        .priority-badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
-        .priority-high { background-color: #fad2d2; color: #a02929; }
-        .priority-medium { background-color: #fae8d2; color: #a07529; }
-        .priority-low { background-color: #d2fad5; color: #29a041; }
         .recommendations { background-color: var(--light-gray); border: 1px solid var(--border-color); border-radius: 8px; padding: 1.5rem; }
         .recommendation-list { list-style-type: none; margin-top: 1rem; padding-left: 0; }
         .recommendation-item { display: flex; align-items: flex-start; margin-bottom: 1rem; }
@@ -342,7 +328,6 @@
               <th>Gap</th>
               <th>Weight</th>
               <th>Impact Score</th>
-              <th>Priority</th>
             </tr>
           </thead>
           <tbody>
@@ -353,11 +338,6 @@
                 <td>${Math.round(gap.gap)}%</td>
                 <td>${Math.round(gap.weight)}%</td>
                 <td>${Math.round(gap.impact)}</td>
-                <td>
-                  <span class="priority-badge priority-${gap.priority.toLowerCase()}">
-                    ${gap.priority}
-                  </span>
-                </td>
               </tr>
             `).join('')}
           </tbody>
@@ -434,19 +414,13 @@
             const gap = 100 - score;
             const impact = (gap * weight) / 100;
             
-            let priority: 'High' | 'Medium' | 'Low';
-            if (impact > 15) priority = 'High';
-            else if (impact > 7) priority = 'Medium';
-            else priority = 'Low';
-            
             return {
               category,
               score,
               weight,
               gap,
-              impact,
-              priority
-            };
+              impact
+            } as GapAnalysis;  // Explicitly cast to GapAnalysis
           }).sort((a, b) => b.impact - a.impact); // Sort by impact (highest first)
           
           setGapAnalysisData(gapAnalysis);
@@ -830,20 +804,14 @@
                     <div className="font-semibold text-foreground flex items-center gap-2">
                       {/* Priority Ranking */}
                       <span className={`flex items-center justify-center h-6 w-6 rounded-full text-xs font-bold ${
-                          item.priority === 'High' ? 'bg-destructive text-destructive-foreground' :
-                          item.priority === 'Medium' ? 'bg-yellow-500 text-black' :
+                          item.impact > 15 ? 'bg-destructive text-destructive-foreground' :
+                          item.impact > 7 ? 'bg-yellow-500 text-black' :
                           'bg-secondary text-secondary-foreground'
                       }`}>
                         {index + 1}
                       </span>
                       {item.category}
                     </div>
-                    <Badge
-                      variant={item.priority === 'High' ? 'destructive' : (item.priority === 'Medium' ? 'secondary' : 'outline')}
-                      className="capitalize flex-shrink-0"
-                    >
-                      {item.priority} Priority
-                    </Badge>
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3 text-sm">
