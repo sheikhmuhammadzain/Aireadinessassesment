@@ -333,45 +333,48 @@ export async function generateRecommendations(category: string, score: number, g
 }
 
 /**
- * Generate a comprehensive AI readiness report based on all assessment results
- * @param assessmentResults All assessment results
- * @returns Promise with HTML formatted report
- */
-// import { OpenAI } from 'openai';
-
-// // Assume 'openai' is initialized elsewhere (e.g., const openai = new OpenAI({ apiKey: 'YOUR_API_KEY' });)
-// declare const openai: OpenAI; // Placeholder for your OpenAI client instance
-
-// // Helper function to determine progress bar color based on score
-// function getColorForScore(score: number): string {
-//   if (score < 40) return '#ef4444'; // Red
-//   if (score < 70) return '#f59e0b'; // Amber
-//   return '#22c55e'; // Green
-// // }
-// import OpenAI from 'openai';
-
-// // Assume 'openai' is configured elsewhere (e.g., new OpenAI({ apiKey: 'YOUR_API_KEY' }))
-// // Placeholder for actual OpenAI client initialization
-// // Ensure your environment variable or key is correctly set.
-// const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || 'YOUR_DEFAULT_KEY_WARN_DO_NOT_USE_IN_PROD' });
-
-// // Helper function for score-based color (adjust thresholds/colors as needed)
-// function getColorForScore(score: number | string | undefined | null): string {
-//   const numericScore = Number(score);
-//   if (isNaN(numericScore)) return '#6c757d'; // Grey for invalid/NaN
-//   if (numericScore >= 75) return '#1a7f37'; // Dark Green (Good)
-//   if (numericScore >= 50) return '#ffc107'; // Amber/Yellow (Medium)
-//   return '#c82333'; // Dark Red (Low)
-// }
-
-/**
  * Generates a comprehensive, professional AI Readiness Deep Research Report in HTML format.
  * @param assessmentResults - An object containing assessment data keyed by category type.
+ * @param companyName - The name of the company for which to generate the report.
  * @returns A Promise resolving to the HTML report string or an error HTML string.
  */
-export async function generateDeepResearchReport(assessmentResults: Record<string, any>): Promise<string> {
+export async function generateDeepResearchReport(
+  assessmentResults: Record<string, any>,
+  companyName: string = 'Valued Client'
+): Promise<string> {
   try {
-    // --- 1. Data Preparation & Validation ---
+    // --- 1. Fetch Company Information ---
+    let companyInfo;
+    try {
+      // Fetch company details using the existing function
+      companyInfo = await searchCompanyAndSuggestWeights({ name: companyName });
+      console.log("Successfully fetched company information:", companyInfo.companyDetails);
+    } catch (error) {
+      console.error("Error fetching company information:", error);
+      // Create fallback company info if the API call fails
+      companyInfo = {
+        companyDetails: {
+          name: companyName,
+          industry: "Technology",
+          size: "Mid-size (100-999 employees)",
+          description: "No detailed information available.",
+          sources: []
+        },
+        weights: {
+          "AI Governance": 14.3,
+          "AI Culture": 14.3,
+          "AI Infrastructure": 14.3,
+          "AI Strategy": 14.3,
+          "AI Data": 14.3,
+          "AI Talent": 14.3,
+          "AI Security": 14.2
+        },
+        explanation: "Using default weights.",
+        companyInsights: "Could not retrieve company insights."
+      };
+    }
+
+    // --- 2. Data Preparation & Validation ---
     const categoriesData = Object.entries(assessmentResults).map(([type, result]) => {
       // Ensure nested objects exist, even if empty, and scores are numbers
       const safeResult = {
@@ -404,10 +407,19 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
       ? Math.round(categoriesData.reduce((sum: number, cat: { overallScore: number }) => sum + cat.overallScore, 0) / categoriesData.length)
       : 0; // Default to 0 if no categories
 
-    // --- 2. Enhanced Prompt Engineering ---
-    // Note: Corrected section anchor format to use <hN id="..."> in the prompt instructions.
+    // --- 3. Enhanced Prompt Engineering ---
     const prompt = `
-      Generate an exceptionally comprehensive, highly professional AI Readiness Deep Research Report (target length: 4000-5000 words) based on the following assessment data. Structure the report precisely as outlined below, adhering strictly to the specified sections, content requirements, and word count guidelines. Ensure every data point provided (scores, all weights, Q-values for every subcategory) is explicitly referenced and synthesized into actionable strategic insights.
+      Generate an exceptionally comprehensive, highly professional AI Readiness Deep Research Report (target length: 4000-5000 words) based on the following assessment data and company information. Structure the report precisely as outlined below, adhering strictly to the specified sections, content requirements, and word count guidelines. Ensure every data point provided (scores, all weights, Q-values for every subcategory) is explicitly referenced and synthesized into actionable strategic insights.
+
+      Company Information:
+      Company Name: ${companyInfo.companyDetails.name}
+      Industry: ${companyInfo.companyDetails.industry}
+      Size: ${companyInfo.companyDetails.size}
+      Description: ${companyInfo.companyDetails.description}
+      
+      Industry-Specific AI Insights: ${companyInfo.companyInsights || "Not available."}
+      Recommended Weight Distribution: ${JSON.stringify(companyInfo.weights)}
+      Explanation for Recommended Weights: ${companyInfo.explanation || "Not available."}
 
       Overall AI Readiness Score: ${overallReadiness}%
 
@@ -422,17 +434,19 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
           *   Generate automatically based on the H1 and H2 headings below. Ensure links correctly target the section IDs (using standard HTML heading IDs like \`<h1 id="executive-summary">...\`).
 
       1.  **<h1 id="executive-summary">Executive Summary</h1>**
-          *   **Comprehensive Key Findings:** Synthesize the most critical insights from the entire assessment, going beyond simple score reporting.
-          *   **Detailed Overall AI Readiness Posture:** Provide a nuanced narrative of the organization's current position, integrating findings across categories.
-          *   **In-depth Analysis of Major Strengths and Weaknesses:** Identify the top 3-5 core strengths and critical weaknesses, explaining their root causes by referencing specific category/subcategory scores and weights. Quantify impact where possible.
-          *   **Prioritized Strategic Recommendations:** Offer 3-5 high-level strategic recommendations, clearly prioritized (e.g., Must Do, Should Do, Could Do) with suggested high-level timelines (e.g., Next 6 months, 6-18 months, 18+ months). Justify prioritization based on gap analysis and potential impact.
-          *   **Business Impact Assessment:** Articulate the tangible business consequences (positive and negative) of the current AI readiness state (e.g., impact on efficiency, innovation, competitiveness, risk).
+          *   **Company-Specific Context:** Begin with a brief but insightful introduction that shows deep understanding of ${companyInfo.companyDetails.name}'s specific industry context (${companyInfo.companyDetails.industry}) and business challenges. Reference key facts about the company.
+          *   **Comprehensive Key Findings:** Synthesize the most critical insights from the entire assessment, going beyond simple score reporting. Connect findings explicitly to ${companyInfo.companyDetails.name}'s industry and business context.
+          *   **Detailed Overall AI Readiness Posture:** Provide a nuanced narrative of the organization's current position, integrating findings across categories. Benchmark against typical industry peers in ${companyInfo.companyDetails.industry}.
+          *   **In-depth Analysis of Major Strengths and Weaknesses:** Identify the top 3-5 core strengths and critical weaknesses, explaining their root causes by referencing specific category/subcategory scores and weights. Quantify impact where possible. Relate specifically to ${companyInfo.companyDetails.name}'s business context.
+          *   **Prioritized Strategic Recommendations:** Offer 3-5 high-level strategic recommendations tailored specifically to ${companyInfo.companyDetails.name}'s size (${companyInfo.companyDetails.size}) and industry context, clearly prioritized (e.g., Must Do, Should Do, Could Do) with suggested high-level timelines (e.g., Next 6 months, 6-18 months, 18+ months). Justify prioritization based on gap analysis and potential impact.
+          *   **Business Impact Assessment:** Articulate the tangible business consequences (positive and negative) of the current AI readiness state (e.g., impact on efficiency, innovation, competitiveness, risk) within the specific context of ${companyInfo.companyDetails.industry}.
 
       2.  **<h1 id="assessment-methodology">Assessment Methodology </h1>**
           *   **Detailed Methodology Overview:** Explain the assessment framework, data collection methods (if inferrable), and the purpose of the readiness evaluation. Describe the scoring scale (e.g., 0-100%) and what different score levels imply (e.g., Nascent, Developing, Mature, Leading).
+          *   **Industry Context:** Explain how this methodology applies specifically to ${companyInfo.companyDetails.name}'s industry and size class, noting any industry-specific considerations for AI readiness.
           *   **Score Calculation and Normalization:** Detail how category overall scores are derived from subcategory scores and adjusted weights. Mention any normalization techniques applied.
-          *   **Comprehensive Breakdown of Assessment Categories:** For each major category assessed (e.g., Strategy, Data, Technology, Talent, Governance), explain its significance to overall AI readiness and successful business outcomes.
-          *   **Technical Explanation of Q-values:** Define Q-values in the context of this assessment (learned importance derived via ML/RL). Explain their significance in identifying empirically critical subcategories. Provide 2-3 numerical examples from the provided data, explaining *why* a specific Q-value might be high or low for a subcategory (e.g., "Subcategory 'Data Quality' under 'Data' has a high Q-value of ${categoriesData.find(c=>c.category === 'Data')?.qValues?.['Data Quality']?.toFixed(4) ?? 'X.XXXX'}, suggesting assessment patterns indicate its strong influence on successful AI outcomes, potentially more than initially weighted by users.").
+          *   **Comprehensive Breakdown of Assessment Categories:** For each major category assessed (e.g., Strategy, Data, Technology, Talent, Governance), explain its significance to overall AI readiness and successful business outcomes, with specific relevance to ${companyInfo.companyDetails.industry}.
+          *   **Technical Explanation of Q-values:** Define Q-values in the context of this assessment (learned importance derived via ML/RL). Explain their significance in identifying empirically critical subcategories. Provide 2-3 numerical examples from the provided data, explaining *why* a specific Q-value might be high or low for a subcategory (e.g., "Subcategory 'Data Quality' under 'Data' has a high Q-value of ${categoriesData.find(c=>c.category === 'Data')?.qValues?.['Data Quality']?.toFixed(4) ?? 'X.XXXX'}, suggesting assessment patterns indicate its strong influence on successful AI outcomes, particularly in the ${companyInfo.companyDetails.industry} industry.").
           *   **Detailed Description of Weighting Mechanisms:**
               *   **User Weights:** Explain their purpose as user-defined strategic importance. Reference an example like "User assigned Y% weight to Subcategory A...".
               *   **Softmax Weights:** Explain they are derived from Q-values, representing *relative* learned importance within a category. Example: "The Softmax weight of Z% for Subcategory B indicates it has the highest learned importance within its category..."
@@ -443,69 +457,73 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
       3.  **<h1 id="detailed-analysis">Detailed Analysis by Category</h1>**
           *   For **each category** present in the \`categoriesData\`:
               *   Create a dedicated H2 heading: **<h2 id="category-${/* Generate a slug-like ID */ (cat: {category: string}) => cat.category.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}">${/* Display Category Name */ (cat: {category: string}) => cat.category} Analysis</h2>** (Ensure the LLM generates this heading with the correct ID for each category loop).
-              *   **Current State Assessment (Score: ${/* Get score */ (cat: {overallScore: number}) => cat.overallScore.toFixed(1)}%)**: Start with the exact overall score and provide a qualitative interpretation (e.g., "significantly underdeveloped," "moderately capable," "area of strength").
-              *   **Detailed Strengths (3-4 minimum):** Identify specific strengths *within this category*. For each strength: Reference the specific subcategory(ies), mention their **exact scores**, discuss the impact of their **adjusted weights**, and provide concrete examples.
-              *   **Detailed Weaknesses (3-4 minimum):** Identify specific weaknesses *within this category*. For each weakness: Reference the specific subcategory(ies), mention their **exact scores**, analyze the **Q-value and Softmax weight**, and discuss concrete consequences.
-              *   **Specific Bottlenecks and Limitations:** Detail technical or process constraints.
+              *   **Industry Context:** Begin with an overview of why this category is particularly important in the ${companyInfo.companyDetails.industry} industry and for a company of ${companyInfo.companyDetails.size} size.
+              *   **Current State Assessment (Score: ${/* Get score */ (cat: {overallScore: number}) => cat.overallScore.toFixed(1)}%)**: Start with the exact overall score and provide a qualitative interpretation (e.g., "significantly underdeveloped," "moderately capable," "area of strength"). Compare to typical industry norms for ${companyInfo.companyDetails.industry}.
+              *   **Detailed Strengths (3-4 minimum):** Identify specific strengths *within this category*. For each strength: Reference the specific subcategory(ies), mention their **exact scores**, discuss the impact of their **adjusted weights**, and provide concrete examples relevant to ${companyInfo.companyDetails.name}'s business context.
+              *   **Detailed Weaknesses (3-4 minimum):** Identify specific weaknesses *within this category*. For each weakness: Reference the specific subcategory(ies), mention their **exact scores**, analyze the **Q-value and Softmax weight**, and discuss concrete consequences for ${companyInfo.companyDetails.name}'s business objectives.
+              *   **Specific Bottlenecks and Limitations:** Detail technical or process constraints relevant to ${companyInfo.companyDetails.industry}.
               *   **Impact of Weights and Q-Values:** Explicitly summarize how the interplay of all weights shaped the overall score for *this specific category*. Highlight discrepancies between User Weights and Adjusted Weights.
-              *   **Industry Benchmarking (Conceptual):** Compare assessed state to general industry best practices.
-              *   **Potential Future Trajectory:** Describe likely evolution without intervention.
+              *   **Industry Benchmarking:** Compare assessed state to general industry best practices for ${companyInfo.companyDetails.industry} and companies of ${companyInfo.companyDetails.size} size.
+              *   **Potential Future Trajectory:** Describe likely evolution without intervention, with specific implications for ${companyInfo.companyDetails.name}.
 
-      4.  **<h1 id="swot-analysis">SWOT Analysis /h1>**
-          *   **Synthesize Findings:** Based *directly* on the detailed category analysis (Section 3).
-          *   **Strengths:** List 4-5 key internal strengths. Reference key subcategories/scores.
-          *   **Weaknesses:** List 4-5 critical internal weaknesses. Reference key subcategories/scores/weights.
-          *   **Opportunities:** Identify 3-4 external opportunities related to AI.
-          *   **Threats:** Identify 3-4 external threats related to AI.
+      4.  **<h1 id="swot-analysis">SWOT Analysis </h1>**
+          *   **Industry-Specific SWOT:** Focus on how each element relates specifically to ${companyInfo.companyDetails.name}'s position in the ${companyInfo.companyDetails.industry} industry.
+          *   **Strengths:** List 4-5 key internal strengths. Reference key subcategories/scores and explain their specific advantage in ${companyInfo.companyDetails.industry}.
+          *   **Weaknesses:** List 4-5 critical internal weaknesses. Reference key subcategories/scores/weights and explain their specific disadvantage in ${companyInfo.companyDetails.industry}.
+          *   **Opportunities:** Identify 3-4 external opportunities related to AI that are particularly relevant to ${companyInfo.companyDetails.industry} and ${companyInfo.companyDetails.size} companies.
+          *   **Threats:** Identify 3-4 external threats related to AI that are particularly concerning for ${companyInfo.companyDetails.name}'s industry position.
 
       5.  **<h1 id="gap-analysis">Gap Analysis </h1>**
-          *   **Detailed Capability Gaps:** Systematically identify significant gaps between current and desired states, organized by category.
-          *   **Comprehensive Risk Assessment:** Assess risks associated with major gaps (Likelihood/Impact concept).
-          *   **Quantifiable Impact:** Estimate quantifiable impact on business outcomes.
-          *   **Competitive Disadvantages:** Link gaps to potential competitive disadvantages.
-          *   **Regulatory and Compliance Implications:** Discuss risks related to regulations (e.g., GDPR, CCPA).
+          *   **${companyInfo.companyDetails.industry}-Specific Capability Gaps:** Systematically identify significant gaps between current and desired states, organized by category, with particular attention to crucial capabilities in ${companyInfo.companyDetails.industry}.
+          *   **Comprehensive Risk Assessment:** Assess risks associated with major gaps (Likelihood/Impact concept) with specific reference to ${companyInfo.companyDetails.name}'s business context.
+          *   **Quantifiable Impact:** Estimate quantifiable impact on business outcomes, using ${companyInfo.companyDetails.industry}-specific metrics and benchmarks where possible.
+          *   **Competitive Disadvantages:** Link gaps to potential competitive disadvantages in ${companyInfo.companyDetails.industry}, especially compared to competitors who have stronger AI capabilities.
+          *   **Regulatory and Compliance Implications:** Discuss risks related to regulations (e.g., GDPR, CCPA) with specific focus on ${companyInfo.companyDetails.industry} regulatory environment.
 
       6.  **<h1 id="implementation-roadmap">Implementation Roadmap </h1>**
-          *   **Phased Approach:** Structure clear phases (Short-Term: 0-6 months, Medium-Term: 6-18 months, Long-Term: 18+ months).
-          *   **Detailed Actions (per phase):** List specific steps, tools, platforms, methodologies, potential ownership, resource needs.
-          *   **Extensive Key Performance Indicators (KPIs):** Define SMART KPIs for tracking progress in each phase.
-          *   **Cost-Benefit Analysis (Conceptual):** Discuss costs vs. benefits for major initiatives.
-          *   **Risk Mitigation Strategies:** Identify implementation risks and propose mitigations.
+          *   **Company-Specific Approach:** Tailor the roadmap specifically to ${companyInfo.companyDetails.name}'s current state, resources, and industry position.
+          *   **Phased Approach:** Structure clear phases (Short-Term: 0-6 months, Medium-Term: 6-18 months, Long-Term: 18+ months) with milestones appropriate for a ${companyInfo.companyDetails.size} company in ${companyInfo.companyDetails.industry}.
+          *   **Detailed Actions (per phase):** List specific steps, tools, platforms, methodologies, potential ownership, resource needs appropriate for ${companyInfo.companyDetails.name}'s context.
+          *   **Extensive Key Performance Indicators (KPIs):** Define SMART KPIs for tracking progress in each phase, using industry-relevant metrics for ${companyInfo.companyDetails.industry}.
+          *   **Cost-Benefit Analysis:** Discuss costs vs. benefits for major initiatives with specific reference to typical investment levels for a ${companyInfo.companyDetails.size} company.
+          *   **Risk Mitigation Strategies:** Identify implementation risks and propose mitigations tailored to ${companyInfo.companyDetails.name}'s specific circumstances.
 
       7.  **<h1 id="tech-infra-recommendations">Technology and Infrastructure Recommendations </h1>**
-          *   **Specific Tools and Platforms:** Recommend enterprise-grade AI/ML platforms, data tools, cloud services (e.g., AWS SageMaker, Azure ML, Google Vertex AI, Databricks, Snowflake), justifying based on gaps.
-          *   **Comprehensive Integration Strategy:** Discuss integration with existing systems (ERP, CRM, etc.).
-          *   **Detailed Scalability Planning:** Address scaling for future demands.
-          *   **Cost Estimates and ROI Projections (High-Level):** Provide indicative costs and ROI potential.
-          *   **Technical Architecture Recommendations (Text Description):** Describe a target state architecture conceptually (layers, components, data flows).
+          *   **Industry-Specific Tools and Platforms:** Recommend enterprise-grade AI/ML platforms, data tools, cloud services (e.g., AWS SageMaker, Azure ML, Google Vertex AI, Databricks, Snowflake) that are particularly well-suited to ${companyInfo.companyDetails.industry} and ${companyInfo.companyDetails.size} companies.
+          *   **Comprehensive Integration Strategy:** Discuss integration with existing systems (ERP, CRM, etc.) typically found in ${companyInfo.companyDetails.industry} companies of ${companyInfo.companyDetails.size} size.
+          *   **Detailed Scalability Planning:** Address scaling for future demands with specific attention to growth patterns in ${companyInfo.companyDetails.industry}.
+          *   **Cost Estimates and ROI Projections:** Provide indicative costs and ROI potential calibrated to ${companyInfo.companyDetails.size} companies.
+          *   **Technical Architecture Recommendations:** Describe a target state architecture conceptually (layers, components, data flows) optimized for ${companyInfo.companyDetails.industry}-specific AI applications.
 
       8.  **<h1 id="org-cultural-considerations">Organizational and Cultural Considerations </h1>**
-          *   **Required Organizational Changes:** Suggest structural adjustments (e.g., CoE, new roles, cross-functional teams).
-          *   **Comprehensive Skills Development Strategy:** Outline strategy, training programs, timelines.
-          *   **Detailed Change Management Approach:** Propose approach (e.g., Kotter, ADKAR), stakeholder analysis.
-          *   **Cultural Transformation Roadmap:** Outline steps and milestones for fostering an AI-positive culture.
-          *   **Leadership Development:** Specify required leadership skills/mindset.
-          *   **Performance Management Adaptations:** Discuss necessary changes to metrics/incentives.
+          *   **Industry-Specific Organizational Changes:** Suggest structural adjustments (e.g., CoE, new roles, cross-functional teams) with specific reference to organizational patterns in ${companyInfo.companyDetails.industry}.
+          *   **Comprehensive Skills Development Strategy:** Outline strategy, training programs, timelines appropriate for ${companyInfo.companyDetails.size} companies.
+          *   **Detailed Change Management Approach:** Propose approach (e.g., Kotter, ADKAR), stakeholder analysis tailored to typical organizational structures in ${companyInfo.companyDetails.industry}.
+          *   **Cultural Transformation Roadmap:** Outline steps and milestones for fostering an AI-positive culture appropriate for ${companyInfo.companyDetails.name}'s context.
+          *   **Leadership Development:** Specify required leadership skills/mindset with particular attention to leadership challenges in ${companyInfo.companyDetails.industry}.
+          *   **Performance Management Adaptations:** Discuss necessary changes to metrics/incentives in the context of ${companyInfo.companyDetails.industry} standards.
 
       9.  **<h1 id="detailed-score-breakdown-analysis">Detailed Score Breakdown and Weights Analysis </h1>**
           *   **(Note: The table itself is generated by the calling code, but this section requires textual analysis referencing it)**
           *   **Introduction:** Briefly introduce the purpose of the detailed breakdown table.
-          *   **Deep Dive into Q-Values:** Reiterate definition, analyze 2-3 specific examples from the table where Q-values significantly influenced Adjusted Weight. Explain the implication.
-          *   **User Weights vs. Adjusted Weights Analysis:** Provide clear examples from the data table illustrating differences and explain what large deltas imply.
-          *   **Statistical Analysis Commentary:** Briefly discuss score distribution, variance within categories, and significance.
-          *   **Visual Representation Description (Text):** Describe 2-3 potential charts (e.g., Radar chart for categories, Stacked bar charts for subcategory contributions, Scatter plot for User vs. Adjusted Weights).
-          *   **Confidence Intervals/Margin of Error:** Discuss the concept conceptually, advising caution against over-interpreting small score differences.
+          *   **${companyInfo.companyDetails.industry}-Specific Analysis:** Discuss how the scores and weights relate to typical patterns seen in ${companyInfo.companyDetails.industry}.
+          *   **Deep Dive into Q-Values:** Reiterate definition, analyze 2-3 specific examples from the table where Q-values significantly influenced Adjusted Weight. Explain the implication in the context of ${companyInfo.companyDetails.name}'s business priorities.
+          *   **User Weights vs. Adjusted Weights Analysis:** Provide clear examples from the data table illustrating differences and explain what large deltas imply for ${companyInfo.companyDetails.name}'s strategic planning.
+          *   **Statistical Analysis Commentary:** Briefly discuss score distribution, variance within categories, and significance with respect to ${companyInfo.companyDetails.industry} benchmarks.
+          *   **Visual Representation Description (Text):** Describe 2-3 potential charts (e.g., Radar chart for categories, Stacked bar charts for subcategory contributions, Scatter plot for User vs. Adjusted Weights) that would be particularly insightful for ${companyInfo.companyDetails.name}'s leadership team.
+          *   **Confidence Intervals/Margin of Error:** Discuss the concept conceptually, advising caution against over-interpreting small score differences, particularly in the context of a ${companyInfo.companyDetails.size} company in ${companyInfo.companyDetails.industry}.
 
       Final Instructions:
       *   Maintain a highly professional, analytical, and strategic tone suitable for a C-suite audience.
       *   Use clear headings (H1, H2, H3) and subheadings for structure. Ensure H1 and H2 have the correct 'id' attributes for TOC linking.
-      *   Ensure seamless narrative flow and synthesis of data into actionable intelligence.
+      *   Ensure seamless narrative flow and synthesis of data into actionable intelligence specifically tailored to ${companyInfo.companyDetails.name}'s context.
+      *   Constantly reference and integrate the company's specific information (name, industry, size, description) throughout the report to make it deeply personalized.
       *   Strictly adhere to the requested HTML format.
       *   Double-check that *every* score, weight type, and Q-value for *every* subcategory is referenced somewhere in Section 3 or Section 9's analysis.
       *   Ensure the total word count substantially exceeds 4000 words.
     `;
 
-    // --- 3. LLM Interaction ---
+    // --- 4. LLM Interaction ---
     const response = await openai.chat.completions.create({
       model: "gpt-4o", // Recommended model for complexity and context window
       messages: [
@@ -527,10 +545,10 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
       throw new Error("No content received from OpenAI API response.");
     }
 
-    // --- 4. HTML Assembly & Styling ---
-    // Get company name safely (handles server-side rendering)
-    const companyName = typeof window !== 'undefined' && window.localStorage ?
-      localStorage.getItem('companyName') || 'Valued Client' : 'Valued Client';
+    // --- 5. HTML Assembly & Styling ---
+    const reportCompanyName = companyInfo.companyDetails.name || 'Valued Client';
+    const companyIndustry = companyInfo.companyDetails.industry || 'Technology';
+    const companySize = companyInfo.companyDetails.size || 'Mid-size';
 
     const currentDate = new Date().toLocaleDateString('en-US', {
       year: 'numeric', month: 'long', day: 'numeric'
@@ -549,6 +567,42 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
            <p>For one or more categories, initial user weights were uniformly zero or not provided. In these cases, default equal weighting (100% / number of subcategories) was used as a basis for calculating the Adjusted Weights and the Overall Category Score. This ensures all subcategories contribute meaningfully to the analysis in the absence of explicit user prioritization. The 'User Weight' column in the table below will indicate 'N/A (Default Applied)' for these subcategories.</p>
          </div>` : '';
 
+    // Create a company profile section using the fetched information
+    const companyProfileSection = `
+    <section class="company-profile-section">
+      <h2 id="company-profile">Company Profile</h2>
+      <div class="company-profile-card">
+        <div class="company-profile-header">
+          <div class="company-profile-name">${reportCompanyName}</div>
+          <div class="company-profile-meta">
+            <span class="company-profile-industry">${companyIndustry}</span>
+            <span class="company-profile-divider">•</span>
+            <span class="company-profile-size">${companySize}</span>
+          </div>
+        </div>
+        <div class="company-profile-description">
+          ${companyInfo.companyDetails.description || 'No company description available.'}
+        </div>
+        ${companyInfo.companyInsights ? `
+        <div class="company-profile-insights">
+          <h4>AI Readiness Insights</h4>
+          <p>${companyInfo.companyInsights}</p>
+        </div>
+        ` : ''}
+        ${companyInfo.companyDetails.sources && companyInfo.companyDetails.sources.length > 0 ? `
+        <div class="company-profile-sources">
+          <h4>Information Sources</h4>
+          <ul>
+            ${companyInfo.companyDetails.sources.map((source: any) => `
+              <li><a href="${source.link}" target="_blank" rel="noopener noreferrer">${source.title}</a></li>
+            `).join('')}
+          </ul>
+        </div>
+        ` : ''}
+      </div>
+    </section>
+    `;
+
     // Generate the final HTML report string
     const htmlReport = `
     <!DOCTYPE html>
@@ -556,7 +610,7 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>AI Readiness  Report - ${companyName}</title>
+      <title>AI Readiness Report for ${reportCompanyName}</title>
       <link rel="preconnect" href="https://fonts.googleapis.com">
       <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
       <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Roboto+Slab:wght@400;700&display=swap" rel="stylesheet">
@@ -646,6 +700,21 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
         .highlight-success .highlight-title { color: #1a7f37; }
         .highlight-warning .highlight-title { color: #b36d00; }
         .highlight-danger .highlight-title { color: #b91c1c; }
+        
+        /* Company Profile Styles */
+        .company-profile-section { margin: 40px 0; }
+        .company-profile-card { background-color: var(--color-white); border-radius: var(--border-radius); padding: 30px; box-shadow: var(--box-shadow-light); border: 1px solid var(--color-border); }
+        .company-profile-header { margin-bottom: 20px; }
+        .company-profile-name { font-size: 24px; font-weight: 700; color: var(--color-primary); margin-bottom: 5px; }
+        .company-profile-meta { font-size: 0.9em; color: var(--color-text-muted); }
+        .company-profile-divider { margin: 0 8px; }
+        .company-profile-description { margin-bottom: 25px; padding-bottom: 20px; border-bottom: 1px solid var(--color-border); }
+        .company-profile-insights { margin-bottom: 25px; }
+        .company-profile-insights h4, .company-profile-sources h4 { margin-top: 0; margin-bottom: 10px; color: var(--color-secondary); font-size: 16px; }
+        .company-profile-insights p { margin-bottom: 0; }
+        .company-profile-sources ul { margin-bottom: 0; }
+        .company-profile-sources li { margin-bottom: 5px; }
+        
         footer { margin-top: 50px; padding: 25px 50px; border-top: 1px solid var(--color-border); text-align: center; font-size: 0.85em; color: var(--color-text-muted); background-color: #f8f9fa; }
         footer p { margin: 5px 0; }
         /* Utility Classes */
@@ -660,9 +729,11 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
         <div class="report-container">
           <header class="header">
             <div>
-              <h1 class="report-title">AI Readiness  Report</h1>
+              <h1 class="report-title">AI Readiness Report for ${reportCompanyName}</h1>
               <div class="report-meta">
-                <div class="meta-item"><span class="meta-label">Prepared for:</span> <span class="meta-value">${companyName}</span></div>
+                <div class="meta-item"><span class="meta-label">Company:</span> <span class="meta-value">${reportCompanyName}</span></div>
+                <div class="meta-item"><span class="meta-label">Industry:</span> <span class="meta-value">${companyIndustry}</span></div>
+                <div class="meta-item"><span class="meta-label">Company Size:</span> <span class="meta-value">${companySize}</span></div>
                 <div class="meta-item"><span class="meta-label">Assessment Date:</span> <span class="meta-value">${currentDate}</span></div>
                 <div class="meta-item"><span class="meta-label">Report Version:</span> <span class="meta-value">1.0</span></div>
                 <div class="meta-item"><span class="meta-label">Assessment Focus:</span> <span class="meta-value">${assessmentFocus} Readiness</span></div>
@@ -678,6 +749,8 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
             <p class="score-label">Overall AI Readiness Score</p>
             <p class="score-value">${overallReadiness}%</p>
           </section>
+
+          ${companyProfileSection}
 
           <section class="category-scores-container">
             ${categoriesData.map(cat => `
@@ -722,7 +795,6 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
                   <th>Raw Score (%)</th>
                   <th>User Weight (%)</th>
                   <th>Q-Value</th>
-                  <th>Softmax Weight (%)</th>
                   <th>Adjusted Weight (%)</th>
                   <th>Score Contribution</th>
                 </tr>
@@ -776,7 +848,6 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
                         <td>${numScore.toFixed(1)}</td>
                         <td>${typeof userWeightDisplay === 'number' ? userWeightDisplay.toFixed(1) : userWeightDisplay}</td>
                         <td>${qValue.toFixed(4)}</td>
-                        <td>${softmaxWeight.toFixed(1)}</td>
                         <td class="font-bold">${adjustedWeightValue.toFixed(1)}</td>
                         <td class="font-bold">${scoreContribution.toFixed(1)}</td>
                       </tr>
@@ -800,7 +871,7 @@ export async function generateDeepResearchReport(assessmentResults: Record<strin
           </section>
 
           <footer>
-             <p>Confidential AI Readiness Assessment Report for ${companyName}</p>
+             <p>Confidential AI Readiness Assessment Report for ${reportCompanyName}</p>
              <p>© ${new Date().getFullYear()} Cybergen Strategic AI Insights. All rights reserved.</p>
              <p>This report was generated leveraging advanced AI analysis based on the provided assessment data. Findings and recommendations are based on the data available at the time of assessment.</p>
           </footer>

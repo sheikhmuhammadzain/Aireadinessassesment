@@ -342,11 +342,10 @@ export default function AdminPage() {
         <h1 className="text-3xl font-bold tracking-tight mb-8">Admin Dashboard</h1>
 
         <Tabs defaultValue="users" className="w-full" value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-6">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 mb-6">
             <TabsTrigger value="users">User Management</TabsTrigger>
             <TabsTrigger value="companies">Companies</TabsTrigger>
             <TabsTrigger value="pillars">Pillar Overview</TabsTrigger>
-            <TabsTrigger value="reports">Reports</TabsTrigger>
           </TabsList>
 
           {/* User Management Tab */}
