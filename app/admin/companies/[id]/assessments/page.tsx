@@ -532,12 +532,12 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
 
   const handleGenerateDeepResearchReport = async () => {
     setGeneratingReport(true);
-    
+
     toast({
       title: "Generating Report",
       description: "Preparing the Deep Research Report. This may take a moment...",
     });
-    
+
     try {
       if (!company) {
         throw new Error("No company selected");
@@ -644,25 +644,25 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
         let subcategoryNames: string[] = [];
         
         // Create subcategories based on assessment type
-        if (assessmentType === "AI Talent") {
+              if (assessmentType === "AI Talent") {
           subcategoryNames = ["Talent Acquisition", "Talent Development", "AI Skills Assessment", "Team Structure", "Hiring Strategy"];
-        } 
-        else if (assessmentType === "AI Data") {
+              } 
+              else if (assessmentType === "AI Data") {
           subcategoryNames = ["Data Quality", "Data Governance", "Data Integration", "Data Security", "Data Processing"];
-        }
-        else if (assessmentType === "AI Governance") {
+              }
+              else if (assessmentType === "AI Governance") {
           subcategoryNames = ["Ethics Guidelines", "Risk Management", "Compliance Process", "Oversight Structure", "Documentation"];
-        }
-        else if (assessmentType === "AI Culture") {
+              }
+              else if (assessmentType === "AI Culture") {
           subcategoryNames = ["Leadership Support", "Adoption Readiness", "Change Management", "Innovation Climate", "Cross-functional Collaboration"];
-        }
-        else if (assessmentType === "AI Infrastructure") {
+              }
+              else if (assessmentType === "AI Infrastructure") {
           subcategoryNames = ["Compute Resources", "MLOps Capability", "Technical Debt", "Cloud Integration", "Development Environment", "Model Deployment", "Scalability Architecture"];
-        }
-        else if (assessmentType === "AI Strategy") {
+              }
+              else if (assessmentType === "AI Strategy") {
           subcategoryNames = ["Vision Alignment", "Investment Planning", "Business Integration", "Success Metrics", "Roadmap Development"];
-        }
-        else if (assessmentType === "AI Security") {
+              }
+              else if (assessmentType === "AI Security") {
           subcategoryNames = ["Model Security", "Data Protection", "Adversarial Defense", "Access Management", "Security Testing"];
         }
         else {
@@ -740,9 +740,9 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
         calculateScoreContributions();
         
         console.log(`Generated ${Object.keys(subcategories).length} fallback subcategories for ${assessmentType} with weights`);
-        return subcategories;
-      };
-      
+              return subcategories;
+            };
+            
       // Process each assessment to collect data for the report
       for (const assessment of assessmentStatus.assessments) {
         if (assessment.status === "completed" && assessment.score) {
@@ -789,8 +789,8 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
                 }
                 
                 // Add the assessment data to the results object
-                assessmentResults[assessment.type] = {
-                  overallScore: assessment.score,
+          assessmentResults[assessment.type] = {
+            overallScore: assessment.score,
                   categoryScores: Object.fromEntries(
                     Object.entries(subcategories).map(([name, data]) => [name, data.score])
                   ),
