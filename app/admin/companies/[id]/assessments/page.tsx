@@ -14,6 +14,12 @@ import { User as UserType } from "../../../../../types";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/lib/auth-context";
 import { generateDeepResearchReport } from "@/lib/openai";
+import { 
+  startResearch, 
+  checkResearchStatus, 
+  downloadResearchReport, 
+  prepareResearchPayload 
+} from "@/lib/api/research";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -213,6 +219,10 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [assigningUsers, setAssigningUsers] = useState(false);
+
+  // Add a "using backend" state and "research ID" state
+  const [usingBackendApi, setUsingBackendApi] = useState(false);
+  const [researchId, setResearchId] = useState<string | null>(null);
 
   // Fetch team members assigned to the company
   const fetchTeamMembers = async (companyId: string) => {
@@ -528,87 +538,6 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
     });
     
     router.push(`/results/${encodeURIComponent(assessmentType)}`);
-  };
-
-  const handleGenerateDeepResearchReport = async () => {
-    setGeneratingReport(true);
-
-    toast({
-      title: "Generating Report",
-      description: "Preparing the Deep Research Report. This may take a moment...",
-    });
-
-    try {
-      if (!company) {
-        throw new Error("No company selected");
-      }
-      
-      if (!assessmentStatus) {
-        throw new Error("No assessment data available");
-      }
-      
-      // Object to store assessment results, keyed by assessment type
-      const assessmentResults: Record<string, any> = {};
-      
-      // Generate synthetic weights if none exist
-      const createSyntheticWeights = () => {
-        // Create reasonable synthetic weights for the assessment
-        const baseWeight = 100 / 7; // Equal distribution across 7 assessment types
-        const variance = baseWeight * 0.2; // 20% variance
-        
-        return {
-          "AI Governance": baseWeight + (Math.random() * variance - variance/2),
-          "AI Culture": baseWeight + (Math.random() * variance - variance/2),
-          "AI Infrastructure": baseWeight + (Math.random() * variance - variance/2),
-          "AI Strategy": baseWeight + (Math.random() * variance - variance/2),
-          "AI Data": baseWeight + (Math.random() * variance - variance/2),
-          "AI Talent": baseWeight + (Math.random() * variance - variance/2),
-          "AI Security": baseWeight + (Math.random() * variance - variance/2)
-        };
-      };
-      
-      // Generate synthetic Q-values that can be used to create softmax weights
-      const createSyntheticQValues = () => {
-        // Create reasonable synthetic Q-values (range 0-1)
-        // These represent learned importance weights
-        const categories = [
-          "AI Governance", "AI Culture", "AI Infrastructure", 
-          "AI Strategy", "AI Data", "AI Talent", "AI Security"
-        ];
-        
-        const result: Record<string, number> = {};
-        categories.forEach(category => {
-          // Generate random Q-values between 0.1 and 0.9
-          result[category] = 0.1 + Math.random() * 0.8;
-        });
-        
-        return result;
-      };
-      
-      // Calculate softmax weights from Q-values
-      const calculateSoftmaxWeights = (qValues: Record<string, number>) => {
-        const keys = Object.keys(qValues);
-        if (keys.length === 0) return {};
-        
-        // Apply softmax transformation
-        const maxQValue = Math.max(...Object.values(qValues));
-        const expValues: Record<string, number> = {};
-        let sumExp = 0;
-        
-        keys.forEach(key => {
-          // Use numerically stable softmax by subtracting the max
-          const expValue = Math.exp(qValues[key] - maxQValue);
-          expValues[key] = expValue;
-          sumExp += expValue;
-        });
-        
-        // Calculate final softmax probabilities and convert to percentages
-        const softmaxWeights: Record<string, number> = {};
-        keys.forEach(key => {
-          softmaxWeights[key] = parseFloat(((expValues[key] / sumExp) * 100).toFixed(1));
-        });
-        
-        return softmaxWeights;
       };
       
       // Create fallback subcategories if assessment data is missing
@@ -740,9 +669,29 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
         calculateScoreContributions();
         
         console.log(`Generated ${Object.keys(subcategories).length} fallback subcategories for ${assessmentType} with weights`);
-              return subcategories;
-            };
-            
+        return subcategories;
+      };
+
+  const handleGenerateDeepResearchReport = async () => {
+    setGeneratingReport(true);
+    
+    toast({
+      title: "Generating Report",
+      description: "Preparing the Comprehensive Report. This may take a moment...",
+    });
+    
+    try {
+      if (!company) {
+        throw new Error("No company selected");
+      }
+      
+      if (!assessmentStatus) {
+        throw new Error("No assessment data available");
+      }
+      
+      // Object to store assessment results, keyed by assessment type
+      const assessmentResults: Record<string, any> = {};
+      
       // Process each assessment to collect data for the report
       for (const assessment of assessmentStatus.assessments) {
         if (assessment.status === "completed" && assessment.score) {
@@ -954,6 +903,238 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
     } finally {
       // Always set generating report state back to false
       setGeneratingReport(false);
+    }
+  };
+
+  const handleGenerateDeepResearchReportViaBackend = async () => {
+    setGeneratingReport(true);
+    setUsingBackendApi(true);
+    setResearchId(null);
+    
+    toast({
+      title: "Generating Report",
+      description: "Preparing the Deep Research Report. This process typically takes 2-3 minutes to complete.",
+    });
+    
+    try {
+      if (!company) {
+        throw new Error("No company selected");
+      }
+      
+      if (!assessmentStatus) {
+        throw new Error("No assessment data available");
+      }
+      
+      // Object to store assessment results, keyed by assessment type
+      const assessmentResults: Record<string, any> = {};
+      
+      // Process each assessment to collect data for the report (same as original function)
+      for (const assessment of assessmentStatus.assessments) {
+        if (assessment.status === "completed" && assessment.score) {
+          try {
+            console.log(`Processing ${assessment.type} assessment with score ${assessment.score}`);
+            
+            // Try to get detailed assessment data from localStorage
+            const storedResult = localStorage.getItem(`assessment_result_${assessment.type}`);
+            if (storedResult) {
+              try {
+                const parsedResult = JSON.parse(storedResult);
+                
+                // Create subcategories data if not present in the parsed result
+                let subcategories: Record<string, any> = {};
+                
+                if (!parsedResult.categoryScores || Object.keys(parsedResult.categoryScores).length === 0) {
+                  // No category scores found, generate fallback subcategories
+                  subcategories = createFallbackSubcategories(assessment.type);
+                  console.log(`Generated fallback subcategories for ${assessment.type}`);
+                } else {
+                  // Extract subcategories from the stored result
+                  const categoryScores = parsedResult.categoryScores || {};
+                  const userWeights = parsedResult.userWeights || {};
+                  const qValues = parsedResult.qValues || {};
+                  const softmaxWeights = parsedResult.softmaxWeights || {};
+                  const adjustedWeights = parsedResult.adjustedWeights || {};
+                  
+                  // Create subcategories from category scores and available weight data
+                  Object.entries(categoryScores).forEach(([category, score]) => {
+                    subcategories[category] = {
+                      score: Number(score),
+                      userWeight: userWeights[category] || 0,
+                      qValue: qValues[category] || 0,
+                      softmaxWeight: softmaxWeights[category] || 0,
+                      adjustedWeight: adjustedWeights[category] || 0,
+                      scoreContribution: (Number(score) * (adjustedWeights[category] || 0)) / 100
+                    };
+                  });
+                  
+                  // If we still have empty subcategories, use fallbacks
+                  if (Object.keys(subcategories).length === 0) {
+                    subcategories = createFallbackSubcategories(assessment.type);
+                  }
+                }
+                
+                // Add the assessment data to the results object
+                assessmentResults[assessment.type] = {
+                  overallScore: assessment.score,
+                  categoryScores: Object.fromEntries(
+                    Object.entries(subcategories).map(([name, data]) => [name, data.score])
+                  ),
+                  userWeights: Object.fromEntries(
+                    Object.entries(subcategories).map(([name, data]) => [name, data.userWeight])
+                  ),
+                  qValues: Object.fromEntries(
+                    Object.entries(subcategories).map(([name, data]) => [name, data.qValue])
+                  ),
+                  softmaxWeights: Object.fromEntries(
+                    Object.entries(subcategories).map(([name, data]) => [name, data.softmaxWeight])
+                  ),
+                  adjustedWeights: Object.fromEntries(
+                    Object.entries(subcategories).map(([name, data]) => [name, data.adjustedWeight])
+                  ),
+                  subcategories: subcategories
+                };
+                
+                console.log(`Successfully processed ${assessment.type} from localStorage with ${Object.keys(subcategories).length} subcategories`);
+                continue; // Skip to next assessment
+              } catch (parseError) {
+                console.error(`Error parsing stored result for ${assessment.type}:`, parseError);
+              }
+            }
+            
+            // If we couldn't get detailed data, use fallbacks
+            console.log(`Using fallback data for ${assessment.type}`);
+            const subcategories = createFallbackSubcategories(assessment.type);
+            
+            // Generate category scores and other values from subcategories
+            assessmentResults[assessment.type] = {
+              overallScore: assessment.score,
+              categoryScores: Object.fromEntries(
+                Object.entries(subcategories).map(([name, data]) => [name, data.score])
+              ),
+              userWeights: Object.fromEntries(
+                Object.entries(subcategories).map(([name, data]) => [name, data.userWeight])
+              ),
+              qValues: Object.fromEntries(
+                Object.entries(subcategories).map(([name, data]) => [name, data.qValue])
+              ),
+              softmaxWeights: Object.fromEntries(
+                Object.entries(subcategories).map(([name, data]) => [name, data.softmaxWeight])
+              ),
+              adjustedWeights: Object.fromEntries(
+                Object.entries(subcategories).map(([name, data]) => [name, data.adjustedWeight])
+              ),
+              subcategories: subcategories
+            };
+          } catch (error) {
+            console.error(`Error processing ${assessment.type}:`, error);
+          }
+        }
+      }
+      
+      // Check if we have any assessment data
+      if (Object.keys(assessmentResults).length === 0) {
+        toast({
+          title: "Cannot Generate Report",
+          description: "At least one completed assessment is required to generate a Deep Research Report.",
+          variant: "destructive",
+        });
+        setGeneratingReport(false);
+        setUsingBackendApi(false);
+        return;
+      }
+      
+      console.log("Generating deep research report via backend API with data:", 
+        `Number of assessments: ${Object.keys(assessmentResults).length}`);
+      
+      // Prepare the payload for the research API
+      const payload = prepareResearchPayload(assessmentResults, company.name || 'Company');
+      
+      // Start the research process by calling the API
+      const newResearchId = await startResearch(payload);
+      setResearchId(newResearchId);
+      
+      // Poll for status until complete
+      let isComplete = false;
+      let attempts = 0;
+      
+      while (!isComplete && attempts < 60) { // Poll for up to 5 minutes (60 * 5s = 5 minutes)
+        attempts++;
+        
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds between checks
+        
+        const status = await checkResearchStatus(newResearchId);
+        console.log(`Research status check ${attempts}: ${status.status}`);
+        
+        if (status.status === 'completed') {
+          isComplete = true;
+        } else if (status.status === 'failed') {
+          throw new Error(`Research process failed: ${status.message}`);
+        }
+        
+        // Update toast with more professional messages without percentages
+        if (attempts % 3 === 0) { // Update toast every 15 seconds
+          const statusMessages = [
+            "Analyzing assessment data...",
+            "Processing insights across pillars...",
+            "Generating executive summary...",
+            "Creating detailed analysis...",
+            "Finalizing report content...",
+            "Almost there, please wait...",
+            "This comprehensive report takes a few minutes to generate...",
+            "Working on your detailed AI readiness report..."
+          ];
+          
+          // Cycle through messages based on attempt number
+          const messageIndex = Math.floor(attempts / 3) % statusMessages.length;
+          
+          toast({
+            title: "Processing Report",
+            description: statusMessages[messageIndex],
+          });
+        }
+      }
+      
+      if (!isComplete) {
+        throw new Error("Research process timed out. The report may still be processing.");
+      }
+      
+      // Download the completed report
+      const htmlReport = await downloadResearchReport(newResearchId);
+      
+      // Create a Blob from the HTML content
+      const blob = new Blob([htmlReport], { type: 'text/html' });
+      
+      // Create a URL for the Blob
+      const url = URL.createObjectURL(blob);
+      
+      // Create a temporary link element
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${company?.name || 'Company'}_AI_Readiness_Report_${new Date().toISOString().split('T')[0]}.html`;
+      
+      // Add the link to the document and click it
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Report Generated",
+        description: "Deep Research Report has been downloaded successfully.",
+      });
+    } catch (error) {
+      console.error("Error generating deep research report via backend:", error);
+      toast({
+        title: "Error Generating Report",
+        description: "There was a problem generating the Deep Research Report via backend API.",
+        variant: "destructive",
+      });
+    } finally {
+      // Always set generating report state back to false
+      setGeneratingReport(false);
+      setUsingBackendApi(false);
     }
   };
 
@@ -1589,23 +1770,44 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
                   
                   {assessmentStatus.assessments.some(a => a.status === "completed") && (
                     <div className="mt-6 text-center">
+                      <div className="flex flex-col gap-2">
                       <Button
                         onClick={handleGenerateDeepResearchReport}
                         className="flex items-center gap-2 w-full"
                         variant="secondary"
                         disabled={generatingReport}
                       >
-                        {generatingReport ? (
+                          {generatingReport && !usingBackendApi ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
                         <FileDown className="h-4 w-4" />
                         )}
-                        Generate Deep Research Report
+                          Comprehensive Report
                       </Button>
+                        <Button
+                          onClick={handleGenerateDeepResearchReportViaBackend}
+                          className="flex items-center gap-2 w-full"
+                          variant="default"
+                          disabled={generatingReport}
+                        >
+                          {generatingReport && usingBackendApi ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <FileDown className="h-4 w-4" />
+                          )}
+                          Detailed Report (Deep Research)
+                        </Button>
+                      </div>
                       {generatingReport ? (
-                        <div className="flex flex-col items-center mt-2 text-xs text-muted-foreground">
-                          <Loader2 className="h-4 w-4 animate-spin mb-1" />
-                          <span>Analyzing assessment data and generating insights...</span>
+                        <div className="flex flex-col items-center mt-3 text-xs">
+                          <div className="flex items-center gap-2 bg-muted/50 px-3 py-2 rounded-md animate-pulse">
+                            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                            <span className="text-foreground">
+                              {usingBackendApi 
+                                ? `Generating detailed AI readiness analysis ${researchId ? `(Reference: ${researchId})` : ''}` 
+                                : "Analyzing assessment data and generating insights..."}
+                            </span>
+                          </div>
                         </div>
                       ) : (
                       <p className="text-xs text-muted-foreground mt-2">
