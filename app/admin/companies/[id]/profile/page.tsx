@@ -4,7 +4,7 @@ import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, CheckCircle } from "lucide-react";
 import { CompanyInfoForm } from "@/components/CompanyInfoForm";
 import { WeightAdjustment } from "@/components/WeightAdjustment";
 import { CompanyInfo, CategoryWeights } from "@/types";
@@ -67,34 +67,65 @@ export default function CompanyProfilePage({ params }: { params: Promise<{ id: s
   const [recommendedWeights, setRecommendedWeights] = useState<CategoryWeights | undefined>(undefined);
   const [progress, setProgress] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState<any>(null);
 
   useEffect(() => {
     // Load company info from localStorage
     const loadCompanyData = async () => {
       try {
+        console.log("Loading company data for ID:", companyId);
         // First try to get from company_info (if this is right after company creation)
         const storedCompanyInfo = localStorage.getItem('company_info');
         if (storedCompanyInfo) {
           const parsedInfo = JSON.parse(storedCompanyInfo);
+          console.log("Found stored company info:", parsedInfo);
           
           // Only use if the ID matches
           if (parsedInfo.id === companyId) {
             setCompanyInfo(parsedInfo);
             
-            // Try to get saved weights from database
-            try {
-              const { data: savedWeights, error } = await api.weights.getCompanyWeights(companyId);
-              if (!error && savedWeights && savedWeights.weights) {
-                // If we have saved weights, use those
-                console.log("Found saved weights in database:", savedWeights.weights);
-                setRecommendedWeights(savedWeights.weights);
-                setWeights(savedWeights.weights);
+            // Set progress to indicate search will happen
+            setProgress(40);
+            
+            // If company has verified info from the add company page, auto-progress to weight adjustment
+            if (parsedInfo.verifiedInfo) {
+              console.log("Company has verified info:", parsedInfo.verifiedInfo);
+              try {
+                // Use verified info to get recommended weights
+                const suggestedWeights = await getRecommendedWeights(parsedInfo);
+                console.log("Received suggested weights:", suggestedWeights);
+                setRecommendedWeights(suggestedWeights);
+                setWeights(suggestedWeights);
+                setProgress(80);
+                
+                // Auto-progress to weight adjustment if verified
+                if (parsedInfo.verifiedInfo.isVerified) {
+                  setStep('weight-adjustment');
+                  toast({
+                    title: "Company Verified",
+                    description: "We've loaded your verified company details and suggested weights based on the company profile.",
+                  });
+                }
+              } catch (weightError) {
+                console.warn("Could not get recommended weights:", weightError);
               }
-            } catch (weightError) {
-              console.warn("Could not fetch saved weights from database:", weightError);
-              // Will continue with default weights
+            } else {
+              // Try to get saved weights from database
+              try {
+                const { data: savedWeights, error } = await api.weights.getCompanyWeights(companyId);
+                if (!error && savedWeights && savedWeights.weights) {
+                  // If we have saved weights, use those
+                  console.log("Found saved weights in database:", savedWeights.weights);
+                  setRecommendedWeights(savedWeights.weights);
+                  setWeights(savedWeights.weights);
+                }
+              } catch (weightError) {
+                console.warn("Could not fetch saved weights from database:", weightError);
+                // Will continue with default weights
+              }
             }
             
+            setProgress(100);
             setLoading(false);
             return;
           }
@@ -177,6 +208,39 @@ export default function CompanyProfilePage({ params }: { params: Promise<{ id: s
         const companyWeightsKey = `company_weights_${companyId}`;
         localStorage.setItem(companyWeightsKey, JSON.stringify(suggestedWeights));
         
+        // Save weights to backend database
+        try {
+          const weightsData = {
+            weights: suggestedWeights
+          };
+          
+          // Save weights to backend
+          const weightResponse = await api.weights.updateCompanyWeights(companyId, weightsData);
+          
+          if (!weightResponse.error) {
+            console.log("Successfully saved suggested weights to backend database:", weightResponse.data);
+          } else {
+            console.warn("Failed to save weights to backend:", weightResponse.error);
+          }
+          
+          // Also update company info in the database
+          const updatedCompanyInfo = {
+            ...info,
+            id: companyId
+          };
+          
+          const companyResponse = await api.companies.updateCompany(companyId, updatedCompanyInfo);
+          
+          if (!companyResponse.error) {
+            console.log("Successfully saved company data to backend database:", companyResponse.data);
+          } else {
+            console.warn("Failed to save company data to backend:", companyResponse.error);
+          }
+          
+        } catch (dbError) {
+          console.warn("Error saving to backend database:", dbError);
+        }
+        
         toast({
           title: "Web-suggested weights applied",
           description: "We've applied the weights suggested based on your company's web profile.",
@@ -194,6 +258,23 @@ export default function CompanyProfilePage({ params }: { params: Promise<{ id: s
         
         setRecommendedWeights(fallbackWeights);
         setWeights(fallbackWeights);
+        
+        // Save default weights to backend
+        try {
+          const weightsData = {
+            weights: fallbackWeights
+          };
+          
+          const weightResponse = await api.weights.updateCompanyWeights(companyId, weightsData);
+          
+          if (!weightResponse.error) {
+            console.log("Successfully saved default weights to backend database:", weightResponse.data);
+          } else {
+            console.warn("Failed to save default weights to backend:", weightResponse.error);
+          }
+        } catch (dbError) {
+          console.warn("Error saving default weights to backend:", dbError);
+        }
         
         toast({
           title: "Default weights applied",
@@ -262,31 +343,74 @@ export default function CompanyProfilePage({ params }: { params: Promise<{ id: s
     setWeights(newWeights);
   };
 
-  const handleWeightsSubmit = () => {
-    // Store weights for this company
-    const companyWeightsKey = `company_weights_${companyId}`;
-    localStorage.setItem(companyWeightsKey, JSON.stringify(weights));
-    
-    // Also set as the default weights for assessments
-    localStorage.setItem('assessment_weights', JSON.stringify(weights));
-    
-    // Don't remove company_info here, preserve it for the assessments page
-    // Ensure companyInfo has the correct ID
-    if (companyInfo && companyId) {
-      const updatedCompanyInfo = {
-        ...companyInfo,
-        id: companyId
-      };
-      localStorage.setItem('company_info', JSON.stringify(updatedCompanyInfo));
-    }
-    
+  const handleWeightsSubmit = async () => {
+    // Show loading toast
     toast({
-      title: "Company Profile Complete",
-      description: "The company profile and assessment weights have been configured.",
+      title: "Saving weights",
+      description: "Saving assessment weights to the backend...",
     });
-    
-    // Navigate to the company assessments page
-    router.push(`/admin/companies/${companyId}/assessments`);
+
+    try {
+      // Store weights for this company
+      const companyWeightsKey = `company_weights_${companyId}`;
+      localStorage.setItem(companyWeightsKey, JSON.stringify(weights));
+      
+      // Also set as the default weights for assessments
+      localStorage.setItem('assessment_weights', JSON.stringify(weights));
+      
+      // Save to backend database
+      const weightsData = {
+        weights: weights
+      };
+      
+      const response = await api.weights.updateCompanyWeights(companyId, weightsData);
+      
+      if (!response.error) {
+        console.log("Successfully saved final weights to backend database:", response.data);
+        
+        // Also update company info in the database if available
+        if (companyInfo) {
+          const updatedCompanyInfo = {
+            ...companyInfo,
+            id: companyId
+          };
+          
+          const companyResponse = await api.companies.updateCompany(companyId, updatedCompanyInfo);
+          
+          if (!companyResponse.error) {
+            console.log("Successfully saved company data to backend database:", companyResponse.data);
+          } else {
+            console.warn("Failed to save company data to backend:", companyResponse.error);
+          }
+        }
+        
+        // Save success toast
+        toast({
+          title: "Company Profile Complete",
+          description: "The company profile and assessment weights have been saved to the database.",
+        });
+      } else {
+        console.warn("Error saving weights to backend:", response.error);
+        toast({
+          title: "Partial Save",
+          description: "Weights saved locally but couldn't be saved to the backend database.",
+          variant: "default"
+        });
+      }
+      
+      // Navigate to the company assessments page
+      router.push(`/admin/companies/${companyId}/assessments`);
+    } catch (error) {
+      console.error("Error saving weights:", error);
+      toast({
+        title: "Error",
+        description: "An error occurred while saving weights. Local data has been preserved.",
+        variant: "destructive"
+      });
+      
+      // Continue to the next page anyway since we've saved locally
+      router.push(`/admin/companies/${companyId}/assessments`);
+    }
   };
 
   const saveRecommendedWeights = async () => {
@@ -309,22 +433,53 @@ export default function CompanyProfilePage({ params }: { params: Promise<{ id: s
       // Also set as the default weights for assessments
       localStorage.setItem('assessment_weights', JSON.stringify(weights));
       
-      // If you still want to save to the backend (optional)
+      // Save to the backend with improved error handling and logging
       try {
         const weightsData = {
           weights: weights
         };
         
-        await api.weights.updateCompanyWeights(companyId, weightsData);
+        const response = await api.weights.updateCompanyWeights(companyId, weightsData);
+        
+        if (!response.error) {
+          console.log("Successfully saved weights to backend database:", response.data);
+          
+          // Also update company info in the database if available
+          if (companyInfo) {
+            const updatedCompanyInfo = {
+              ...companyInfo,
+              id: companyId
+            };
+            
+            const companyResponse = await api.companies.updateCompany(companyId, updatedCompanyInfo);
+            
+            if (!companyResponse.error) {
+              console.log("Successfully saved company data to backend database:", companyResponse.data);
+            } else {
+              console.warn("Failed to save company data to backend:", companyResponse.error);
+            }
+          }
+          
+          toast({
+            title: "Weights Saved",
+            description: "The weights have been saved to the backend database.",
+          });
+        } else {
+          console.warn("Error from backend API:", response.error);
+          toast({
+            title: "Partial Save",
+            description: "Weights saved locally but couldn't be saved to the backend database.",
+            variant: "default"
+          });
+        }
       } catch (apiError) {
-        console.warn("Could not save weights to backend, but weights are saved locally:", apiError);
-        // Continue anyway since we've saved to localStorage
+        console.error("Error saving to backend:", apiError);
+        toast({
+          title: "Partial Save",
+          description: "Weights saved locally but couldn't be saved to the backend database.",
+          variant: "default"
+        });
       }
-      
-      toast({
-        title: "Weights Saved",
-        description: "The current weights have been saved for this company.",
-      });
     } catch (error) {
       console.error("Error saving weights:", error);
       toast({
@@ -343,7 +498,19 @@ export default function CompanyProfilePage({ params }: { params: Promise<{ id: s
         <div className="text-center">
           <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-primary" />
           <p className="text-lg font-medium">Loading...</p>
-          <p className="text-sm text-muted-foreground mt-2">Preparing company profile.</p>
+          {companyInfo?.verifiedInfo?.isVerified ? (
+            <>
+              <p className="text-sm text-green-700 font-medium mt-2">
+                <CheckCircle className="h-4 w-4 inline-block mr-1" />
+                Verified Company Detected
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Automatically searching for company details and optimal weights
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground mt-2">Preparing company profile.</p>
+          )}
           <Progress value={progress} className="w-[300px] mt-4" />
         </div>
       </div>
@@ -363,6 +530,22 @@ export default function CompanyProfilePage({ params }: { params: Promise<{ id: s
         </div>
       </div>
 
+      {step === 'company-info' && companyInfo?.verifiedInfo?.isVerified && searchResults && (
+        <div className="max-w-3xl mx-auto mb-4">
+          <div className="bg-green-50 border border-green-200 rounded-md p-4 flex items-start">
+            <div className="flex-shrink-0">
+              <CheckCircle className="h-5 w-5 text-green-500" />
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-green-800">Verified Company: {companyInfo.name}</h3>
+              <div className="mt-2 text-sm text-green-700">
+                <p>We've automatically searched for optimal AI readiness weights based on your verified company information.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {step === 'company-info' && (
         <div className="max-w-3xl mx-auto">
           <Card>
@@ -373,7 +556,45 @@ export default function CompanyProfilePage({ params }: { params: Promise<{ id: s
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <CompanyInfoForm onSubmit={handleCompanyInfoSubmit} loading={loading} initialData={companyInfo} />
+              {companyInfo?.verifiedInfo?.isVerified ? (
+                <div className="space-y-6">
+                  <div className="bg-green-50 border border-green-200 rounded-md p-4 flex items-start">
+                    <div className="flex-shrink-0">
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                    </div>
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-green-800">Company Verified: {companyInfo.name}</h3>
+                      <div className="mt-2 text-sm text-green-700">
+                        <p>Your company information has been verified with external sources.</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="text-center p-6 border border-amber-200 bg-amber-50 rounded-md">
+                    <div className="flex justify-center mb-4">
+                      <Loader2 className="h-8 w-8 animate-spin text-amber-500" />
+                    </div>
+                    <h3 className="text-lg font-medium text-amber-800 mb-2">Optimizing AI Readiness Weights</h3>
+                    <p className="text-amber-700">We're automatically calculating the optimal weights for your verified company based on industry benchmarks and best practices.</p>
+                    <div className="mt-4">
+                      <Progress value={75} className="h-2" />
+                      <p className="text-xs text-amber-600 mt-2">This may take a moment...</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-center mt-6">
+                    <Button 
+                      onClick={() => setStep('weight-adjustment')}
+                      className="w-full max-w-md bg-green-600 hover:bg-green-700"
+                    >
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      Continue with Verified Company
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <CompanyInfoForm onSubmit={handleCompanyInfoSubmit} loading={loading} initialData={companyInfo} />
+              )}
             </CardContent>
           </Card>
         </div>

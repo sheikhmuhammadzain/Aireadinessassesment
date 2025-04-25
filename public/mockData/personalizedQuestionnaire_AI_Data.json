@@ -1,0 +1,73 @@
+{
+  "categories": [
+    {
+      "name": "Data Quality",
+      "questions": [
+        {
+          "text": "How would you rate the overall quality of your organization's data assets?",
+          "options": [
+            { "id": "option1", "text": "Poor - Significant data quality issues are common" },
+            { "id": "option2", "text": "Fair - Some data quality issues exist" },
+            { "id": "option3", "text": "Good - Generally high quality with occasional issues" },
+            { "id": "option4", "text": "Excellent - Consistently high quality data across the organization" }
+          ]
+        },
+        {
+          "text": "What processes do you have in place for data validation and cleaning?",
+          "options": [
+            { "id": "option1", "text": "No formal processes" },
+            { "id": "option2", "text": "Basic data cleaning during analysis" },
+            { "id": "option3", "text": "Standardized validation and cleaning workflows" },
+            { "id": "option4", "text": "Automated data quality monitoring and remediation pipelines" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Data Governance",
+      "questions": [
+        {
+          "text": "How mature is your organization's data governance framework?",
+          "options": [
+            { "id": "option1", "text": "No formal governance framework" },
+            { "id": "option2", "text": "Basic policies exist but implementation is inconsistent" },
+            { "id": "option3", "text": "Established framework with clear roles and responsibilities" },
+            { "id": "option4", "text": "Comprehensive framework integrated with business operations" }
+          ]
+        },
+        {
+          "text": "How do you manage data access and security?",
+          "options": [
+            { "id": "option1", "text": "Limited controls, primarily open access" },
+            { "id": "option2", "text": "Basic role-based access controls" },
+            { "id": "option3", "text": "Fine-grained access policies with regular audits" },
+            { "id": "option4", "text": "Zero-trust model with continuous monitoring and adaptive controls" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "AI-Ready Infrastructure",
+      "questions": [
+        {
+          "text": "How would you describe your data infrastructure's readiness for AI applications?",
+          "options": [
+            { "id": "option1", "text": "Not designed for AI workloads" },
+            { "id": "option2", "text": "Basic capabilities with significant limitations" },
+            { "id": "option3", "text": "Capable infrastructure that handles most AI needs" },
+            { "id": "option4", "text": "Purpose-built for advanced AI with scalability and flexibility" }
+          ]
+        },
+        {
+          "text": "What level of integration exists between your data systems?",
+          "options": [
+            { "id": "option1", "text": "Mostly siloed data systems" },
+            { "id": "option2", "text": "Some integration but significant manual effort required" },
+            { "id": "option3", "text": "Well-integrated systems with standardized data flows" },
+            { "id": "option4", "text": "Fully connected data ecosystem with real-time synchronization" }
+          ]
+        }
+      ]
+    }
+  ]
+} 

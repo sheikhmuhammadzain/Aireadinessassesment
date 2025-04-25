@@ -21,6 +21,10 @@ from models import UserCreate, UserResponse, CompanyCreate, CompanyResponse
 from models import AssessmentCreate, AssessmentResponse, CompanyUserAssignment
 from models import DefaultPillarWeight, CompanyPillarWeight, CategoryWeight, CompanyWeightsUpdate
 
+# Add import for the new utility functions
+from utils import get_color_for_score, get_strength_comment, get_improvement_comment, get_recommendations
+from utils import generate_personalized_questions, get_personalized_assessment
+
 # Add UserUpdate model import if it exists, otherwise we'll create it
 try:
     from models import UserUpdate
@@ -196,6 +200,52 @@ def get_questionnaire(assessment_type: str):
     if assessment_type not in questionnaires:
         raise HTTPException(status_code=404, detail=f"Assessment type '{assessment_type}' not found")
     return questionnaires[assessment_type]
+
+@app.get("/questionnaire/{assessment_type}/personalized/{company_id}")
+def get_personalized_questionnaire(assessment_type: str, company_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """
+    Get a personalized questionnaire with dynamic options for a specific company.
+    Questions are generated using OpenAI based on the company's profile and industry.
+    """
+    # Debug logging
+    logger.info(f"Request for personalized questionnaire: assessment_type={assessment_type}, company_id={company_id}")
+    logger.info(f"User requesting: {current_user.email}, role: {current_user.role}")
+    
+    try:
+        # Check if user has access to this company
+        has_access = current_user.role == "admin" or any(c.id == company_id for c in current_user.companies)
+        
+        if not has_access:
+            raise HTTPException(status_code=403, detail="Not authorized to view this company's assessment")
+        
+        # Check if assessment type exists
+        if assessment_type not in questionnaires:
+            raise HTTPException(status_code=404, detail=f"Assessment type '{assessment_type}' not found")
+        
+        # Debug log before company query
+        logger.info(f"Querying for company with ID: {company_id}")
+        
+        # Check if company exists
+        db_company = db.query(Company).filter(Company.id == company_id).first()
+        
+        if db_company is None:
+            raise HTTPException(status_code=404, detail="Company not found")
+            
+        logger.info(f"Found company: {db_company.name}")
+        
+        # Get personalized assessment
+        assessment = get_personalized_assessment(company_id, assessment_type, db)
+        
+        if "error" in assessment:
+            logger.error(f"Error in personalized assessment: {assessment['error']}")
+            raise HTTPException(status_code=500, detail=assessment["error"])
+        
+        return assessment
+    except Exception as e:
+        # Catch and log any unexpected errors
+        logger.error(f"Exception in get_personalized_questionnaire: {str(e)}")
+        logger.exception(e)
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/calculate-results", response_model=AssessmentResult)
 async def calculate_results(assessment_response: AssessmentResponse):
@@ -964,6 +1014,99 @@ def update_category_weights(company_id: str, pillar: str, request: Dict[str, Any
     
     # Return updated weights
     return get_category_weights(company_id, pillar, db, current_user)
+
+# Add a new endpoint to submit personalized assessment responses
+@app.post("/assessments/personalized")
+def submit_personalized_assessment(
+    assessment: Dict, 
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Submit responses for a personalized assessment with custom questions and options.
+    """
+    try:
+        company_id = assessment.get("company_id")
+        assessment_type = assessment.get("assessment_type")
+        responses = assessment.get("responses", [])
+        
+        # Check if user has access to this company
+        has_access = current_user.role == "admin" or any(c.id == company_id for c in current_user.companies)
+        
+        if not has_access:
+            raise HTTPException(status_code=403, detail="Not authorized to submit assessments for this company")
+        
+        # Calculate score
+        # For personalized assessments with custom options, we calculate score based on 
+        # correct answers (each correct answer gives 4 points, every other option gives
+        # a proportionally lower score)
+        
+        total_questions = 0
+        total_score = 0
+        
+        for category in responses:
+            category_name = category.get("category")
+            questions = category.get("questions", [])
+            
+            for question in questions:
+                total_questions += 1
+                selected_option = question.get("selected_option")
+                correct_option = question.get("correct_option")
+                
+                # Award points: 4 for correct, 3, 2, or 1 for others based on option ID
+                if selected_option == correct_option:
+                    # If selected the correct option
+                    total_score += 4
+                else:
+                    # Calculate points based on how far the selection is from correct
+                    option_values = {"a": 1, "b": 2, "c": 3, "d": 4}
+                    correct_value = option_values.get(correct_option, 4)
+                    selected_value = option_values.get(selected_option, 1)
+                    
+                    # Distance-based scoring
+                    distance = abs(correct_value - selected_value)
+                    if distance == 1:
+                        total_score += 3  # One option away from correct
+                    elif distance == 2:
+                        total_score += 2  # Two options away from correct
+                    else:
+                        total_score += 1  # Three options away from correct
+        
+        # Calculate average score on 1-4 scale
+        average_score = total_score / total_questions if total_questions > 0 else 0
+        
+        # Create the assessment record
+        assessment_id = f"assessment_{uuid.uuid4()}"
+        db_assessment = Assessment(
+            id=assessment_id,
+            company_id=company_id,
+            assessment_type=assessment_type,
+            status="completed",
+            score=average_score,
+            data=assessment,  # Store the full assessment data
+            completed_at=datetime.utcnow(),
+            completed_by_id=current_user.id,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        
+        db.add(db_assessment)
+        db.commit()
+        db.refresh(db_assessment)
+        
+        # Return the assessment result
+        return {
+            "id": db_assessment.id,
+            "company_id": company_id,
+            "assessment_type": assessment_type,
+            "score": average_score * 25,  # Scale to 0-100
+            "completed_at": db_assessment.completed_at,
+            "completed_by": current_user.name
+        }
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error submitting assessment: {str(e)}")
 
   # {
   #   "name": "TechInnovate Solutions",

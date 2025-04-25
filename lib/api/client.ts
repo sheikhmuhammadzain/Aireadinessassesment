@@ -242,7 +242,8 @@ export const companiesApi = {
       size: company.size,
       region: company.region,
       ai_maturity: company.aiMaturity, // Convert camelCase to snake_case
-      notes: company.notes || ""
+      notes: company.notes || "",
+      verified_info: company.verifiedInfo ? JSON.stringify(company.verifiedInfo) : null // Add verified info
     };
     
     return apiCall<CompanyInfo>('/companies', {
@@ -259,7 +260,8 @@ export const companiesApi = {
       size: company.size,
       region: company.region,
       ai_maturity: company.aiMaturity, // Convert camelCase to snake_case
-      notes: company.notes || ""
+      notes: company.notes || "",
+      verified_info: company.verifiedInfo ? JSON.stringify(company.verifiedInfo) : null // Add verified info
     };
     
     return apiCall<CompanyInfo>(`/companies/${companyId}`, {

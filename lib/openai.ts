@@ -119,7 +119,7 @@ export async function searchCompanyAndSuggestWeights(companyInfo: {
  * @param companyName The company name to search for
  * @returns Company details including industry, size, description and sources
  */
-async function fetchCompanyDetails(companyName: string) {
+export async function fetchCompanyDetails(companyName: string) {
   try {
     // Use the Serper API to search for company information
     const response = await fetch('https://google.serper.dev/search', {
@@ -208,7 +208,7 @@ async function fetchCompanyDetails(companyName: string) {
       industry: "Technology", // Default assumption
       size: "Mid-size (100-999 employees)", // Default assumption
       description: "No detailed information available.",
-      sources: []
+      sources: [] // Add empty sources array to match the structure
     };
   }
 }

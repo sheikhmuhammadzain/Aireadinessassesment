@@ -29,4 +29,6 @@ yarn-error.log*
 
 # local env files
 .env*.local
+.env
 
+# ai-readiness-assessment-backen

@@ -911,4 +911,112 @@ function getDefaultEqualWeights(): Record<string, number> {
   }
   
   return weights;
+}
+
+/**
+ * Fetch personalized assessment questions for a specific company
+ */
+export async function fetchPersonalizedQuestionnaire(assessmentType: string, companyId: string) {
+  // Deduplicate identical requests
+  const cacheKey = `personalized_questionnaire_${assessmentType}_${companyId}`;
+  if (pendingRequests.has(cacheKey)) {
+    return pendingRequests.get(cacheKey);
+  }
+  
+  const requestPromise = (async () => {
+    try {
+      const apiUrl = createApiUrl(`/questionnaire/${encodeURIComponent(assessmentType)}/personalized/${encodeURIComponent(companyId)}`);
+      console.log(`Fetching personalized questionnaire from ${apiUrl}`);
+      
+      const response = await apiClient.get(apiUrl, {
+        timeout: 30000, // 30 second timeout
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        }
+      });
+      
+      console.log(`Successfully fetched personalized questionnaire data`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching personalized questionnaire for ${assessmentType}:`, error);
+      
+      // Try to load mock data from public directory if available
+      try {
+        console.log(`Attempting to load mock personalized data for ${assessmentType}`);
+        const normalizedType = assessmentType.replace(/\s+/g, '_');
+        const normalizedId = companyId.toString().replace(/[^a-zA-Z0-9]/g, '_');
+        
+        // First try company-specific mock data
+        let mockDataUrl = `/mockData/personalizedQuestionnaire_${normalizedType}_${normalizedId}.json`;
+        console.log(`Looking for mock data at: ${mockDataUrl}`);
+        
+        const mockResponse = await fetch(mockDataUrl);
+        if (mockResponse.ok) {
+          const mockData = await mockResponse.json();
+          console.log('Successfully loaded mock personalized questionnaire data');
+          return mockData;
+        }
+        
+        // If company-specific mock not found, try generic mock for this assessment type
+        mockDataUrl = `/mockData/personalizedQuestionnaire_${normalizedType}.json`;
+        console.log(`Looking for generic mock data at: ${mockDataUrl}`);
+        
+        const genericMockResponse = await fetch(mockDataUrl);
+        if (genericMockResponse.ok) {
+          const mockData = await genericMockResponse.json();
+          console.log('Successfully loaded generic personalized questionnaire data');
+          return mockData;
+        }
+      } catch (mockError) {
+        console.warn('Failed to load mock personalized data:', mockError);
+      }
+      
+      // Fall back to standard questionnaire
+      console.log('Falling back to standard questionnaire');
+      return fetchQuestionnaire(assessmentType);
+    } finally {
+      // Clean up pending request
+      pendingRequests.delete(cacheKey);
+    }
+  })();
+  
+  pendingRequests.set(cacheKey, requestPromise);
+  return requestPromise;
+}
+
+/**
+ * Submit personalized assessment responses with custom options
+ */
+export async function submitPersonalizedAssessment(payload: any): Promise<any> {
+  try {
+    console.log(`Submitting personalized assessment for: ${payload.assessment_type}`);
+    
+    // Validate payload structure before submitting
+    if (!payload.company_id || !payload.assessment_type || !payload.responses) {
+      throw new Error('Invalid assessment payload - missing required fields');
+    }
+    
+    const apiUrl = createApiUrl('/assessments/personalized');
+    console.log(`Submitting to: ${apiUrl}`);
+    
+    const response = await apiClient.post(apiUrl, payload, {
+      timeout: 30000, // 30 second timeout
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+      }
+    });
+    
+    const result = response.data;
+    console.log('Personalized assessment submission successful with result:', result);
+    return result;
+  } catch (error) {
+    console.error("Error submitting personalized assessment:", error);
+    
+    if (axios.isAxiosError(error)) {
+      throw new Error(`Error submitting assessment: ${error.message}`);
+    }
+    throw error;
+  }
 } 

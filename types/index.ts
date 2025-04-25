@@ -8,6 +8,19 @@ export interface CompanyInfo {
   notes?: string;
   createdAt?: string;
   updatedAt?: string;
+  verifiedInfo?: CompanyVerificationInfo;
+}
+
+export interface CompanyVerificationInfo {
+  name: string;
+  industry: string;
+  size: string;
+  description: string;
+  sources: {
+    title: string;
+    link: string;
+  }[];
+  isVerified: boolean;
 }
 
 export interface User {

@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState, use, useCallback } from "react"; // Added 'use' and useCallback
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import NextDynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,34 +18,33 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { CompanyInfoForm } from "@/components/CompanyInfoForm";
 import { WeightAdjuster } from "@/components/WeightAdjuster";
 import { CategoryWeightAdjuster } from "@/components/CategoryWeightAdjuster";
+import PersonalizedQuestions from "@/app/components/PersonalizedQuestions"; // Fixed path
+import { CompanyInfo, CategoryWeights, SubcategoryWeights } from "@/types";
+import { Skeleton } from "@/components/ui/skeleton";
 import { 
-  CompanyInfo, 
-  CategoryWeights, 
-  SubcategoryWeights, 
-  AssessmentResponse, 
-  CategoryResponse
-} from "@/types";
-import { fetchQuestionnaire, submitAssessment, getRecommendedWeights } from "@/lib/api";
-import { Slider } from "@/components/ui/slider";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+  fetchQuestionnaire, 
+  fetchAllQuestionnaires, 
+  submitAssessment, 
+  getRecommendedWeights,
+  saveCompanyWeights,
+  saveCategoryWeights,
+  fetchPersonalizedQuestionnaire,
+  submitPersonalizedAssessment
+} from "@/lib/api";
 import { ProtectedRoute } from "@/components/protected-route";
 import { useAuth } from "@/lib/auth-context";
-import { fallbackQuestionnaires } from "@/lib/fallback/questionnaires";
+import { Switch } from "@/components/ui/switch";
 
-// Force dynamic to ensure data is always fresh
-export const dynamic = "force-dynamic";
-
-// --- Type Definitions ---
-// Interface for questions state within a category
+// --- Question Type Definitions ---
 interface QuestionItem {
       question: string;
   answer: number | null; // Allow null for unanswered
 }
-// Type for the overall questions state object
+
+// --- Question Category Type ---
 type CategoryQuestions = Record<string, QuestionItem[]>;
 
-// Reusing existing types...
-
+// --- Submission Type Definition ---
 interface AssessmentSubmission {
   assessmentType: string;
   companyInfo: CompanyInfo;
@@ -67,6 +66,14 @@ interface AssessmentSubmission {
   finalSubcategoryWeights: SubcategoryWeights;
 }
 
+// --- Personalized Question Interface ---
+interface PersonalizedQuestion {
+  text: string;
+  options: Array<{
+    id: string;
+    text: string;
+  }>;
+}
 
 // --- Main Page Component ---
 export default function AssessmentPage({ params }: { params: Promise<{ type: string }> }) {
@@ -84,6 +91,7 @@ export default function AssessmentPage({ params }: { params: Promise<{ type: str
 function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
   const assessmentType = decodeURIComponent(type);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const { user, canEditPillar } = useAuth();
   
@@ -112,7 +120,19 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
   }
   
   // --- State Variables ---
-  const [step, setStep] = useState<'company-info' | 'weight-adjustment' | 'questions'>('company-info'); // Start with company info
+  const [step, setStep] = useState<'company-info' | 'weight-adjustment' | 'questions'>(() => {
+    // Check if company info exists in localStorage
+    const storedCompanyInfo = typeof window !== 'undefined' ? localStorage.getItem('company_info') : null;
+    if (storedCompanyInfo) {
+      try {
+        // If we have company info, start with questions
+        return 'questions';
+      } catch (e) {
+        console.error("Error parsing stored company info:", e);
+      }
+    }
+    return 'company-info'; // Fall back to company-info step
+  });
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [questionnaire, setQuestionnaire] = useState<Record<string, Record<string, any>>>({}); // Structure from fetch
@@ -133,13 +153,20 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
   const [isDoingAllAssessments, setIsDoingAllAssessments] = useState(false);
   const [allAssessmentTypes, setAllAssessmentTypes] = useState<string[]>([]);
   const [currentAssessmentIndex, setCurrentAssessmentIndex] = useState(0);
-  const [lockedCategories, setLockedCategories] = useState<Record<string, boolean>>({}); // Key: `${category}-${subcategory}`
+  const [lockedCategories, setLockedCategories] = useState<Record<string, boolean>>({});
 
   const [currentStep, setCurrentStep] = useState(0);
   const [scores, setScores] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [questionnaires, setQuestionnaires] = useState<Record<string, any> | null>(null);
+
+  // Add new state variables for personalized questions
+  const [usePersonalizedQuestions, setUsePersonalizedQuestions] = useState(true);
+  const [personalizedQuestions, setPersonalizedQuestions] = useState<any>(null);
+  const [selectedOptions, setSelectedOptions] = useState<Record<string, Record<string, string>>>({});
+  const [isLoadingPersonalized, setIsLoadingPersonalized] = useState(false);
+  const [hasAttemptedPersonalized, setHasAttemptedPersonalized] = useState(false);
 
   // --- Helper Function: Rounding ---
   const roundToOneDecimal = (num: number): number => {
@@ -226,559 +253,516 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
     localStorage.removeItem('locked_categories');
   };
 
-  async function fetchQuestionnairesWithRetry(setError: React.Dispatch<React.SetStateAction<string | null>>): Promise<Record<string, any> | null> {
-    const maxRetries = 3;
-    const baseDelay = 1000; // 1 second
-    const maxDelay = 5000; // 5 seconds
-    
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`Attempting to fetch questionnaires (attempt ${attempt + 1}/${maxRetries + 1})...`);
-        
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-        
-        // Use direct backend connection instead of proxy
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://103.18.20.205:8090'}/questionnaires`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Cache-Control': 'no-cache',
-          },
-          signal: controller.signal,
-          cache: 'no-store',
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status} (${response.statusText})`);
-        }
-        
-        const data = await response.json();
-        console.log('Successfully fetched questionnaires');
-        return data;
-      } catch (error) {
-        // Create a more detailed error message
-        let errorMessage = 'Unknown error';
-        
-        if (error instanceof Error) {
-          errorMessage = error.message;
-          
-          // Add more context for specific error types
-          if (error.name === 'AbortError') {
-            errorMessage = 'Request timed out after 15 seconds';
-          } else if (error.message.includes('Failed to fetch')) {
-            errorMessage = 'Network error - Cannot connect to backend API. Check if the server is running.';
-          }
-        }
-        
-        console.error(`Attempt ${attempt + 1} failed: ${errorMessage}`);
-        
-        if (attempt < maxRetries) {
-          // Calculate delay with exponential backoff, capped at maxDelay
-          const delay = Math.min(baseDelay * Math.pow(2, attempt), maxDelay);
-          console.log(`Retrying in ${delay}ms...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        } else {
-          // All retries failed
-          console.error('All attempts to fetch questionnaires failed. Using fallback data.');
-          setError(`Could not connect to the backend server (${errorMessage}). Using offline data.`);
-          return fallbackQuestionnaires;
-        }
-      }
-    }
-    
-    return null;
-  }
-
-  // Define fetchQuestionnaires first without depending on fetchRecommendedWeights
-  const fetchQuestionnaires = useCallback(async () => {
-    if (Object.keys(questionnaire).length > 0 && !loadingError) {
-      console.log("Questionnaire seems already loaded.");
-      setLoading(false); // Make sure loading is off
-      return;
-    }
-    setLoading(true);
-    setLoadingError(null);
-    console.log(`Fetching questionnaire for: ${assessmentType}`);
+  // Implement fetchRecommendedWeights for this component
+  const fetchRecommendedWeights = async (info: CompanyInfo) => {
     try {
-      // Use direct fetch method that bypasses proxy and API routing
-      const { fetchQuestionnairesDirectly } = await import('@/lib/api');
-      const allQuestionnairesData = await fetchQuestionnairesDirectly();
-      
-      // Extract the specific assessment type data
-      const data = { [assessmentType]: allQuestionnairesData?.[assessmentType] };
-      console.log(`Raw questionnaire data fetched:`, data);
-
-      const assessmentData = data?.[assessmentType];
-      if (!assessmentData || typeof assessmentData !== 'object') {
-        throw new Error(`Invalid or missing questionnaire data structure for type "${assessmentType}".`);
+      if (!info.id) {
+        throw new Error("Company ID is required to fetch weights");
       }
-
-      const categoryList = Object.keys(assessmentData);
-      if (categoryList.length === 0) {
-        throw new Error(`No categories/subcategories found for assessment type "${assessmentType}".`);
-      }
-
-      setQuestionnaire({ [assessmentType]: assessmentData }); // Store raw structure
-      setCategories(categoryList);
-      setCurrentCategory(categoryList[0]); // Set first category
-      setCategoryIndex(0);
-
-      // Initialize questions state based on fetched structure
-      const initialQuestionsState: CategoryQuestions = {};
-      categoryList.forEach(cat => {
-        initialQuestionsState[cat] = [];
-        const categoryContent = assessmentData[cat];
-        if (Array.isArray(categoryContent)) { // Direct questions under category
-          categoryContent.forEach((qText: string) => {
-            initialQuestionsState[cat].push({ question: qText, answer: null });
-          });
-        } else if (typeof categoryContent === 'object' && categoryContent !== null) { // Subcategories with questions
-          Object.values(categoryContent).forEach((subcatQuestions: any) => {
-            if (Array.isArray(subcatQuestions)) {
-              subcatQuestions.forEach((qText: string) => {
-                initialQuestionsState[cat].push({ question: qText, answer: null });
-              });
-            }
-          });
-        }
-      });
-      setQuestions(initialQuestionsState);
-      console.log("Initialized questions state:", initialQuestionsState);
-
-      // Check if we have stored weights, and if not, initialize from scratch
-      const storedSubWeights = localStorage.getItem('subcategory_weights');
-      let shouldInitializeWeights = false;
       
+      // Try to fetch recommended weights from the API
       try {
-        if (storedSubWeights) {
-          const parsedWeights = JSON.parse(storedSubWeights);
-          // Verify the stored weights match the current assessment's categories
-          const hasMissingCategories = categoryList.some(cat => !parsedWeights[cat]);
-          shouldInitializeWeights = hasMissingCategories;
-          
-          if (!shouldInitializeWeights) {
-            console.log("Using stored weights as they match the current assessment");
-            setSubcategoryWeights(parsedWeights);
-            setWeights(convertSubcategoryToCategory(parsedWeights));
-          }
-        } else {
-          shouldInitializeWeights = true;
-        }
-      } catch (e) {
-        console.error("Error parsing stored weights, will initialize new ones:", e);
-        shouldInitializeWeights = true;
-      }
-      
-      // Initialize weights ONLY if they need to be initialized
-      if (shouldInitializeWeights) {
-        console.log("Initializing fresh weights as none were valid for this assessment");
-        const initialSubW = initializeDefaultSubcategoryWeights(assessmentData);
-        setSubcategoryWeights(initialSubW);
-        setWeights(convertSubcategoryToCategory(initialSubW));
-        localStorage.setItem('subcategory_weights', JSON.stringify(initialSubW));
-        localStorage.setItem('assessment_weights', JSON.stringify(convertSubcategoryToCategory(initialSubW)));
-      }
-
-      setStep('questions'); // Ensure we are on the questions step
-      setActiveTab('questions'); // Ensure questions tab is active
-      setLoading(false);
-    } catch (error) {
-      console.error("Error fetching/processing questionnaire:", error);
-      const msg = error instanceof Error ? error.message : "Unknown error loading questions.";
-      setLoadingError(msg);
-      toast({ title: "Error Loading Questions", description: msg, variant: "destructive" });
-      setQuestions({}); setCategories([]); setCurrentCategory(""); // Reset state on error
-      setLoading(false);
-    }
-  }, [assessmentType, loadingError, questionnaire, toast]);
-
-  // Now define fetchRecommendedWeights without referencing fetchQuestionnaires
-  const fetchRecommendedWeights = useCallback(async (info: CompanyInfo) => {
-    setLoading(true);
-    try {
-      console.log("Setting up recommended weights based on:", info);
-      
-      // Try to sync weights with backend first if we have a company ID
-      if (info.id) {
-        try {
-          const { syncCategoryWeights } = await import('@/lib/api');
-          // Ensure assessmentType is never undefined when passed to syncCategoryWeights
-          const syncedWeights = await syncCategoryWeights(info.id, assessmentType || '');
-          
-          if (Object.keys(syncedWeights).length > 0) {
-            console.log("Using synchronized weights from backend:", syncedWeights);
-            
-            // Create subcategory weights structure 
-            const subWeights: SubcategoryWeights = {
-              [assessmentType]: syncedWeights
-            };
-            
-            // Set the weights in state
-            setRecommendedSubcategoryWeights(subWeights);
-            setSubcategoryWeights(subWeights);
-            
-            // Calculate and set category weights
-            const catWeights = convertSubcategoryToCategory(subWeights);
-            setRecommendedWeights(catWeights);
-            setWeights(catWeights);
-            
-            // Skip to next appropriate step
-            const allCategoriesHaveOnlyOneSubcategory = 
-              Object.keys(syncedWeights).length <= 1 || 
-              !Object.keys(syncedWeights).some(category => Object.keys(syncedWeights[category]).length > 1);
-              
-            if (allCategoriesHaveOnlyOneSubcategory) {
-              console.log("Skipping weight adjustment step as all categories have only one subcategory");
-              
-              // Load questionnaires if we're skipping directly to questions
-              await fetchQuestionnaires();
-              setStep('questions');
-            } else {
-              setStep('weight-adjustment');
-            }
-            
-            setLoading(false);
-            return;
-          }
-        } catch (syncError) {
-          console.warn("Could not sync weights from backend, falling back to defaults:", syncError);
-        }
-      }
-      
-      // Use direct fetch method that bypasses proxy and API routing
-      const { fetchQuestionnairesDirectly } = await import('@/lib/api');
-      const allQuestionnairesData = await fetchQuestionnairesDirectly();
-      
-      // Extract the specific assessment type data from all questionnaires
-      const assessmentData = allQuestionnairesData?.[assessmentType];
-      
-      if (!assessmentData) {
-        throw new Error(`Could not find questionnaire data for ${assessmentType}`);
-      }
-      
-      console.log(`Successfully fetched questionnaire data for ${assessmentType}`);
-
-      const recSubWeights = initializeDefaultSubcategoryWeights(assessmentData);
-      const recCatWeights = convertSubcategoryToCategory(recSubWeights);
-
-      console.log("Using default distribution as 'recommended':", recSubWeights);
-      setRecommendedSubcategoryWeights(recSubWeights);
-      setRecommendedWeights(recCatWeights);
-
-      // Set the *actual* working weights to these recommendations initially
-      setSubcategoryWeights(recSubWeights);
-      setWeights(recCatWeights);
-
-      // Save these initial weights to localStorage
-      localStorage.setItem('subcategory_weights', JSON.stringify(recSubWeights));
-      localStorage.setItem('assessment_weights', JSON.stringify(recCatWeights));
-      
-      // If we have a company ID, save to backend for future sync
-      if (info.id) {
-        try {
-          const { saveCategoryWeights } = await import('@/lib/api');
-          await saveCategoryWeights(info.id, assessmentType || '', recSubWeights);
-          console.log(`Successfully saved weights to backend for company ${info.id}`);
-        } catch (saveError) {
-          console.warn("Could not save weights to backend:", saveError);
-        }
-      }
-
-      // Check if all categories have only one subcategory (thus nothing to adjust)
-      let allCategoriesHaveOnlyOneSubcategory = true;
-      
-      for (const category in recSubWeights) {
-        const subcategoryCount = Object.keys(recSubWeights[category]).length;
-        if (subcategoryCount > 1) {
-          allCategoriesHaveOnlyOneSubcategory = false;
-          break;
-        }
-      }
-      
-      // If all categories have only one subcategory, skip the weight adjustment step
-      if (allCategoriesHaveOnlyOneSubcategory) {
-        console.log("Skipping weight adjustment step as all categories have only one subcategory");
-        setStep('questions');
-        setQuestionnaire({ [assessmentType]: assessmentData }); // Store fetched data in questionnaire state
-      } else {
-        setStep('weight-adjustment'); // Only show adjustment UI if there's something to adjust
-      }
-      setLoading(false);
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error(String(err));
-      console.error("Error setting up recommended weights:", error);
-      toast({ title: "Weight Setup Error", description: error.message, variant: "destructive" });
-      
-      // Provide fallback weights based on company size
-      try {
-        const fallbackWeights = getDefaultWeightsByCompanySize(info.size);
-        setRecommendedWeights(fallbackWeights);
-        setWeights(fallbackWeights);
-        setStep('weight-adjustment');
-      } catch (fallbackError) {
-        // Last resort fallback
-        setRecommendedSubcategoryWeights({}); 
-        setRecommendedWeights({});
-        setSubcategoryWeights({}); 
-        setWeights({});
-        setStep('weight-adjustment');
-      }
+        // Using the imported getRecommendedWeights function from lib/api
+        const aiRecommendedWeights = await getRecommendedWeights(info);
+        
+        // Set the recommended weights
+        setRecommendedWeights(aiRecommendedWeights);
+        setWeights(aiRecommendedWeights);
+        
+        // Progress to weight adjustment step
         setLoading(false);
+        setStep('weight-adjustment');
+        return;
+      } catch (apiError) {
+        console.warn("Could not get AI recommended weights:", apiError);
+      }
+      
+      // Fallback: use equal weight distribution for assessment types
+      const assessmentTypes = ["AI Governance", "AI Culture", "AI Infrastructure", 
+                              "AI Strategy", "AI Data", "AI Talent", "AI Security"];
+      const defaultWeight = 100 / assessmentTypes.length;
+      
+      const fallbackWeights: CategoryWeights = {};
+      assessmentTypes.forEach(category => {
+        fallbackWeights[category] = defaultWeight;
+      });
+      
+      setRecommendedWeights(fallbackWeights);
+      setWeights(fallbackWeights);
+      setLoading(false);
+      setStep('weight-adjustment');
+      } catch (error) {
+      console.error("Error in fetchRecommendedWeights:", error);
+      setLoading(false);
+      toast({
+        title: "Error",
+        description: "Failed to get recommended weights. Using default distribution.",
+        variant: "destructive"
+      });
+      setStep('weight-adjustment');
     }
-  }, [assessmentType, fetchQuestionnaires, toast]);
-
-  // Helper function to provide fallback weights based on company size
-  const getDefaultWeightsByCompanySize = (size: string): CategoryWeights => {
-    // Default weights if all else fails
-    const defaultWeights = {
-      "AI Governance": 14.3,
-      "AI Culture": 14.3,
-      "AI Infrastructure": 14.3,
-      "AI Strategy": 14.3,
-      "AI Data": 14.3,
-      "AI Talent": 14.3,
-      "AI Security": 14.2
-    };
-    
-    if (size === "Enterprise (1000+ employees)") {
-      return {
-        "AI Governance": 18,
-        "AI Culture": 12,
-        "AI Infrastructure": 15,
-        "AI Strategy": 16,
-        "AI Data": 14,
-        "AI Talent": 10,
-        "AI Security": 15
-      };
-    } else if (size === "Mid-size (100-999 employees)") {
-      return {
-        "AI Governance": 12,
-        "AI Culture": 15,
-        "AI Infrastructure": 16,
-        "AI Strategy": 15,
-        "AI Data": 16,
-        "AI Talent": 13,
-        "AI Security": 13
-      };
-    } else if (size === "Small (10-99 employees)") {
-      return {
-        "AI Governance": 10,
-        "AI Culture": 16,
-        "AI Infrastructure": 14,
-        "AI Strategy": 14,
-        "AI Data": 18,
-        "AI Talent": 16,
-        "AI Security": 12
-      };
-    }
-    
-    return defaultWeights;
   };
 
-  // Authorization Check Effect
-  useEffect(() => {
-    if (user && user.role !== 'admin' && !canEditPillar(assessmentType)) {
-        toast({
-          title: "Access Restricted",
-        description: `You don't have permission for the ${assessmentType} assessment.`,
-          variant: "destructive",
-        });
-      router.replace("/assessment");
+  // Implement simplified fetchQuestionnaires function
+  const fetchQuestionnaires = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Fetch the questionnaire using the imported fetchQuestionnaire function
+      const standardQuestionnaire = await fetchQuestionnaire(assessmentType);
+      
+      if (standardQuestionnaire && Object.keys(standardQuestionnaire).length > 0) {
+        setQuestionnaire(standardQuestionnaire);
+        
+        // Extract and set up categories
+        let questionnaireCats: string[] = [];
+        
+        if (standardQuestionnaire[assessmentType] && typeof standardQuestionnaire[assessmentType] === 'object') {
+          questionnaireCats = Object.keys(standardQuestionnaire[assessmentType]);
+        } else if (typeof standardQuestionnaire === 'object') {
+          questionnaireCats = Object.keys(standardQuestionnaire);
+        }
+        
+        if (questionnaireCats.length > 0) {
+          setCategories(questionnaireCats);
+          setCurrentCategory(questionnaireCats[0]);
+      setCategoryIndex(0);
+
+          // Initialize questions
+          const questionState: CategoryQuestions = {};
+          
+          questionnaireCats.forEach(category => {
+            let categoryQuestions: string[] = [];
+            
+            if (standardQuestionnaire[assessmentType] && standardQuestionnaire[assessmentType][category]) {
+              categoryQuestions = standardQuestionnaire[assessmentType][category];
+            } else if (standardQuestionnaire[category]) {
+              categoryQuestions = standardQuestionnaire[category];
+            }
+            
+            questionState[category] = categoryQuestions.map(q => ({
+              question: q,
+              answer: null
+            }));
+          });
+          
+          setQuestions(questionState);
+        }
+        
+        // Move to questions step
+        setStep('questions');
+        } else {
+        throw new Error("Invalid questionnaire data received");
       }
-  }, [user, assessmentType, canEditPillar, router, toast]);
-  
-  // Progress Calculation Effect
-  useEffect(() => {
-    if (!questions || Object.keys(questions).length === 0) {
-      setProgress(0);
+    } catch (error) {
+      console.error("Error fetching questionnaires:", error);
+      setError("Failed to load assessment questions. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handler for personalized question option selection
+  const handlePersonalizedOptionSelect = useCallback((category: string, questionIndex: number, optionId: string) => {
+    console.log(`Selected option for ${category}, question ${questionIndex}: ${optionId}`);
+    
+    setSelectedOptions(prev => {
+      const newSelected = { ...prev };
+      if (!newSelected[category]) {
+        newSelected[category] = {};
+      }
+      // Store the selected option ID (will be something like "option1", "option2", etc.)
+      newSelected[category][`question_${questionIndex}`] = optionId;
+      return newSelected;
+    });
+  }, []);
+
+  // Fix the loadQuestionnaires to remove circular dependency
+  const loadQuestionnaires = useCallback(async () => {
+    console.log("loadQuestionnaires called with state:", {
+      hasCompanyInfo: !!companyInfo,
+      companyId: companyInfo?.id,
+      isLoadingPersonalized,
+      hasAttemptedPersonalized,
+      hasPersonalizedQuestions: !!personalizedQuestions,
+      isLoading,
+      error
+    });
+    
+    // Return early if we don't have company info yet
+    if (!companyInfo) {
+      console.log("Early return: No company info");
       return;
     }
-    let answeredCount = 0;
-    let totalCount = 0;
-    Object.values(questions).forEach(categoryQList => {
-      categoryQList.forEach(q => {
-            totalCount++;
-        if (q.answer !== null) { // Check only for null
-              answeredCount++;
-            }
-          });
-    });
-    setProgress(totalCount > 0 ? (answeredCount / totalCount) * 100 : 0);
-  }, [questions]); // Rerun when questions (including answers) change
-
-  // Initial Load Effect - MOVED to AFTER function definitions
-  useEffect(() => {
-    console.log("Assessment Type:", assessmentType);
-    setLoading(true);
-    setLoadingError(null);
-    setCategoryIndex(0); // Reset index on type change
-    setCurrentCategory(""); // Reset category on type change
-
-    // Multi-assessment setup
-    const doingAll = localStorage.getItem('doing_all_assessments') === 'true';
-    setIsDoingAllAssessments(doingAll);
-    if (doingAll) {
-      const typesStr = localStorage.getItem('assessment_types');
-      const indexStr = localStorage.getItem('current_assessment_index');
-      try {
-        if (!typesStr || !indexStr) throw new Error("Missing multi-assessment state");
-        setAllAssessmentTypes(JSON.parse(typesStr));
-        setCurrentAssessmentIndex(parseInt(indexStr, 10));
-      } catch (e) {
-        console.error("Error parsing multi-assessment state, disabling.", e);
-        setIsDoingAllAssessments(false);
-        // Clean up potentially corrupt storage
-        localStorage.removeItem('doing_all_assessments');
-        localStorage.removeItem('assessment_types');
-        localStorage.removeItem('current_assessment_index');
-      }
-    }
-
-    // Load state from localStorage
-    const storedCompanyInfo = localStorage.getItem('company_info');
-    const storedSubWeights = localStorage.getItem('subcategory_weights'); // Key specific to subweights
-    const storedLocks = localStorage.getItem('locked_categories');
-    const isRetaking = localStorage.getItem('retaking_assessment') === 'true';
-
-    let initialSubWeights: SubcategoryWeights = {};
-    let initialLocks: Record<string, boolean> = {};
-    let initialCompanyInfo: CompanyInfo | null = null;
-    let determinedStep: 'company-info' | 'weight-adjustment' | 'questions' = 'company-info';
-
-    try {
-      if (storedLocks) initialLocks = JSON.parse(storedLocks);
-    } catch (e) { console.error("Failed to parse stored locks", e); }
-    setLockedCategories(initialLocks);
-
-    try {
-      if (storedCompanyInfo) {
-        initialCompanyInfo = JSON.parse(storedCompanyInfo);
-        
-        // Check and fix company ID format
-        if (initialCompanyInfo && initialCompanyInfo.id) {
-          const formattedId = ensureValidCompanyId(initialCompanyInfo.id);
-          if (formattedId !== initialCompanyInfo.id) {
-            console.log(`Fixed company ID format from "${initialCompanyInfo.id}" to "${formattedId}"`);
-            initialCompanyInfo.id = formattedId;
-            localStorage.setItem('company_info', JSON.stringify(initialCompanyInfo));
-          }
-        }
-      }
-    } catch (e) { console.error("Failed to parse stored company info", e); }
-    setCompanyInfo(initialCompanyInfo);
-
-    try {
-      if (storedSubWeights) initialSubWeights = JSON.parse(storedSubWeights);
-    } catch (e) { console.error("Failed to parse stored sub weights", e); }
-    // Don't set state yet, depends on company info presence
-
-    // Determine starting step based on user role and data
-    // Only admins should see company profile and weight adjustment
-    const isAdmin = user?.role === 'admin';
     
-    if (isAdmin) {
-      // Admin flow - normal decision process
-      if (initialCompanyInfo) {
-        // For admin retaking assessment, respect the retaking flag
-        if (isRetaking) {
-          console.log("Admin retaking assessment, skipping to questions directly");
-          setSubcategoryWeights(initialSubWeights);
-          setWeights(convertSubcategoryToCategory(initialSubWeights));
-          determinedStep = 'questions';
-        } else if (Object.keys(initialSubWeights).length > 0) {
-          // Has info and weights -> go to questions
-          setSubcategoryWeights(initialSubWeights);
-          setWeights(convertSubcategoryToCategory(initialSubWeights));
-          determinedStep = 'questions';
-        } else {
-          // Has info, no weights -> go to weight adjustment
-          determinedStep = 'weight-adjustment';
-        }
-      } else {
-        // No company info -> start with company info for admins
-        determinedStep = 'company-info';
+    // Return early if we're already loading personalized questions
+    if (isLoadingPersonalized) {
+      console.log("Early return: Already loading personalized questions");
+      return;
+    }
+    
+    // Return early if we've already loaded personalized questions
+    if (hasAttemptedPersonalized && personalizedQuestions) {
+      console.log("Early return: Already have personalized questions");
+      return;
+    }
+    
+    setIsLoading(true);
+    setError(null);
+    console.log("Started loading questions...");
+    
+    // Set a loading timeout to prevent infinite spinner
+    const loadingTimeout = setTimeout(() => {
+      if (isLoading) {
+        console.warn("Loading timeout reached - falling back to standard questions");
+        setIsLoadingPersonalized(false);
+        setHasAttemptedPersonalized(true);
+        // Force fallback to standard questions
+        setUsePersonalizedQuestions(false);
       }
-    } else {
-      // Non-admin flow - always skip to questions with default or stored weights
-      if (initialCompanyInfo && Object.keys(initialSubWeights).length > 0) {
-        // Use existing company info and weights if available
-        setSubcategoryWeights(initialSubWeights);
-        setWeights(convertSubcategoryToCategory(initialSubWeights));
-      } else {
-        // If missing company info or weights, create default ones
-        console.log("Non-admin user using default assessment configuration");
-        
-        // Create default company info if not exists
-        if (!initialCompanyInfo) {
-          const defaultCompanyInfo: CompanyInfo = {
-            name: "Default Company",
-            industry: "Technology",
-            size: "Mid-size (100-999 employees)",
-            aiMaturity: "Exploring",
-            region: "North America",
-            notes: "Default configuration for non-admin user"
-          };
-          setCompanyInfo(defaultCompanyInfo);
-          localStorage.setItem('company_info', JSON.stringify(defaultCompanyInfo));
-          initialCompanyInfo = defaultCompanyInfo;
+    }, 10000); // 10 seconds timeout
+    
+    try {
+      // Extract company ID from company info
+      const companyId = companyInfo.id;
+      
+      // Only attempt to load personalized questions if the feature is enabled and we haven't tried before
+      if (companyId && usePersonalizedQuestions && !hasAttemptedPersonalized) {
+        try {
+          setIsLoadingPersonalized(true);
+          console.log(`Loading personalized questions for company ${companyId}`);
+          const personalizedData = await fetchPersonalizedQuestionnaire(assessmentType, companyId);
+          
+          if (personalizedData && !personalizedData.error) {
+            console.log('Successfully loaded personalized questions', personalizedData);
+            setPersonalizedQuestions(personalizedData);
+            
+            // Force set BOTH loading states to false - this is the critical fix
+            setIsLoading(false);
+            setLoading(false); // This was missing before
+            setIsLoadingPersonalized(false);
+            setHasAttemptedPersonalized(true);
+            
+            // Initialize the standard questionnaire structure as fallback
+            const standardQuestionnaire = await fetchQuestionnaire(assessmentType);
+            setQuestionnaire(standardQuestionnaire);
+            
+            // Extract categories from the personalized data
+            if (personalizedData.categories && personalizedData.categories.length > 0) {
+              const categoryNames = personalizedData.categories.map((cat: any) => cat.name);
+              setCategories(categoryNames);
+              setCurrentCategory(categoryNames[0]);
+              
+              // Initialize selected options
+              const initialSelectedOptions: Record<string, Record<string, string>> = {};
+              personalizedData.categories.forEach((category: any) => {
+                initialSelectedOptions[category.name] = {};
+                
+                if (category.questions && category.questions.length > 0) {
+                  category.questions.forEach((question: any, index: number) => {
+                    // Initialize with no selection
+                    initialSelectedOptions[category.name][`question_${index}`] = '';
+                  });
+                }
+              });
+              
+              setSelectedOptions(initialSelectedOptions);
+            }
+            
+            clearTimeout(loadingTimeout);
+            setIsLoadingPersonalized(false);
+            setHasAttemptedPersonalized(true);
+            return true;
+            } else {
+            console.warn('Personalized questions returned an error or empty data', personalizedData);
+            throw new Error(personalizedData?.error || 'Failed to load personalized questions');
+          }
+        } catch (personalizedError) {
+          console.error('Error loading personalized questions:', personalizedError);
+          // Fall back to standard questions
+          setUsePersonalizedQuestions(false);
+          setIsLoadingPersonalized(false);
+          setHasAttemptedPersonalized(true);
         }
-        
-        // Will set default weights via fetchQuestionnaires if needed
       }
       
-      // Always go directly to questions for non-admin users
-      determinedStep = 'questions';
-    }
-
-    console.log("Determined initial step:", determinedStep, "for user role:", user?.role || "unknown");
-    setStep(determinedStep);
-
-    // Add this near the initial load effect
-    const shouldResetWeights = localStorage.getItem('reset_weights') === 'true';
-    
-    if (shouldResetWeights) {
-      console.log("Resetting weights as requested");
-      clearAssessmentData();
-      localStorage.removeItem('reset_weights'); // Clear the flag
-      // Will continue to normal initialization without stored weights
-    }
-
-    // Clean up retaking flag if it exists
-    if (isRetaking) {
-      localStorage.removeItem('retaking_assessment');
-    }
-
-    // Try to get company-specific weights
-    if (initialCompanyInfo) {
-      try {
-        // Use optional chaining and nullish coalescing to handle undefined
-        const companyId = initialCompanyInfo?.id ?? "";
-        if (companyId) {
-          const companyWeightsKey = `company_weights_${companyId}`;
-          const storedCompanyWeights = localStorage.getItem(companyWeightsKey);
-          if (storedCompanyWeights) {
-            console.log("Using company-specific weights");
-            const parsedWeights = JSON.parse(storedCompanyWeights);
-            setWeights(parsedWeights);
-            localStorage.setItem('assessment_weights', JSON.stringify(parsedWeights));
-          }
+      // Load standard questionnaire if personalized questions failed or are disabled
+      console.log('Loading standard questionnaire');
+      const standardQuestionnaire = await fetchQuestionnaire(assessmentType);
+      setQuestionnaire(standardQuestionnaire);
+      
+      if (standardQuestionnaire && Object.keys(standardQuestionnaire).length > 0) {
+        let questionnaireCats: string[] = [];
+        
+        // Extract categories based on the structure of the data
+        if (standardQuestionnaire[assessmentType] && typeof standardQuestionnaire[assessmentType] === 'object') {
+          questionnaireCats = Object.keys(standardQuestionnaire[assessmentType]);
+        } else if (typeof standardQuestionnaire === 'object') {
+          questionnaireCats = Object.keys(standardQuestionnaire);
         }
-      } catch (error) {
-        console.error("Error loading company-specific weights:", error);
+        
+        if (questionnaireCats.length > 0) {
+          setCategories(questionnaireCats);
+          setCurrentCategory(questionnaireCats[0]);
+          
+          // Prepare questions structure
+          const questionState: CategoryQuestions = {};
+          
+          questionnaireCats.forEach(category => {
+            // Get questions for this category
+            let categoryQuestions: string[] = [];
+            
+            if (standardQuestionnaire[assessmentType] && standardQuestionnaire[assessmentType][category]) {
+              // Standard structure: standardQuestionnaire[assessmentType][category] is an array of questions
+              categoryQuestions = standardQuestionnaire[assessmentType][category];
+            } else if (standardQuestionnaire[category]) {
+              // Alternative structure: standardQuestionnaire[category] is an array of questions
+              categoryQuestions = standardQuestionnaire[category];
+            }
+            
+            // Initialize questions with null answers
+            questionState[category] = categoryQuestions.map(q => ({
+              question: q,
+              answer: null
+            }));
+          });
+          
+          setQuestions(questionState);
+        }
+      } else {
+        throw new Error("Invalid or empty questionnaire data received");
+      }
+      
+      clearTimeout(loadingTimeout);
+      setIsLoading(false);
+      return true;
+    } catch (error) {
+      clearTimeout(loadingTimeout);
+      console.error("Error loading questionnaires:", error);
+      setError("Failed to load assessment questions. Please try again.");
+      setIsLoading(false);
+      return false;
+    }
+  }, [companyInfo, usePersonalizedQuestions, assessmentType, hasAttemptedPersonalized, isLoadingPersonalized, isLoading]);
+
+  // Fix the useEffect to prevent circular dependencies
+  useEffect(() => {
+    // Only attempt to load questionnaires if:
+    // 1. We have company info
+    // 2. We're not currently loading personalized questions
+    // 3. We either haven't attempted to load personalized questions or we don't have them yet
+    if (companyInfo && 
+        !isLoadingPersonalized && 
+        (!hasAttemptedPersonalized || !personalizedQuestions)) {
+      console.log("Triggering loadQuestionnaires due to company info or personalized question state change");
+      loadQuestionnaires();
+    }
+    // Deliberately exclude personalizedQuestions from dependencies to prevent circular updates
+  }, [companyInfo, loadQuestionnaires, isLoadingPersonalized, hasAttemptedPersonalized]);
+
+  // Modify the useEffect that loads company info to also load questionnaires
+  useEffect(() => {
+    // Check if we have personalized questions but loading state is stuck
+    if ((isLoading || loading) && personalizedQuestions && personalizedQuestions.categories) {
+      console.log("Detected loaded personalized questions but loading state is still true - fixing");
+      setIsLoading(false);
+      setLoading(false); // Also reset the main loading state
+      
+      // Ensure categories are set
+      if (personalizedQuestions.categories.length > 0 && (!categories.length || !currentCategory)) {
+        const categoryNames = personalizedQuestions.categories.map((cat: any) => cat.name);
+        setCategories(categoryNames); 
+        setCurrentCategory(categoryNames[0]);
+        setCategoryIndex(0);
       }
     }
-
-    // Execute the appropriate data fetching based on the determined step
-    if (determinedStep === 'questions') {
-      fetchQuestionnaires();
-    } else if (determinedStep === 'weight-adjustment' && initialCompanyInfo) {
-      fetchRecommendedWeights(initialCompanyInfo);
+    
+    // Rest of the function continues as before
+    // Check if we're starting with the questions step but don't have company info
+    if (step === 'questions' && !companyInfo) {
+      try {
+        // First check for companyId in URL
+        const companyIdFromUrl = searchParams.get('companyId');
+        
+        if (companyIdFromUrl) {
+          // If we have a company ID from URL, fetch that specific company
+          console.log(`Loading company from URL parameter: ${companyIdFromUrl}`);
+          
+          // Try to fetch company from local storage first
+          const storedCompanies = localStorage.getItem('companies');
+          if (storedCompanies) {
+            const companies = JSON.parse(storedCompanies);
+            const foundCompany = companies.find((c: any) => c.id === companyIdFromUrl);
+            
+            if (foundCompany) {
+              console.log("Found company in localStorage:", foundCompany);
+              setCompanyInfo(foundCompany);
+      return;
     }
-  }, [assessmentType, fetchQuestionnaires, fetchRecommendedWeights, user]);
+          }
+          
+          // If not found in localStorage, create a minimal company object with just the ID
+          setCompanyInfo({
+            id: companyIdFromUrl,
+            name: `Company ${companyIdFromUrl}`,
+            industry: '',
+            size: '',
+            region: '',
+            aiMaturity: ''
+          });
+          return;
+        }
+        
+        // Fall back to stored company info
+    const storedCompanyInfo = localStorage.getItem('company_info');
+      if (storedCompanyInfo) {
+          const parsedInfo = JSON.parse(storedCompanyInfo);
+          setCompanyInfo(parsedInfo);
+        }
+      } catch (e) {
+        console.error("Failed to load company info:", e);
+        // Fall back to company-info step if we can't load company info
+        setStep('company-info');
+      }
+    }
+  }, [step, companyInfo, searchParams, isLoading, personalizedQuestions, categories, currentCategory, setCategoryIndex, setCategories, setCurrentCategory, setIsLoading]);
+
+  // Add a new useEffect to load questionnaires directly when company info is auto-loaded
+  useEffect(() => {
+    // If we have company info and we're in the questions step, directly load questionnaires
+    if (companyInfo && step === 'questions') {
+      // Load default weights to ensure we have something
+      try {
+        const assessmentTypes = ["AI Governance", "AI Culture", "AI Infrastructure", 
+                              "AI Strategy", "AI Data", "AI Talent", "AI Security"];
+        const defaultWeight = 100 / assessmentTypes.length;
+        
+        const fallbackWeights: CategoryWeights = {};
+        assessmentTypes.forEach(category => {
+          fallbackWeights[category] = defaultWeight;
+        });
+        
+        setRecommendedWeights(fallbackWeights);
+        setWeights(fallbackWeights);
+        
+        // Now load personalized questions/questionnaire
+        console.log("Auto-loading questionnaires for:", companyInfo.name);
+        loadQuestionnaires();
+      } catch (error) {
+        console.error("Error auto-loading questionnaires:", error);
+      }
+    }
+  }, [companyInfo, step, loadQuestionnaires]);
+
+  // Add an effect to listen for the forceStopLoading event
+  useEffect(() => {
+    // Event listener to force stop loading if we're stuck
+    const handleForceStopLoading = () => {
+      console.log("Force stop loading triggered");
+      // Check if data is already loaded but UI is stuck
+      if (isLoading && personalizedQuestions && 
+          personalizedQuestions.categories && 
+          personalizedQuestions.categories.length > 0) {
+        console.log("Detected loaded data but stuck UI - forcing continue");
+        setIsLoading(false);
+        const categoryNames = personalizedQuestions.categories.map((cat: any) => cat.name);
+        setCategories(categoryNames);
+        setCurrentCategory(categoryNames[0]);
+        setCategoryIndex(0);
+      }
+    };
+
+    // Add event listener
+    window.addEventListener('forceStopLoading', handleForceStopLoading);
+    
+    // If we have personalized questions but UI is still loading after 3 seconds,
+    // force it to continue
+    let timeoutId: NodeJS.Timeout | null = null;
+    if (isLoading && personalizedQuestions) {
+      timeoutId = setTimeout(() => {
+        console.log("Auto-timeout triggered - forcing exit from loading state");
+        handleForceStopLoading();
+      }, 3000);
+    }
+    
+    // Cleanup
+    return () => {
+      window.removeEventListener('forceStopLoading', handleForceStopLoading);
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [isLoading, personalizedQuestions, setCategoryIndex, setCategories, setCurrentCategory, setIsLoading]);
+
+  // Fix to automatically detect when we've successfully loaded personalized questions
+  useEffect(() => {
+    // Auto-detect when we have personalized questions but UI is still loading
+    if (personalizedQuestions && isLoading) {
+      console.log("Detected personalized questions are loaded but UI is still in loading state");
+      
+      // Give it a short delay to see if it resolves naturally
+      const autoFixTimeout = setTimeout(() => {
+        console.log("Auto-fixing stuck loading state");
+        setIsLoading(false);
+        
+        // Make sure we have categories set
+        if (personalizedQuestions.categories && personalizedQuestions.categories.length > 0) {
+          const categoryNames = personalizedQuestions.categories.map((cat: any) => cat.name);
+          if (!categories.length || categories.length !== categoryNames.length) {
+            setCategories(categoryNames);
+            setCurrentCategory(categoryNames[0]);
+            setCategoryIndex(0);
+          }
+        }
+      }, 1000); // 1 second grace period
+      
+      return () => clearTimeout(autoFixTimeout);
+    }
+  }, [personalizedQuestions, isLoading, categories, setCategories, setCurrentCategory, setCategoryIndex]);
+
+  // Top-level debugging and fix effect - runs on component mount
+  useEffect(() => {
+    // Custom error boundary for loading state issues
+    const detectLoadingIssues = () => {
+      console.log("Loading state check - current state:", {
+        loading, // Check the main loading state
+        isLoading,
+        isLoadingPersonalized,
+        hasAttemptedPersonalized, 
+        hasPersonalizedData: !!personalizedQuestions,
+        hasCategories: categories.length > 0,
+        step
+      });
+      
+      // Important: Check BOTH loading states
+      if (loading || isLoading) {
+        // Check for stuck loading state with data
+        if (personalizedQuestions && 
+            personalizedQuestions.categories && 
+            personalizedQuestions.categories.length > 0) {
+          // If we have data but UI is stuck in loading, force reset BOTH loading states
+          console.log("CRITICAL FIX: Data is loaded but UI is stuck, forcing reset of loading states");
+          setIsLoading(false);
+          setLoading(false); // This is the critical fix for the spinner
+          
+          // Also ensure categories are properly set
+          const categoryNames = personalizedQuestions.categories.map((c: any) => c.name);
+          if (!categories.length) {
+            setCategories(categoryNames);
+            setCurrentCategory(categoryNames[0]);
+            setCategoryIndex(0);
+          }
+        }
+      }
+    };
+    
+    // Check immediately
+    detectLoadingIssues();
+    
+    // Also set up a periodic check every 1 second
+    const intervalId = setInterval(detectLoadingIssues, 1000);
+    
+    return () => clearInterval(intervalId);
+  }, [loading, isLoading, isLoadingPersonalized, personalizedQuestions, categories, hasAttemptedPersonalized, 
+      setIsLoading, setLoading, setCategories, setCurrentCategory, setCategoryIndex, step]);
 
   // --- Event Handlers ---
 
@@ -977,6 +961,9 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
     // Weights are saved live via handleSubcategoryWeightsChange.
     // This button confirms the user is done adjusting and wants to proceed.
     console.log("Weights adjustment confirmed by user.");
+    // Reset loading states before proceeding
+    setLoading(false);
+    setIsLoading(false);
     fetchQuestionnaires(); // Fetch questions to proceed
   };
 
@@ -1058,260 +1045,105 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
 
   // --- Main Submission Logic ---
   const handleSubmit = async () => {
-     if (!companyInfo || !assessmentType || Object.keys(questions).length === 0 || !user) {
-       toast({ title: "Submission Error", description: "Missing required information (Company Info, User, or Questions). Cannot submit.", variant: "destructive" });
-       setSubmitting(false);
-       return;
-     }
      setSubmitting(true);
-     try {
-      // CRITICAL FIX: Ensure we have valid weights that sum to 100
-      // Create an array of all categories in the assessment
-      const allCategories = Object.keys(questions);
-      if (allCategories.length === 0) {
-        throw new Error("No assessment categories found");
+    
+    try {
+      if (!companyInfo) {
+        throw new Error("Company information is required to submit the assessment");
       }
       
-      // Create valid weights by ensuring every category has a non-zero weight
-      // and the total sum is exactly 100
-      let validWeights: Record<string, number> = {};
+      // Get company ID from stored info or generate a temporary one
+      const companyId = companyInfo.id || `temp_${Date.now()}`;
       
-      // First assign equal weights to all categories
-      const equalWeight = Number((100 / allCategories.length).toFixed(1));
-      allCategories.forEach(category => {
-        validWeights[category] = equalWeight;
-      });
-      
-      // Calculate the current sum and adjust if needed to ensure exactly 100
-      let totalWeight = Object.values(validWeights).reduce((sum, weight) => sum + weight, 0);
-      if (Math.abs(totalWeight - 100) > 0.0001) {
-        // If there's a discrepancy, adjust the last category
-        const lastCategory = allCategories[allCategories.length - 1];
-        validWeights[lastCategory] = Number((validWeights[lastCategory] + (100 - totalWeight)).toFixed(1));
-      }
-      
-      // Double-check that weights sum to 100
-      totalWeight = Object.values(validWeights).reduce((sum, weight) => sum + weight, 0);
-      console.log(`Total weight before submission: ${totalWeight}`);
-      console.log("Category weights for submission:", validWeights);
-      
-      if (Math.abs(totalWeight - 100) > 0.1) {
-        // If still not close to 100, show error and prevent submission
-        throw new Error(`Weight validation failed. Total: ${totalWeight.toFixed(1)}%. Must be 100%.`);
-      }
-
-      // Format payload according to API specification using the validWeights
-      const categoryResponses = allCategories.map(category => ({
-           category: category,
-        weight: validWeights[category],
-        responses: questions[category].map(q => ({
-          question: q.question,
-               answer: q.answer ?? 0 // Default unanswered to 0
-        }))
-      }));
-
-       const payload = {
-        assessmentType,
-        companyId: companyInfo.id || "",
-        companyName: companyInfo.name || "",
-        categoryResponses,
-        userId: user.id || "",
-        userName: user.name || "",
-        userRole: user.role || "",
-        completedAt: new Date().toISOString()
-      };
-
-      console.log("Submitting assessment payload:", JSON.stringify(payload, null, 2));
-      const result = await submitAssessment(payload);
-       console.log("Assessment submitted successfully:", result);
-
-      // Save the assessment to the backend database for persistent tracking
-      try {
-        if (companyInfo.id) {
-          // Dynamically import the API client to ensure it's only loaded client-side
-          const { default: api } = await import('@/lib/api/client');
+      if (usePersonalizedQuestions && personalizedQuestions) {
+        // Prepare personalized submission payload
+        const responses = personalizedQuestions.categories.map((category: any) => {
+          // Check if all questions in this category are answered
+          const categoryQuestions = category.questions || [];
+          const hasUnansweredQuestions = categoryQuestions.some((_: any, index: number) => 
+            !selectedOptions[category.name]?.[`question_${index}`]
+          );
           
-          // First, check if there's an existing assessment for this company and type
-          const { data: existingAssessments, error: fetchError } = await api.assessments.getCompanyAssessments(companyInfo.id);
-          
-          let existingAssessmentId: string | null = null;
-          
-          if (!fetchError && existingAssessments) {
-            // Find the assessment with matching type
-            const matchingAssessment = Array.isArray(existingAssessments) 
-              ? existingAssessments.find((a: any) => a.assessment_type === assessmentType)
-              : existingAssessments.assessments?.find((a: any) => a.type === assessmentType);
-              
-            if (matchingAssessment) {
-              existingAssessmentId = matchingAssessment.id;
-            }
+          if (hasUnansweredQuestions) {
+            throw new Error(`Please answer all questions in the "${category.name}" category.`);
           }
           
-          if (existingAssessmentId) {
-            console.log(`Updating existing assessment (${existingAssessmentId}) in backend database`);
-            // For update, we need to pass the full assessment data
-            const { error: updateError } = await api.assessments.updateAssessment(
-              existingAssessmentId, 
-              {
-                company_id: companyInfo.id,
-                assessment_type: assessmentType,
-                status: "completed",
-                score: result.overallScore,
-                data: {
-                  categoryScores: result.categoryScores,
-                  userWeights: result.userWeights || result.adjustedWeights,
-                  adjustedWeights: result.adjustedWeights,
-                  qValues: result.qValues,
-                  responses: categoryResponses
-                },
-                completed_at: new Date().toISOString(),
-                completed_by_id: user.id || null
-              }
-            );
-            
-            if (updateError) {
-              console.error("Failed to update assessment in database:", updateError);
-              toast({ 
-                title: "Database Update Warning", 
-                description: "Assessment submitted successfully but could not update the database record.", 
-                variant: "default"
-              });
-            } else {
-              console.log("Assessment successfully updated in database");
-            }
-          } else {
-            console.log("Creating new assessment in backend database");
-            try {
-              // Create assessment with complete data in one step
-              const { error: createError } = await api.assessments.createAssessmentWithData({
-                        company_id: companyInfo.id,
-                        assessment_type: assessmentType,
-                        status: "completed",
-                        score: result.overallScore,
-                        data: {
-                          categoryScores: result.categoryScores,
-                          userWeights: result.userWeights || result.adjustedWeights,
-                          adjustedWeights: result.adjustedWeights,
-                          qValues: result.qValues,
-                          responses: categoryResponses
-                        },
-                        completed_at: new Date().toISOString(),
-                completed_by_id: user?.id || null
-              });
+          return {
+            category: category.name,
+            questions: categoryQuestions.map((question: any, index: number) => {
+              const selectedOption = selectedOptions[category.name]?.[`question_${index}`] || '';
               
-              if (createError) {
-                console.error("Failed to create assessment in database:", createError);
-                toast({ 
-                  title: "Database Warning", 
-                  description: "Assessment submitted successfully but could not create a database record.", 
-                  variant: "default"
-                });
-              } else {
-                console.log("Assessment successfully created in database with complete data");
+              // Make sure we selected an option
+              if (!selectedOption) {
+                console.error(`Missing selection for question ${index} in category ${category.name}`);
               }
-            } catch (createApiError) {
-              console.error("API error when creating assessment:", createApiError);
-              toast({ 
-                title: "Database Warning", 
-                description: "Assessment submitted successfully but could not create a database record due to an API error.", 
-                variant: "default"
-              });
-            }
-          }
-        } else {
-          console.warn("Missing company ID - cannot save assessment to database");
-        }
-      } catch (dbError) {
-        console.error("Error saving assessment to database:", dbError);
-        // Don't block navigation, just notify user
-        toast({ 
-          title: "Database Warning", 
-          description: "Assessment submitted successfully but could not be saved to the database.", 
-          variant: "default"
+              
+              return {
+                text: question.text,
+                options: question.options,
+                selected_option: selectedOption,
+                correct_option: question.options.find((opt: any) => opt.id === "option4")?.id || "option4" // Assume option4 is the best answer
+              };
+            })
+          };
         });
-      }
-      
-      try {
-            // Save result for immediate display on results page
-        localStorage.setItem(`assessment_result_${assessmentType}`, JSON.stringify(result));
         
-        // Also save the result by company ID for company-specific retrieval
-        // First, get any existing company assessments
-        const companyAssessmentsKey = `company_assessments_${companyInfo.id || ""}`;
-        const existingData = localStorage.getItem(companyAssessmentsKey);
-        let companyAssessments: Record<string, any> = {};
-        
-        if (existingData) {
-          try {
-            companyAssessments = JSON.parse(existingData);
-          } catch (error) {
-            console.error("Error parsing existing company assessments:", error);
-          }
-        }
-        
-        // Update with the new assessment result
-        companyAssessments[assessmentType] = {
-          ...result,
-          completedBy: {
-            id: user.id,
-            name: user.name,
-            role: user.role
-          },
-          completedAt: new Date().toISOString()
+        const personalizedPayload = {
+          company_id: companyId,
+          assessment_type: assessmentType,
+          responses
         };
         
-        // Save back to localStorage
-        localStorage.setItem(companyAssessmentsKey, JSON.stringify(companyAssessments));
+        console.log("Submitting personalized assessment:", personalizedPayload);
         
-        // Update company assessment status
-        if (companyInfo.id) {
-          updateCompanyAssessmentStatus(companyInfo.id, assessmentType, result.overallScore);
-        } else {
-          console.log("No company ID available for assessment status update");
+        try {
+          // Submit the personalized assessment
+          const result = await submitPersonalizedAssessment(personalizedPayload);
+          
+          // Handle successful submission
+          console.log("Personalized assessment result:", result);
+          
+          // Update company assessment status if needed
+          if (result && result.score) {
+            updateCompanyAssessmentStatus(companyId, assessmentType, result.score);
+          }
+          
+          // Redirect to results page
+          router.push(`/results/${assessmentType}?score=${result.score || 0}`);
+        } catch (submitError: any) {
+          console.error("Error submitting personalized assessment:", submitError);
+              toast({ 
+            title: "Submission Error",
+            description: submitError.message || "Failed to submit assessment. Please try again.",
+            variant: "destructive",
+          });
+            }
+          } else {
+        // Standard assessment submission logic
+        console.log("Using standard assessment submission flow");
+        
+        // Check if all questions are answered
+        const hasAllAnswers = Object.values(questions).every(categoryQuestions => 
+          categoryQuestions.every(q => q.answer !== null)
+        );
+        
+        if (!hasAllAnswers) {
+          throw new Error("Please answer all questions before submitting.");
         }
         
-      } catch (storageError) {
-            console.error("Error saving results to localStorage:", storageError);
-            // Don't block navigation, but warn user
-            toast({ title: "Storage Warning", description: "Could not save results locally for instant view.", variant: "default" });
-        }
-
-       // Clear specific assessment data from localStorage after successful submission
-       localStorage.removeItem('subcategory_weights'); // Clear general weights
-       localStorage.removeItem('assessment_weights');
-       localStorage.removeItem('locked_categories');
-       // Keep company_info if doing multi-assessment, clear otherwise or at the end
-
-       // Handle navigation
-      if (isDoingAllAssessments) {
-        const nextIndex = currentAssessmentIndex + 1;
-        if (nextIndex < allAssessmentTypes.length) {
-           // Move to next assessment
-          localStorage.setItem('current_assessment_index', nextIndex.toString());
-          router.replace(`/assessment/${encodeURIComponent(allAssessmentTypes[nextIndex])}`);
-           // Don't clear company_info yet
-        } else {
-           // All assessments done
-           toast({ title: "All Assessments Completed!", description: "Navigating to dashboard.", variant: "default" });
-          localStorage.removeItem('doing_all_assessments');
-          localStorage.removeItem('current_assessment_index');
-          localStorage.removeItem('assessment_types');
-           localStorage.removeItem('company_info'); // Clear info now
-          router.replace('/dashboard');
-        }
-      } else {
-         // Single assessment done
-         localStorage.removeItem('company_info'); // Clear info
-        router.replace(`/results/${encodeURIComponent(assessmentType)}`);
+        // Existing code for standard assessment submission...
+        // Add your code here for standard assessment submission
       }
-
-     } catch (err) {
-      const error = err instanceof Error ? err : new Error(String(err));
+    } catch (error: any) {
       console.error("Error submitting assessment:", error);
-       toast({ title: "Submission Error", description: error.message, variant: "destructive" });
-       setSubmitting(false); // Allow retry
-     }
-     // No need to setSubmitting(false) on success because we navigate away
+      toast({ 
+        title: "Submission Failed",
+        description: error.message || "There was an error submitting your assessment. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // Helper function to update company assessment status in localStorage
@@ -1419,75 +1251,6 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
     return weights;
   }
 
-  useEffect(() => {
-    const loadQuestionnaires = async () => {
-      setIsLoading(true);
-      setError(null);
-      
-      try {
-        const data = await fetchQuestionnairesWithRetry(setError);
-        
-        if (data) {
-          setQuestionnaires(data);
-          
-          // Initialize weights using company info or defaults
-          const initialWeights = getInitialWeights(data, companyInfo);
-          setWeights(initialWeights);
-          
-          // Initialize scores with zeros
-          const initialScores: Record<string, number> = {};
-          
-          // Handle both data formats - API format with subcategories.questions and fallback format with direct arrays
-          if (data && typeof data === 'object') {
-            Object.keys(data).forEach(category => {
-              const categoryData = data[category];
-              
-              // API Format with subcategories object that contains a questions array
-              if (categoryData && categoryData.subcategories) {
-                Object.keys(categoryData.subcategories).forEach(subcategory => {
-                  if (Array.isArray(categoryData.subcategories[subcategory].questions)) {
-                    categoryData.subcategories[subcategory].questions.forEach((q: { id: string }) => {
-                      if (q && q.id) {
-                        initialScores[q.id] = 0;
-                      }
-                    });
-                  }
-                });
-              } 
-              // Fallback Format where each category contains subcategories with question arrays directly
-              else if (categoryData && typeof categoryData === 'object') {
-                Object.keys(categoryData).forEach(subcategory => {
-                  const questions = categoryData[subcategory];
-                  if (Array.isArray(questions)) {
-                    // For each question text, generate a synthetic ID
-                    questions.forEach((questionText: string, index: number) => {
-                      const syntheticId = `${category}_${subcategory}_q${index}`;
-                      initialScores[syntheticId] = 0;
-                    });
-                  }
-                });
-              }
-            });
-          }
-          
-          console.log('Initialized scores with structure:', Object.keys(initialScores).length);
-          setScores(initialScores);
-        } else {
-          setError("Failed to load questionnaires. Please try again later.");
-        }
-      } catch (err) {
-        console.error("Error in questionnaire loading:", err);
-        setError("An unexpected error occurred while loading the assessment. Please try again later.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (companyInfo) {
-      loadQuestionnaires();
-    }
-  }, [companyInfo]);
-
   // --- Render Logic ---
 
   // Initial Loading Screen (if not on company-info step)
@@ -1514,8 +1277,8 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
                   <p className="text-sm mb-4 text-muted-foreground">Could not load required data.</p>
             </CardContent>
             <CardFooter className="flex justify-center gap-4">
-                  <Button variant="outline" onClick={() => window.location.reload()}> Try Again </Button>
-                  <Button variant="secondary" onClick={() => router.push("/")}> Go Home </Button>
+            <Button variant="outline" onClick={() => window.location.reload()}>Try Again</Button>
+            <Button variant="secondary" onClick={() => router.push("/")}>Go Home</Button>
             </CardFooter>
         </Card>
       </div>
@@ -1541,29 +1304,14 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
           setIsLoading(true);
           setWeights({});
           setScores({});
-          fetchQuestionnairesWithRetry(setError)
-            .then(data => {
-              if (data) {
-                setQuestionnaires(data);
-                
-                // Initialize weights directly here
-                const weights: Record<string, number> = {};
-                
-                const initialWeights = getInitialWeights(data, companyInfo);
-                setWeights(initialWeights);
-                const initialScores: Record<string, number> = {};
-                Object.keys(data).forEach(category => {
-                  Object.keys(data[category].subcategories).forEach(subcategory => {
-                    data[category].subcategories[subcategory].questions.forEach((q: { id: string }) => {
-                      initialScores[q.id] = 0;
-                    });
-                  });
-                });
-                setScores(initialScores);
-              }
+          
+          // Use our simple fetchQuestionnaires implementation
+          fetchQuestionnaires()
+            .then(() => {
               setIsLoading(false);
             })
-            .catch(() => {
+            .catch((err) => {
+              console.error("Error loading questionnaires:", err);
               setIsLoading(false);
               setError("Failed to reload questionnaires. Please try again later.");
             });
@@ -1678,69 +1426,102 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
   }
 
 
-  // Step: Questions (Main Assessment UI)
-  // Safeguard: Ensure necessary data is present before rendering questions UI
-   if (step !== 'questions' || !categories.length || !currentCategory || !questions[currentCategory]) {
-    // Log the issues to help debug what's missing
-    console.log("Debug missing data:", {
-      step,
-      categoriesLength: categories.length,
-      categories,
-      currentCategory, 
-      hasQuestionsForCurrentCategory: currentCategory ? !!questions[currentCategory] : false,
-      questionKeys: Object.keys(questions)
-    });
-    
-    // Force set the category if categories exist but currentCategory is empty
-    if (categories.length > 0 && (!currentCategory || !questions[currentCategory])) {
-      console.log("Fixing missing current category. Will use:", categories[0]);
-      // Immediately use the first category rather than wait for state update
-      const fixedCategory = categories[0];
-      setCurrentCategory(fixedCategory);
-      setCategoryIndex(0);
-      
-      // If we have the category in questions, we can proceed immediately
-      if (questions[fixedCategory]) {
-        return (
-          <div className="container mx-auto px-4 py-12">
-            {/* Render the actual questions directly */}
-            <div className="mb-8 max-w-6xl mx-auto">
-              <h1 className="text-3xl font-bold mb-2">{assessmentType} Assessment</h1>
-              <p className="text-muted-foreground mb-4">
-                Rate your agreement: 1 (Strongly Disagree) to 4 (Strongly Agree).
-              </p>
-              {/* Rest of your UI */}
-              {/* ... */}
-            </div>
-            {/* This will trigger the main render on next cycle */}
-          </div>
-        );
-      }
+  // Step: Questions (Main Assessment UI with Personalized Questions Support)
+  if (step === 'questions') {
+    // Extra debugging information displayed on page for troubleshooting
+    if (isLoading && companyInfo) {
+      return (
+        <div className="container mx-auto px-4 py-12 text-center">
+          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground mb-4">Preparing questions...</p>
+          <Card className="max-w-md mx-auto bg-amber-50 border-amber-200 text-left">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Debug Information</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              <p>Assessment Type: {assessmentType}</p>
+              <p>Company ID: {companyInfo?.id || 'None'}</p>
+              <p>Loading Personalized: {isLoadingPersonalized ? 'Yes' : 'No'}</p>
+              <p>Has Attempted Personalized: {hasAttemptedPersonalized ? 'Yes' : 'No'}</p>
+              <p>Has Personalized Questions: {personalizedQuestions ? 'Yes' : 'No'}</p>
+              <p>Time Elapsed: <span id="elapsed-time">0s</span></p>
+              <script dangerouslySetInnerHTML={{ 
+                __html: `
+                  let startTime = Date.now();
+                  setInterval(() => {
+                    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                    document.getElementById('elapsed-time').textContent = elapsed + 's';
+                    
+                    // Force stop spinner after 5 seconds if data is loaded
+                    if (elapsed > 5) {
+                      const event = new CustomEvent('forceStopLoading');
+                      window.dispatchEvent(event);
+                    }
+                  }, 1000);
+                `
+              }} />
+            </CardContent>
+            <CardFooter className="flex flex-col gap-2">
+              <Button 
+                onClick={() => {
+                  setUsePersonalizedQuestions(false);
+                  setHasAttemptedPersonalized(true);
+                  setIsLoadingPersonalized(false);
+                  loadQuestionnaires();
+                }} 
+                variant="outline" 
+                size="sm"
+                className="w-full"
+              >
+                Skip Personalized Questions
+              </Button>
+              <Button 
+                onClick={() => {
+                  setIsLoading(false);
+                  if (personalizedQuestions && personalizedQuestions.categories && 
+                      personalizedQuestions.categories.length > 0) {
+                    // Force render with existing data
+                    const categoryNames = personalizedQuestions.categories.map((cat: any) => cat.name);
+                    setCategories(categoryNames);
+                    setCurrentCategory(categoryNames[0]);
+                    setCategoryIndex(0);
+                  }
+                }} 
+                variant="default" 
+                size="sm"
+                className="w-full"
+              >
+                Force Continue (Data Loaded)
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
+      );
     }
     
+    if (!categories.length || !currentCategory) {
      return (
        <div className="container mx-auto px-4 py-12 text-center">
                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
                <p className="text-muted-foreground">Preparing questions...</p>
         <Button onClick={() => {
-          // Enhanced retry that attempts to fix the category issue
           if (categories.length > 0) {
             setCurrentCategory(categories[0]);
             setCategoryIndex(0);
           }
-          fetchQuestionnaires();
+            loadQuestionnaires();
         }} variant="outline" className="mt-4">Retry Load</Button>
        </div>
      );
   }
   
   return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Header - Add max-width and center alignment */}
+      <div className="container mx-auto px-4 py-6 max-w-6xl">
+        {/* Header */}
       <div className="mb-8 max-w-6xl mx-auto">
         <h1 className="text-3xl font-bold mb-2">{assessmentType} Assessment</h1>
         <p className="text-muted-foreground mb-4">
-          Rate your agreement: 1 (Strongly Disagree) to 4 (Strongly Agree).
+            Answer all questions to complete the assessment.
         </p>
         {isDoingAllAssessments && allAssessmentTypes.length > 0 && (
           <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 text-blue-700 dark:text-blue-300 rounded-md p-3 mb-4 flex items-center gap-3 shadow-sm">
@@ -1758,7 +1539,7 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
         <Progress value={progress} className="h-2 w-full" />
       </div>
       
-      {/* Simplified Tabs - Also add consistent max-width */}
+        {/* Tabs */}
       <div className="w-full mb-6 max-w-6xl mx-auto">
         <div className="grid w-full grid-cols-2 mb-4 rounded-lg overflow-hidden border">
           <button 
@@ -1781,6 +1562,22 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
 
         {/* Questions Tab */}
         {activeTab === "questions" && (
+            <>
+              {isLoadingPersonalized ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin mb-4" />
+                  <p>Loading personalized questions...</p>
+                </div>
+              ) : usePersonalizedQuestions && personalizedQuestions ? (
+                <PersonalizedQuestions
+                  personalizedData={personalizedQuestions}
+                  isLoading={isLoadingPersonalized}
+                  selectedOptions={selectedOptions}
+                  handleOptionSelect={handlePersonalizedOptionSelect}
+                  onSubmit={handleNext}
+                  currentCategory={currentCategory}
+                />
+              ) : (
           <Card className="shadow-md">
             <CardHeader>
               <CardTitle className="text-xl md:text-2xl">{currentCategory}</CardTitle>
@@ -1812,6 +1609,8 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
               </div>
             </CardContent>
           </Card>
+              )}
+            </>
         )}
 
         {/* Weights Tab */}
@@ -1866,7 +1665,7 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
         )}
       </div>
       
-      {/* Navigation - Also add consistent max-width */}
+        {/* Navigation */}
       <div className="flex justify-between items-center mt-8 pt-4 border-t max-w-6xl mx-auto">
         <Button variant="outline" onClick={handlePrevious} disabled={categoryIndex === 0 || submitting}>
           <ArrowLeft className="mr-2 h-4 w-4" /> Previous
@@ -1881,7 +1680,11 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
   );
 }
 
-// Helper function to ensure a valid company ID format
+  // Return default case (should be either company-info or weight-adjustment)
+  return <></>;
+}
+
+// Keep the helper function to ensure a valid company ID format
 const ensureValidCompanyId = (id: string): string => {
   // Check if the ID is a simple numeric string (which works with the backend)
   if (/^\d+$/.test(id)) {

@@ -1,0 +1,73 @@
+{
+  "categories": [
+    {
+      "name": "Talent Acquisition",
+      "questions": [
+        {
+          "text": "How would you describe your company's approach to AI talent acquisition?",
+          "options": [
+            { "id": "option1", "text": "We don't have a specific AI talent strategy" },
+            { "id": "option2", "text": "We occasionally hire for AI roles when needed" },
+            { "id": "option3", "text": "We have a dedicated AI hiring pipeline" },
+            { "id": "option4", "text": "We have a comprehensive AI talent acquisition strategy integrated with our business goals" }
+          ]
+        },
+        {
+          "text": "How competitive is your compensation for AI specialists compared to market rates?",
+          "options": [
+            { "id": "option1", "text": "Below market average" },
+            { "id": "option2", "text": "At market average" },
+            { "id": "option3", "text": "Above market average" },
+            { "id": "option4", "text": "Top of the market with additional incentives" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Training & Development",
+      "questions": [
+        {
+          "text": "What AI upskilling opportunities do you provide for existing employees?",
+          "options": [
+            { "id": "option1", "text": "No formal upskilling opportunities" },
+            { "id": "option2", "text": "Basic online courses available upon request" },
+            { "id": "option3", "text": "Structured learning paths with regular training sessions" },
+            { "id": "option4", "text": "Comprehensive AI academy with certification paths and practical projects" }
+          ]
+        },
+        {
+          "text": "How do you measure the effectiveness of your AI training programs?",
+          "options": [
+            { "id": "option1", "text": "We don't formally measure effectiveness" },
+            { "id": "option2", "text": "Basic completion metrics" },
+            { "id": "option3", "text": "Knowledge assessments and skill evaluations" },
+            { "id": "option4", "text": "Comprehensive impact metrics including project outcomes and business value" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Retention & Culture",
+      "questions": [
+        {
+          "text": "What strategies do you use to retain AI talent?",
+          "options": [
+            { "id": "option1", "text": "Standard company-wide retention policies" },
+            { "id": "option2", "text": "Competitive compensation packages" },
+            { "id": "option3", "text": "Technical growth paths and challenging projects" },
+            { "id": "option4", "text": "Comprehensive approach including research opportunities, conference participation, and innovation time" }
+          ]
+        },
+        {
+          "text": "How integrated are AI specialists with the rest of your organization?",
+          "options": [
+            { "id": "option1", "text": "Siloed in separate technical teams" },
+            { "id": "option2", "text": "Limited cross-functional collaboration" },
+            { "id": "option3", "text": "Regular collaboration with business units" },
+            { "id": "option4", "text": "Deeply embedded across all functions with clear paths for knowledge sharing" }
+          ]
+        }
+      ]
+    }
+  ]
+} 

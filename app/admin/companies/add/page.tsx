@@ -24,10 +24,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, Plus, CheckCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { CompanyInfo } from "@/types";
+import { CompanyInfo, CompanyVerificationInfo } from "@/types";
 import api from '@/lib/api/client';
+import CompanyVerification from "@/components/CompanyVerification";
 
 // Zod schema for form validation
 const companyFormSchema = z.object({
@@ -80,9 +81,16 @@ const AI_MATURITY_SCORES = {
   "AI Ready": "85+"      // Fully Prepared
 };
 
+enum FormSteps {
+  FORM_INPUT = 'form_input',
+  COMPANY_VERIFICATION = 'company_verification',
+}
+
 export default function AddCompanyPage() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
+  const [currentStep, setCurrentStep] = useState<FormSteps>(FormSteps.FORM_INPUT);
+  const [verificationInfo, setVerificationInfo] = useState<CompanyVerificationInfo | null>(null);
 
   // Initialize form
   const form = useForm<CompanyFormValues>({
@@ -95,7 +103,49 @@ export default function AddCompanyPage() {
     },
   });
 
-  const onSubmit = async (values: CompanyFormValues) => {
+  const handleFormSubmit = (values: CompanyFormValues) => {
+    // Move to verification step when form is submitted
+    setCurrentStep(FormSteps.COMPANY_VERIFICATION);
+  };
+
+  const handleVerification = (verifiedInfo: CompanyVerificationInfo) => {
+    setVerificationInfo(verifiedInfo);
+    // Auto-fill form fields with verified information if available
+    if (verifiedInfo.industry) {
+      form.setValue('industry', mapIndustryToOptions(verifiedInfo.industry));
+    }
+    if (verifiedInfo.size) {
+      form.setValue('size', mapSizeToOptions(verifiedInfo.size));
+    }
+    
+    // Return to form step with prefilled values
+    setCurrentStep(FormSteps.FORM_INPUT);
+  };
+
+  const handleSkipVerification = () => {
+    setCurrentStep(FormSteps.FORM_INPUT);
+  };
+
+  // Helper to map verified industry to dropdown options
+  const mapIndustryToOptions = (industry: string): string => {
+    const match = industryOptions.find(option => 
+      industry.toLowerCase().includes(option.toLowerCase())
+    );
+    return match || "Other";
+  };
+
+  // Helper to map verified size to dropdown options
+  const mapSizeToOptions = (size: string): string => {
+    if (size.toLowerCase().includes("small") || size.toLowerCase().includes("startup")) {
+      return "Small (10-99 employees)";
+    } else if (size.toLowerCase().includes("enterprise") || size.toLowerCase().includes("large")) {
+      return "Enterprise (1000+ employees)";
+    } else {
+      return "Mid-size (100-999 employees)";
+    }
+  };
+
+  const saveCompany = async (values: CompanyFormValues) => {
     setSubmitting(true);
     
     try {
@@ -107,6 +157,7 @@ export default function AddCompanyPage() {
         region: DEFAULT_REGION, // Use default value
         aiMaturity: DEFAULT_AI_MATURITY, // Use default value
         notes: values.notes || "",
+        verifiedInfo: verificationInfo || undefined // Use undefined instead of null
       });
       
       if (error) {
@@ -139,6 +190,35 @@ export default function AddCompanyPage() {
     }
   };
 
+  if (currentStep === FormSteps.COMPANY_VERIFICATION) {
+    return (
+      <div className="container mx-auto py-8 px-4">
+        <div className="flex items-center mb-6">
+          <Button 
+            variant="ghost"
+            onClick={() => setCurrentStep(FormSteps.FORM_INPUT)}
+            className="mr-4"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Form
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold">Verify Company</h1>
+            <p className="text-muted-foreground">Confirm company information</p>
+          </div>
+        </div>
+
+        <div className="max-w-2xl mx-auto">
+          <CompanyVerification 
+            companyName={form.getValues().name}
+            onVerify={handleVerification}
+            onSkip={handleSkipVerification}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto py-8 px-4">
       <div className="flex items-center mb-6">
@@ -156,6 +236,22 @@ export default function AddCompanyPage() {
         </div>
       </div>
 
+      {verificationInfo && verificationInfo.isVerified && (
+        <div className="max-w-2xl mx-auto mb-6">
+          <div className="bg-green-50 border border-green-200 rounded-md p-4 flex items-start">
+            <div className="flex-shrink-0">
+              <CheckCircle className="h-5 w-5 text-green-500" />
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-green-800">Company Verified</h3>
+              <div className="mt-2 text-sm text-green-700">
+                <p>Company information has been verified using external sources.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Card className="max-w-2xl mx-auto">
         <CardHeader>
           <CardTitle>Company Information</CardTitle>
@@ -165,7 +261,7 @@ export default function AddCompanyPage() {
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(form.formState.isSubmitted ? saveCompany : handleFormSubmit)} className="space-y-6">
               <FormField
                 control={form.control}
                 name="name"
@@ -190,6 +286,7 @@ export default function AddCompanyPage() {
                       <Select 
                         onValueChange={field.onChange} 
                         defaultValue={field.value}
+                        value={field.value}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -218,6 +315,7 @@ export default function AddCompanyPage() {
                       <Select 
                         onValueChange={field.onChange} 
                         defaultValue={field.value}
+                        value={field.value}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -248,7 +346,7 @@ export default function AddCompanyPage() {
                       <Textarea 
                         placeholder="Enter additional notes about the company" 
                         className="min-h-[100px]"
-                        {...field} 
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
@@ -256,29 +354,16 @@ export default function AddCompanyPage() {
                 )}
               />
 
-              <div className="flex justify-end pt-4">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => router.back()} 
-                  className="mr-2"
-                  disabled={submitting}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={submitting}>
-                  {submitting ? (
-                    <div className="flex items-center">
-                      <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-opacity-50 border-t-transparent rounded-full"></div>
-                      Creating...
-                    </div>
-                  ) : (
-                    <div className="flex items-center">
-                      <Plus className="mr-2 h-4 w-4" />
-                      Create Company
-                    </div>
-                  )}
-                </Button>
+              <div className="flex justify-between gap-4 pt-2">
+                {!form.formState.isSubmitted ? (
+                  <Button type="submit" className="w-full">
+                    Continue to Verification
+                  </Button>
+                ) : (
+                  <Button type="submit" disabled={submitting} className="w-full">
+                    {submitting ? 'Creating...' : 'Create Company'}
+                  </Button>
+                )}
               </div>
             </form>
           </Form>
