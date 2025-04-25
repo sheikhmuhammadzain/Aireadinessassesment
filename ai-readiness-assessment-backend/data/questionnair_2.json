@@ -1,0 +1,1371 @@
+[
+[
+  {
+    "category": "Strategy",
+    "subcategory": "Strategy Definition",
+    "question": "Does your organization have a defined AI strategy?",
+    "options": [
+      "Yes, it is well-documented and implemented.",
+      "It is currently in development.",
+      "No, but we are planning to define one.",
+      "No, we do not see the need for one."
+    ]
+  },
+  {
+    "category": "Strategy",
+    "subcategory": "Strategy Definition",
+    "question": "Is there a roadmap for AI implementation over the next 1, 3, and 5 years?",
+    "options": [
+      "Yes, detailed plans exist for all three timeframes.",
+      "We have a roadmap for the next year only.",
+      "A roadmap is under development.",
+      "No, we do not have a roadmap."
+    ]
+  },
+  {
+    "category": "Strategy",
+    "subcategory": "Strategy Definition",
+    "question": "Is AI aligned with your organization's overall strategic goals?",
+    "options": [
+      "Fully aligned and integrated.",
+      "Partially aligned but not fully integrated.",
+      "Not yet aligned, but plans are underway.",
+      "No alignment currently exists."
+    ]
+  },
+  {
+    "category": "Strategy",
+    "subcategory": "Leadership and Governance",
+    "question": "Is there a leadership role specifically responsible for AI?",
+    "options": [
+      "Yes, we have a dedicated Chief AI Officer (CAIO).",
+      "AI responsibility is shared among leadership.",
+      "We are considering creating a specific role.",
+      "No specific role exists."
+    ]
+  },
+  {
+    "category": "Strategy",
+    "subcategory": "Leadership and Governance",
+    "question": "Are stakeholders regularly updated on AI developments?",
+    "options": [
+      "Yes, updates are shared through structured reporting.",
+      "Occasionally, but not on a regular basis.",
+      "Only major developments are communicated.",
+      "Stakeholders are not updated."
+    ]
+  },
+  {
+    "category": "Strategy",
+    "subcategory": "Leadership and Governance",
+    "question": "Do you have a mechanism to monitor AI ROI?",
+    "options": [
+      "Yes, we use dedicated tools and metrics.",
+      "ROI is monitored informally.",
+      "A mechanism is being developed.",
+      "No, we do not monitor AI ROI."
+    ]
+  },
+  {
+    "category": "Strategy",
+    "subcategory": "Integration and Execution",
+    "question": "Are AI initiatives integrated into other business transformation programs?",
+    "options": [
+      "Fully integrated across all programs.",
+      "Integrated into select programs.",
+      "Integration is planned but not complete.",
+      "No integration exists."
+    ]
+  },
+  {
+    "category": "Strategy",
+    "subcategory": "Integration and Execution",
+    "question": "Is there a process for prioritizing AI use cases?",
+    "options": [
+      "Yes, we use a formal evaluation framework.",
+      "Prioritization happens on an ad-hoc basis.",
+      "A prioritization process is under development.",
+      "No prioritization process exists."
+    ]
+  },
+  {
+    "category": "Strategy",
+    "subcategory": "Integration and Execution",
+    "question": "Have you assessed your competition’s AI strategies?",
+    "options": [
+      "Yes, we conduct regular benchmarking.",
+      "We have done some informal assessments.",
+      "Assessment is planned but not started.",
+      "No assessments have been made."
+    ]
+  },
+  {
+    "category": "Strategy",
+    "subcategory": "Ecosystem and Partnerships",
+    "question": "Do you have partnerships with AI research organizations or startups?",
+    "options": [
+      "Yes, we have multiple partnerships.",
+      "We have a few partnerships in place.",
+      "We are exploring partnership opportunities.",
+      "No partnerships exist."
+    ]
+  },
+  {
+    "category": "Strategy",
+    "subcategory": "Ecosystem and Partnerships",
+    "question": "Do you have a system for benchmarking AI success against industry standards?",
+    "options": [
+      "Yes, benchmarking is done regularly.",
+      "We benchmark occasionally.",
+      "A benchmarking system is being developed.",
+      "No benchmarking is performed."
+    ]
+  },
+  {
+    "category": "Strategy",
+    "subcategory": "Ecosystem and Partnerships",
+    "question": "Is there a clear policy for intellectual property related to AI?",
+    "options": [
+      "Yes, a comprehensive policy exists.",
+      "There is a basic policy in place.",
+      "Policy development is underway.",
+      "No policy exists."
+    ]
+  },
+  {
+    "category": "Strategy",
+    "subcategory": "Innovation Culture",
+    "question": "Do you maintain a catalog of all AI projects underway?",
+    "options": [
+      "Yes, it is updated regularly.",
+      "We maintain a catalog but updates are irregular.",
+      "A catalog is being developed.",
+      "No catalog is maintained."
+    ]
+  },
+  {
+    "category": "Strategy",
+    "subcategory": "Innovation Culture",
+    "question": "Is AI a part of your organizational mission statement?",
+    "options": [
+      "Yes, it is explicitly stated.",
+      "AI is indirectly referenced.",
+      "We are considering including it.",
+      "No, it is not part of the mission statement."
+    ]
+  },
+  {
+    "category": "Strategy",
+    "subcategory": "Innovation Culture",
+    "question": "Do you have defined KPIs for AI success?",
+    "options": [
+      "Yes, they are well-established.",
+      "We have some basic KPIs.",
+      "KPIs are under development.",
+      "No KPIs have been defined."
+    ]
+  },
+  {
+    "category": "Strategy",
+    "subcategory": "Innovation Culture",
+    "question": "Is there a budget explicitly allocated for AI innovation?",
+    "options": [
+      "Yes, a dedicated budget exists.",
+      "There is some budget flexibility for AI.",
+      "Budget allocation is being considered.",
+      "No dedicated budget exists."
+    ]
+  },
+  {
+    "category": "Strategy",
+    "subcategory": "Innovation Culture",
+    "question": "Are AI risks regularly assessed and mitigated?",
+    "options": [
+      "Yes, using a formal risk management process.",
+      "Risks are assessed occasionally.",
+      "A risk assessment process is being developed.",
+      "No risk assessments are conducted."
+    ]
+  },
+  {
+    "category": "Strategy",
+    "subcategory": "Innovation Culture",
+    "question": "Does your organization have an ethical AI framework?",
+    "options": [
+      "Yes, it is fully implemented.",
+      "A basic framework exists.",
+      "We are developing an ethical AI framework.",
+      "No framework exists."
+    ]
+  },
+  {
+    "category": "Strategy",
+    "subcategory": "Innovation Culture",
+    "question": "Are employees incentivized to contribute to AI innovation?",
+    "options": [
+      "Yes, through rewards and recognition programs.",
+      "Some employees are incentivized.",
+      "Incentive plans are under consideration.",
+      "No incentives exist."
+    ]
+  },
+  {
+    "category": "Strategy",
+    "subcategory": "Innovation Culture",
+    "question": "Do you have a structured innovation lab for AI experimentation?",
+    "options": [
+      "Yes, it is well-established.",
+      "We have a lab, but it is not fully structured.",
+      "Plans for an innovation lab are underway.",
+      "No innovation lab exists."
+    ]
+  }
+],
+  [
+  {
+    "category": "Infrastructure",
+    "subcategory": "Cloud Compatibility",
+    "question": "Is your IT infrastructure cloud-compatible for scaling AI?",
+    "options": [
+      "Fully cloud-compatible",
+      "Partially compatible",
+      "Compatibility in progress",
+      "Not cloud-compatible"
+    ]
+  },
+  {
+    "category": "Infrastructure",
+    "subcategory": "Data Management",
+    "question": "Do you have dedicated data lakes for AI use cases?",
+    "options": [
+      "Fully dedicated data lakes",
+      "Partially dedicated",
+      "Data lake plans in place",
+      "No dedicated data lakes"
+    ]
+  },
+  {
+    "category": "Infrastructure",
+    "subcategory": "Compute Resources",
+    "question": "Are your compute resources sufficient for AI training tasks?",
+    "options": [
+      "Sufficient for all tasks",
+      "Sufficient for most tasks",
+      "Resources being upgraded",
+      "Insufficient resources"
+    ]
+  },
+  {
+    "category": "Infrastructure",
+    "subcategory": "Backup Systems",
+    "question": "How robust are your backup systems for AI data and models?",
+    "options": [
+      "Highly robust",
+      "Moderately robust",
+      "Robustness improvements planned",
+      "Not robust"
+    ]
+  },
+  {
+    "category": "Infrastructure",
+    "subcategory": "Disaster Recovery",
+    "question": "Do you have a disaster recovery plan specific to AI workloads?",
+    "options": [
+      "Comprehensive recovery plan",
+      "Limited recovery plan",
+      "Plan under development",
+      "No recovery plan"
+    ]
+  },
+  {
+    "category": "Infrastructure",
+    "subcategory": "Interoperability",
+    "question": "Are your AI systems interoperable across teams and departments?",
+    "options": [
+      "Fully interoperable",
+      "Partially interoperable",
+      "Interoperability improvements planned",
+      "Not interoperable"
+    ]
+  },
+  {
+    "category": "Infrastructure",
+    "subcategory": "Edge Computing",
+    "question": "Is there a plan to adopt edge computing for AI workloads?",
+    "options": [
+      "Plan fully implemented",
+      "Plan partially implemented",
+      "Plan under development",
+      "No plan exists"
+    ]
+  },
+  {
+    "category": "Infrastructure",
+    "subcategory": "Storage Optimization",
+    "question": "Is your storage optimized for unstructured data used in AI?",
+    "options": [
+      "Fully optimized",
+      "Partially optimized",
+      "Optimization in progress",
+      "Not optimized"
+    ]
+  },
+  {
+    "category": "Infrastructure",
+    "subcategory": "Redundancy Systems",
+    "question": "Do you have redundancy systems for AI computing needs?",
+    "options": [
+      "Fully redundant systems",
+      "Limited redundancy",
+      "Redundancy improvements planned",
+      "No redundancy"
+    ]
+  },
+  {
+    "category": "Infrastructure",
+    "subcategory": "AI Workload Management",
+    "question": "Is your IT team trained in managing AI-specific workloads?",
+    "options": [
+      "Fully trained",
+      "Moderately trained",
+      "Training in progress",
+      "Not trained"
+    ]
+  },
+  {
+    "category": "Infrastructure",
+    "subcategory": "Budget Allocation",
+    "question": "Is there a separate budget for scaling AI infrastructure?",
+    "options": [
+      "Dedicated budget allocated",
+      "Partial budget allocated",
+      "Budget allocation planned",
+      "No separate budget"
+    ]
+  },
+  {
+    "category": "Infrastructure",
+    "subcategory": "Environmental Impact",
+    "question": "Do you evaluate the environmental impact of AI infrastructure?",
+    "options": [
+      "Environmental impact evaluated regularly",
+      "Occasionally evaluated",
+      "Evaluation planned",
+      "Not evaluated"
+    ]
+  },
+  {
+    "category": "Infrastructure",
+    "subcategory": "IoT Integration",
+    "question": "Are your AI systems integrated with IoT platforms?",
+    "options": [
+      "Fully integrated with IoT",
+      "Partially integrated",
+      "Integration planned",
+      "Not integrated"
+    ]
+  },
+  {
+    "category": "Infrastructure",
+    "subcategory": "Containerization",
+    "question": "Do you use containerization tools for AI model deployment?",
+    "options": [
+      "Fully implemented tools",
+      "Limited tools used",
+      "Tool implementation planned",
+      "No tools used"
+    ]
+  },
+  {
+    "category": "Infrastructure",
+    "subcategory": "Network Architecture",
+    "question": "Is there an AI-specific network architecture in place?",
+    "options": [
+      "Comprehensive network architecture",
+      "Partial architecture in place",
+      "Architecture planned",
+      "No specific architecture"
+    ]
+  },
+  {
+    "category": "Infrastructure",
+    "subcategory": "Real-Time Operations",
+    "question": "How efficiently does your infrastructure support real-time AI operations?",
+    "options": [
+      "Highly efficient",
+      "Moderately efficient",
+      "Efficiency improvements planned",
+      "Not efficient"
+    ]
+  },
+  {
+    "category": "Infrastructure",
+    "subcategory": "Latency Monitoring",
+    "question": "Do you have latency monitoring systems for AI services?",
+    "options": [
+      "Monitoring conducted regularly",
+      "Monitoring conducted occasionally",
+      "Monitoring system planned",
+      "No monitoring system"
+    ]
+  },
+  {
+    "category": "Infrastructure",
+    "subcategory": "Hardware Alignment",
+    "question": "How aligned are your hardware upgrades with AI goals?",
+    "options": [
+      "Fully aligned",
+      "Moderately aligned",
+      "Alignment in progress",
+      "Not aligned"
+    ]
+  },
+  {
+    "category": "Infrastructure",
+    "subcategory": "Benchmarking Tools",
+    "question": "Do you use benchmarking tools to assess infrastructure for AI readiness?",
+    "options": [
+      "Benchmarking tools fully utilized",
+      "Tools used occasionally",
+      "Tools implementation planned",
+      "Not used"
+    ]
+  },
+  {
+    "category": "Infrastructure",
+    "subcategory": "Compliance",
+    "question": "Is your infrastructure compliant with global AI standards?",
+    "options": [
+      "Fully compliant",
+      "Partially compliant",
+      "Compliance improvements planned",
+      "Not compliant"
+    ]
+  }
+],
+  [
+  {
+    "category": "Data",
+    "subcategory": "Data Cataloging",
+    "question": "Is your data catalogued for easy access by AI teams?",
+    "options": [
+      "Fully catalogued with role-based access",
+      "Partially catalogued",
+      "Cataloguing in progress",
+      "No cataloguing"
+    ]
+  },
+  {
+    "category": "Data",
+    "subcategory": "Metadata Standardization",
+    "question": "Do you maintain data dictionaries to standardize metadata?",
+    "options": [
+      "Fully standardized",
+      "Partially standardized",
+      "Standardization is planned",
+      "No standardization"
+    ]
+  },
+  {
+    "category": "Data",
+    "subcategory": "Data Updates",
+    "question": "How frequent is your data updated for AI use cases?",
+    "options": [
+      "Real-time updates",
+      "Daily updates",
+      "Weekly updates",
+      "Updates are infrequent"
+    ]
+  },
+  {
+    "category": "Data",
+    "subcategory": "Data Cleansing",
+    "question": "Do you have automated data cleansing pipelines?",
+    "options": [
+      "Fully automated",
+      "Partially automated",
+      "Planned but not implemented",
+      "No automation"
+    ]
+  },
+  {
+    "category": "Data",
+    "subcategory": "Multi-Modal Integration",
+    "question": "Do you support multi-modal data integration for AI?",
+    "options": [
+      "Fully supported",
+      "Supported to a limited extent",
+      "Planned for the future",
+      "Not supported"
+    ]
+  },
+  {
+    "category": "Data",
+    "subcategory": "Data Governance",
+    "question": "Is your data governance aligned with AI requirements?",
+    "options": [
+      "Fully aligned",
+      "Partially aligned",
+      "Governance plan in progress",
+      "Not aligned"
+    ]
+  },
+  {
+    "category": "Data",
+    "subcategory": "Synthetic Data",
+    "question": "Do you have internal tools for synthetic data generation?",
+    "options": [
+      "Fully implemented",
+      "Partially implemented",
+      "Planned but not developed",
+      "No tools available"
+    ]
+  },
+  {
+    "category": "Data",
+    "subcategory": "External Data Security",
+    "question": "How secure is your external data ingestion process?",
+    "options": [
+      "Highly secure",
+      "Moderately secure",
+      "Security measures in development",
+      "Not secure"
+    ]
+  },
+  {
+    "category": "Data",
+    "subcategory": "External Data Auditing",
+    "question": "Do you audit external data sources for quality and reliability?",
+    "options": [
+      "Regular and thorough audits",
+      "Occasional audits",
+      "Planned audits",
+      "No audits conducted"
+    ]
+  },
+  {
+    "category": "Data",
+    "subcategory": "Labeling Standardization",
+    "question": "Are labeling processes standardized for supervised learning?",
+    "options": [
+      "Fully standardized",
+      "Partially standardized",
+      "Standardization planned",
+      "No standardization"
+    ]
+  },
+  {
+    "category": "Data",
+    "subcategory": "Version Control",
+    "question": "Do you use version control for data sets used in AI?",
+    "options": [
+      "Fully implemented version control",
+      "Limited version control",
+      "Planned but not implemented",
+      "No version control"
+    ]
+  },
+  {
+    "category": "Data",
+    "subcategory": "Data Anonymization",
+    "question": "How comprehensive is your data anonymization process?",
+    "options": [
+      "Comprehensive and regular",
+      "Limited anonymization",
+      "In development",
+      "No anonymization"
+    ]
+  },
+  {
+    "category": "Data",
+    "subcategory": "Bias Detection",
+    "question": "Do you have tools to identify biases in data pipelines?",
+    "options": [
+      "Tools fully implemented",
+      "Limited tools available",
+      "Tools are planned",
+      "No tools available"
+    ]
+  },
+  {
+    "category": "Data",
+    "subcategory": "Data Pipeline Automation",
+    "question": "Is your data pipeline automated for repeatable experiments?",
+    "options": [
+      "Fully automated",
+      "Partially automated",
+      "Planned automation",
+      "No automation"
+    ]
+  },
+  {
+    "category": "Data",
+    "subcategory": "Knowledge Graph",
+    "question": "Do you maintain a knowledge graph for AI contextual data needs?",
+    "options": [
+      "Fully maintained",
+      "Limited knowledge graph",
+      "Maintenance planned",
+      "No knowledge graph"
+    ]
+  },
+  {
+    "category": "Data",
+    "subcategory": "Data Lineage Audits",
+    "question": "Do you conduct regular data lineage audits?",
+    "options": [
+      "Conducted regularly",
+      "Conducted occasionally",
+      "Planned audits",
+      "No audits conducted"
+    ]
+  },
+  {
+    "category": "Data",
+    "subcategory": "Data Formats",
+    "question": "How prepared are your data formats for new AI applications?",
+    "options": [
+      "Fully prepared",
+      "Moderately prepared",
+      "Preparation in progress",
+      "Not prepared"
+    ]
+  },
+  {
+    "category": "Data",
+    "subcategory": "Energy Consumption",
+    "question": "Do you assess the energy consumption of data processing?",
+    "options": [
+      "Regularly assessed",
+      "Occasionally assessed",
+      "Assessment planned",
+      "Not assessed"
+    ]
+  },
+  {
+    "category": "Data",
+    "subcategory": "Data Breach Contingency",
+    "question": "Are there contingency plans for data breaches in AI systems?",
+    "options": [
+      "Comprehensive plans exist",
+      "Limited plans available",
+      "Plans under development",
+      "No contingency plans"
+    ]
+  },
+  {
+    "category": "Data",
+    "subcategory": "Cloud-Native Tools",
+    "question": "Do you use cloud-native data tools for AI processing?",
+    "options": [
+      "Fully implemented",
+      "Partially implemented",
+      "Planned but not implemented",
+      "Not implemented"
+    ]
+  },
+  {
+    "category": "Data",
+    "subcategory": "Dataset Completeness",
+    "question": "How complete is your dataset for each use case (e.g., % of missing values)?",
+    "options": [
+      "Dataset is fully complete and regularly audited for missing values.",
+      "Most data is complete, with occasional gaps addressed systematically.",
+      "Moderate percentage of missing data, with some imputation performed.",
+      "High percentage of missing data, minimal efforts to address it."
+    ]
+  },
+  {
+    "category": "Data",
+    "subcategory": "Incomplete Data Handling",
+    "question": "What processes are in place for handling incomplete data (e.g., imputation techniques)?",
+    "options": [
+      "Comprehensive, automated techniques ensure data completeness.",
+      "Advanced methods (e.g., KNN imputation) are occasionally applied.",
+      "Basic techniques like replacing missing data with defaults are used.",
+      "No processes in place to address incomplete data."
+    ]
+  },
+  {
+    "category": "Data",
+    "subcategory": "Outlier Detection",
+    "question": "What mechanisms do you use to detect and manage outliers in structured datasets?",
+    "options": [
+      "Automated, advanced techniques (e.g., LOF) are implemented for outlier detection.",
+      "Basic outlier detection methods (e.g., standard deviation) are used.",
+      "Manual reviews occasionally identify outliers.",
+      "Outliers are not systematically identified or managed."
+    ]
+  },
+  {
+    "category": "Data",
+    "subcategory": "Label Accuracy",
+    "question": "Have you assessed the label accuracy of your datasets? If yes, what percentage of your labels are verified for correctness?",
+    "options": [
+      "All labels (91–100%) are rigorously verified and cross-checked.",
+      "Most labels (51–90%) have been verified for correctness.",
+      "A small subset of labels (≤50%) has been verified.",
+      "Label accuracy has not been assessed."
+    ]
+  },
+  {
+    "category": "Data",
+    "subcategory": "Duplicate Records",
+    "question": "Are duplicate records identified and removed from the dataset?",
+    "options": [
+      "Automated tools comprehensively identify and eliminate duplicates.",
+      "Basic similarity metrics (e.g., Levenshtein distance) are used for duplicate removal.",
+      "Duplicates are identified manually and occasionally removed.",
+      "No mechanisms in place to identify or remove duplicates."
+    ]
+  },
+  {
+    "category": "Data",
+    "subcategory": "Privacy Risk Assessment",
+    "question": "How do you assess the privacy risks of data used in AI models?",
+    "options": [
+      "Advanced techniques like Membership Inference Attack tests and differential privacy are actively implemented.",
+      "Comprehensive frameworks are applied to evaluate privacy risks.",
+      "Basic measures are in place to ensure privacy (e.g., anonymization).",
+      "Privacy risks are not assessed or considered."
+    ]
+  },
+  {
+    "category": "Data",
+    "subcategory": "Synthetic Data Evaluation",
+    "question": "Are mechanisms like synthetic data generation used, and how is closeness to real data evaluated?",
+    "options": [
+      "Synthetic data is rigorously assessed for privacy and fidelity using advanced techniques.",
+      "Synthetic data is evaluated against basic quality metrics.",
+      "Synthetic data is used, but its quality is not assessed.",
+      "Synthetic data is not used or evaluated."
+    ]
+  },
+  {
+    "category": "Data",
+    "subcategory": "Bias Detection in Data",
+    "question": "How is the data checked for biases (e.g., gender, race, class imbalance)?",
+    "options": [
+      "Comprehensive tools and metrics (e.g., P-Difference, Gini Index) are applied systematically.",
+      "Bias detection tools and metrics (e.g., fairness indicators) are partially implemented.",
+      "Occasional, manual reviews are performed for bias detection.",
+      "No checks for bias are conducted."
+    ]
+  }
+  ],
+[
+  {
+    "category": "AI Governance",
+    "subcategory": "AI Roles & Responsibilities",
+    "question": "Do you have policies for ethical AI development?",
+    "options": [
+      "Comprehensive policies implemented",
+      "Partial policies in place",
+      "Policies under development",
+      "No policies exist"
+    ]
+  },
+  {
+    "category": "AI Governance",
+    "subcategory": "Bias & Fairness Mitigation",
+    "question": "Is there a mechanism to validate fairness in AI outcomes?",
+    "options": [
+      "Fully validated for fairness",
+      "Partially validated",
+      "Validation mechanisms planned",
+      "No validation mechanisms"
+    ]
+  },
+  {
+    "category": "AI Governance",
+    "subcategory": "AI Transparency & Explainability",
+    "question": "Are your AI algorithms subject to peer review before deployment?",
+    "options": [
+      "Subject to formal peer review",
+      "Informal reviews conducted",
+      "Reviews planned but not implemented",
+      "No peer reviews"
+    ]
+  },
+  {
+    "category": "AI Governance",
+    "subcategory": "AI Transparency & Explainability",
+    "question": "Do you maintain an audit trail for AI decisions?",
+    "options": [
+      "Comprehensive audit trail maintained",
+      "Partial audit trail",
+      "Audit trail development in progress",
+      "No audit trail"
+    ]
+  },
+  {
+    "category": "AI Governance",
+    "subcategory": "Regulatory Compliance",
+    "question": "Do you evaluate third-party AI tools for compliance risks?",
+    "options": [
+      "Fully evaluated",
+      "Limited evaluation",
+      "Evaluation plans in progress",
+      "No evaluation conducted"
+    ]
+  },
+  {
+    "category": "AI Governance",
+    "subcategory": "AI Roles & Responsibilities",
+    "question": "Are all stakeholders educated on AI governance policies?",
+    "options": [
+      "All stakeholders educated",
+      "Some stakeholders educated",
+      "Education planned",
+      "No education efforts"
+    ]
+  },
+  {
+    "category": "AI Governance",
+    "subcategory": "AI Roles & Responsibilities",
+    "question": "Do you have regular AI governance board meetings?",
+    "options": [
+      "Regular meetings held",
+      "Occasional meetings",
+      "Meetings planned",
+      "No meetings held"
+    ]
+  },
+  {
+    "category": "AI Governance",
+    "subcategory": "AI Risk Management",
+    "question": "Is there a whistleblowing mechanism for unethical AI use?",
+    "options": [
+      "Mechanism fully implemented",
+      "Limited mechanism in place",
+      "Mechanism planned",
+      "No whistleblowing mechanism"
+    ]
+  },
+  {
+    "category": "AI Governance",
+    "subcategory": "Regulatory Compliance",
+    "question": "Are your AI policies updated with changing regulations?",
+    "options": [
+      "Policies updated regularly",
+      "Policies updated occasionally",
+      "Updates planned",
+      "Policies not updated"
+    ]
+  },
+  {
+    "category": "AI Governance",
+    "subcategory": "Regulatory Compliance",
+    "question": "Do you adhere to AI transparency standards globally?",
+    "options": [
+      "Fully adhere",
+      "Partially adhere",
+      "Adherence in progress",
+      "Do not adhere"
+    ]
+  },
+  {
+    "category": "AI Governance",
+    "subcategory": "AI Risk Management",
+    "question": "Do you conduct risk assessments for algorithmic decisions?",
+    "options": [
+      "Conducted for all decisions",
+      "Conducted occasionally",
+      "Risk assessment plans in place",
+      "No risk assessments"
+    ]
+  },
+  {
+    "category": "AI Governance",
+    "subcategory": "AI Risk Management",
+    "question": "Are external audits conducted on AI systems?",
+    "options": [
+      "Regular audits conducted",
+      "Occasional audits",
+      "Audits planned",
+      "No external audits"
+    ]
+  },
+  {
+    "category": "AI Governance",
+    "subcategory": "AI Risk Management",
+    "question": "How regularly are your AI governance policies reviewed?",
+    "options": [
+      "Reviewed quarterly",
+      "Reviewed annually",
+      "Reviews planned",
+      "No regular reviews"
+    ]
+  },
+  {
+    "category": "AI Governance",
+    "subcategory": "Regulatory Compliance",
+    "question": "Do you engage in forums to influence AI policymaking?",
+    "options": [
+      "Actively engaged",
+      "Occasionally engaged",
+      "Engagement plans underway",
+      "Not engaged"
+    ]
+  },
+  {
+    "category": "AI Governance",
+    "subcategory": "Bias & Fairness Mitigation",
+    "question": "Are your governance measures tailored for AI’s unique challenges?",
+    "options": [
+      "Tailored governance measures in place",
+      "Partially tailored measures",
+      "Measures under development",
+      "No tailored measures"
+    ]
+  },
+  {
+    "category": "AI Governance",
+    "subcategory": "AI Transparency & Explainability",
+    "question": "Do you employ explainable AI techniques to enhance transparency?",
+    "options": [
+      "Fully employed",
+      "Partially employed",
+      "Techniques under development",
+      "Not employed"
+    ]
+  },
+  {
+    "category": "AI Governance",
+    "subcategory": "AI Roles & Responsibilities",
+    "question": "Is algorithmic accountability explicitly assigned?",
+    "options": [
+      "Explicitly assigned",
+      "Partially assigned",
+      "Accountability framework planned",
+      "Not assigned"
+    ]
+  },
+  {
+    "category": "AI Governance",
+    "subcategory": "Bias & Fairness Mitigation",
+    "question": "Do you have bias mitigation mechanisms for deployed AI models?",
+    "options": [
+      "Comprehensive mitigation mechanisms",
+      "Limited mechanisms",
+      "Mechanisms under development",
+      "No mechanisms"
+    ]
+  },
+  {
+    "category": "AI Governance",
+    "subcategory": "AI Transparency & Explainability",
+    "question": "How mature is your AI governance framework?",
+    "options": [
+      "Highly mature",
+      "Moderately mature",
+      "Maturity in progress",
+      "Immature governance framework"
+    ]
+  },
+  {
+    "category": "AI Governance",
+    "subcategory": "Regulatory Compliance",
+    "question": "Is your organization part of any AI governance consortiums?",
+    "options": [
+      "Active member",
+      "Limited participation",
+      "Membership planned",
+      "Not part of any consortium"
+    ]
+  }
+],
+  [
+  {
+    "category": "AI Culture",
+    "subcategory": "AI Experimentation & Innovation",
+    "question": "Do you celebrate AI project milestones publicly?",
+    "options": [
+      "Celebrated across all levels",
+      "Celebrated occasionally",
+      "Plans to celebrate in the future",
+      "Not celebrated"
+    ]
+  },
+  {
+    "category": "AI Culture",
+    "subcategory": "AI Leadership & Vision",
+    "question": "Is there an AI champions program in your organization?",
+    "options": [
+      "Fully established program",
+      "Partially established",
+      "Program is in development",
+      "No program exists"
+    ]
+  },
+  {
+    "category": "AI Culture",
+    "subcategory": "AI Adoption Mindset",
+    "question": "How open are employees to learning about AI?",
+    "options": [
+      "Highly open",
+      "Moderately open",
+      "Openness is developing",
+      "Limited openness"
+    ]
+  },
+  {
+    "category": "AI Culture",
+    "subcategory": "AI Experimentation & Innovation",
+    "question": "Do you have a platform for sharing AI-related innovations?",
+    "options": [
+      "Comprehensive platform in place",
+      "Limited platform available",
+      "Platform is being developed",
+      "No platform exists"
+    ]
+  },
+  {
+    "category": "AI Culture",
+    "subcategory": "AI Adoption Mindset",
+    "question": "Are AI use cases communicated effectively to all employees?",
+    "options": [
+      "Effectively communicated to all employees",
+      "Communicated to specific teams",
+      "Communication plans in progress",
+      "Not communicated effectively"
+    ]
+  },
+  {
+    "category": "AI Culture",
+    "subcategory": "AI Leadership & Vision",
+    "question": "Do you integrate AI into day-to-day organizational workflows?",
+    "options": [
+      "Fully integrated",
+      "Partially integrated",
+      "Integration is planned",
+      "Not integrated"
+    ]
+  },
+  {
+    "category": "AI Culture",
+    "subcategory": "AI Experimentation & Innovation",
+    "question": "Is there a culture of experimentation for AI adoption?",
+    "options": [
+      "Strong culture of experimentation",
+      "Moderate culture of experimentation",
+      "Culture is being developed",
+      "No culture of experimentation"
+    ]
+  },
+  {
+    "category": "AI Culture",
+    "subcategory": "AI Adoption Mindset",
+    "question": "Do employees feel supported during AI-driven organizational changes?",
+    "options": [
+      "Strong support provided",
+      "Moderate support provided",
+      "Support plans in place",
+      "Limited or no support"
+    ]
+  },
+  {
+    "category": "AI Culture",
+    "subcategory": "AI Adoption Mindset",
+    "question": "Do you measure the sentiment toward AI across teams?",
+    "options": [
+      "Sentiment measured regularly",
+      "Measured occasionally",
+      "Measurement plans in progress",
+      "Not measured"
+    ]
+  },
+  {
+    "category": "AI Culture",
+    "subcategory": "Cross-Functional AI Collaboration",
+    "question": "Are there cross-functional teams to drive AI innovation?",
+    "options": [
+      "Fully established teams",
+      "Partially established teams",
+      "Teams are being formed",
+      "No teams exist"
+    ]
+  }
+],
+  [
+  {
+    "category": "AI Security",
+    "subcategory": "AI Security Framework",
+    "question": "How aware is your organization of the unique security threats posed by AI systems?",
+    "options": [
+      "Comprehensive understanding with regular updates on AI security threats.",
+      "Moderate awareness with basic understanding of AI security risks.",
+      "Limited awareness with initial understanding of potential threats.",
+      "No awareness of AI-specific security risks."
+    ]
+  },
+  {
+    "category": "AI Security",
+    "subcategory": "AI Security Framework",
+    "question": "What measures has your organization implemented to secure AI models and datasets?",
+    "options": [
+      "Robust security measures with regular updates and audits.",
+      "Basic security measures with occasional updates.",
+      "Minimal security measures implemented inconsistently.",
+      "No specific security measures for AI models and datasets."
+    ]
+  },
+  {
+    "category": "AI Security",
+    "subcategory": "Data Security for AI",
+    "question": "How effectively does your organization monitor unauthorized access to AI systems?",
+    "options": [
+      "Comprehensive monitoring systems with real-time alerts and responses.",
+      "Monitoring systems with periodic checks and moderate responses.",
+      "Limited monitoring with manual reviews.",
+      "No monitoring systems in place for AI systems."
+    ]
+  },
+  {
+    "category": "AI Security",
+    "subcategory": "Model Security",
+    "question": "What is your organization's capability to respond to adversarial attacks on AI systems?",
+    "options": [
+      "Established protocols and teams ready to handle adversarial attacks effectively.",
+      "Moderate capability with plans to enhance response strategies.",
+      "Limited capability with basic response mechanisms.",
+      "No capability to respond to adversarial attacks."
+    ]
+  },
+  {
+    "category": "AI Security",
+    "subcategory": "Data Security for AI",
+    "question": "How robust are your organization's data encryption and protection mechanisms for AI deployments?",
+    "options": [
+      "Advanced encryption and protection mechanisms covering all AI deployments.",
+      "Basic encryption measures implemented across most systems.",
+      "Limited encryption and protection in specific areas.",
+      "No encryption or protection mechanisms for AI deployments."
+    ]
+  },
+  {
+    "category": "AI Security",
+    "subcategory": "AI Security Testing",
+    "question": "Does your organization conduct regular security audits for AI systems?",
+    "options": [
+      "Frequent audits conducted by internal and external teams with detailed reports.",
+      "Periodic audits conducted internally with limited external involvement.",
+      "Irregular audits with minimal coverage of AI systems.",
+      "No security audits conducted for AI systems."
+    ]
+  },
+  {
+    "category": "AI Security",
+    "subcategory": "AI Security Framework",
+    "question": "How well-trained is your workforce in identifying and addressing AI security vulnerabilities?",
+    "options": [
+      "Workforce is highly trained with regular updates on AI security practices.",
+      "Workforce has basic training in AI security with occasional updates.",
+      "Workforce has limited training and awareness of AI security risks.",
+      "No training provided for workforce on AI security."
+    ]
+  },
+  {
+    "category": "AI Security",
+    "subcategory": "Model Security",
+    "question": "How prepared is your organization to address biases and fairness in AI systems?",
+    "options": [
+      "Established frameworks to regularly assess and mitigate biases in AI systems.",
+      "Basic efforts to identify and address biases in critical areas.",
+      "Limited actions taken to handle biases, often reactive in nature.",
+      "No measures to address biases in AI systems."
+    ]
+  },
+  {
+    "category": "AI Security",
+    "subcategory": "AI Security Framework",
+    "question": "How does your organization ensure compliance with regulations regarding AI security?",
+    "options": [
+      "Full compliance with all relevant regulations and standards for AI security.",
+      "Moderate compliance with gaps identified for future improvement.",
+      "Limited compliance with major areas yet to be addressed.",
+      "No compliance with AI security regulations or standards."
+    ]
+  },
+  {
+    "category": "AI Security",
+    "subcategory": "Data Security for AI",
+    "question": "How effectively does your organization manage third-party AI security risks?",
+    "options": [
+      "Comprehensive third-party risk management with regular assessments and controls.",
+      "Basic third-party risk management practices in place with some gaps.",
+      "Limited oversight of third-party AI security risks.",
+      "No third-party risk management measures implemented."
+    ]
+  },
+  {
+    "category": "AI Security",
+    "subcategory": "Data Security for AI",
+    "question": "Are access controls for AI systems well-defined and enforced?",
+    "options": [
+      "Access controls are fully defined, implemented, and regularly reviewed.",
+      "Access controls exist but are not consistently enforced or updated.",
+      "Limited access controls in place with inconsistent implementation.",
+      "No defined access controls for AI systems."
+    ]
+  },
+  {
+    "category": "AI Security",
+    "subcategory": "AI Security Testing",
+    "question": "How frequently does your organization test AI systems for vulnerabilities?",
+    "options": [
+      "AI systems are regularly tested with advanced tools and methodologies.",
+      "Periodic testing is conducted using basic tools and methods.",
+      "Infrequent testing is done with limited coverage of vulnerabilities.",
+      "No testing of AI systems for vulnerabilities is conducted."
+    ]
+  },
+  {
+    "category": "AI Security",
+    "subcategory": "Ethical Considerations",
+    "question": "How well does your organization address ethical considerations in AI security?",
+    "options": [
+      "Strong policies ensuring ethical AI use and security practices.",
+      "Moderate policies addressing key ethical considerations in AI security.",
+      "Limited policies with gaps in ethical considerations.",
+      "No ethical policies for AI security in place."
+    ]
+  },
+  {
+    "category": "AI Security",
+    "subcategory": "AI Security Testing",
+    "question": "How does your organization handle incidents involving AI security breaches?",
+    "options": [
+      "Well-established incident response plans with clear escalation procedures.",
+      "Basic response plans with room for improvement in procedures.",
+      "Limited plans with ad-hoc responses to breaches.",
+      "No incident response plans for AI security breaches."
+    ]
+  },
+  {
+    "category": "AI Security",
+    "subcategory": "AI Security Framework",
+    "question": "How integrated is AI security into your overall cybersecurity strategy?",
+    "options": [
+      "Fully integrated with seamless alignment to the broader cybersecurity strategy.",
+      "Partially integrated with some alignment to overall strategy.",
+      "Minimal integration with AI security treated separately from cybersecurity.",
+      "No integration of AI security into the overall cybersecurity strategy."
+    ]
+  }
+],
+  [
+  {
+    "category": "AI Talent",
+    "subcategory": "Capability Assessment",
+    "question": "Do you conduct regular AI capability assessments for your staff?",
+    "options": [
+      "Conducted quarterly",
+      "Conducted annually",
+      "Planned assessments",
+      "No assessments conducted"
+    ]
+  },
+  {
+    "category": "AI Talent",
+    "subcategory": "Recruitment Strategy",
+    "question": "Are your hiring policies tailored for AI-specific skills?",
+    "options": [
+      "Fully tailored",
+      "Partially tailored",
+      "Tailoring in progress",
+      "Not tailored"
+    ]
+  },
+  {
+    "category": "AI Talent",
+    "subcategory": "Workforce Diversity",
+    "question": "How diverse is your AI talent pool?",
+    "options": [
+      "Highly diverse",
+      "Moderately diverse",
+      "Diversity efforts in progress",
+      "Limited diversity"
+    ]
+  },
+  {
+    "category": "AI Talent",
+    "subcategory": "Academic Partnerships",
+    "question": "Do you partner with universities for AI research?",
+    "options": [
+      "Multiple partnerships",
+      "A few partnerships",
+      "Partnership plans underway",
+      "No partnerships"
+    ]
+  },
+  {
+    "category": "AI Talent",
+    "subcategory": "Mentorship and Support",
+    "question": "Is there a mentorship program for junior AI staff?",
+    "options": [
+      "Comprehensive mentorship program",
+      "Limited mentorship available",
+      "Mentorship program planned",
+      "No mentorship program"
+    ]
+  },
+  {
+    "category": "AI Talent",
+    "subcategory": "Career Development",
+    "question": "Do you track the career growth of your AI team?",
+    "options": [
+      "Career growth regularly tracked",
+      "Occasionally tracked",
+      "Tracking planned",
+      "Not tracked"
+    ]
+  },
+  {
+    "category": "AI Talent",
+    "subcategory": "Upskilling Incentives",
+    "question": "Are staff incentivized for AI upskilling?",
+    "options": [
+      "Strong incentives provided",
+      "Moderate incentives provided",
+      "Incentive programs planned",
+      "No incentives provided"
+    ]
+  },
+  {
+    "category": "AI Talent",
+    "subcategory": "Global Talent Strategy",
+    "question": "Do you recruit globally for AI talent?",
+    "options": [
+      "Actively recruit globally",
+      "Recruit globally occasionally",
+      "Global recruitment planned",
+      "No global recruitment"
+    ]
+  },
+  {
+    "category": "AI Talent",
+    "subcategory": "Role Clarity",
+    "question": "Are your job roles for AI well-defined?",
+    "options": [
+      "Fully defined roles",
+      "Partially defined roles",
+      "Definition of roles in progress",
+      "No defined roles"
+    ]
+  },
+  {
+    "category": "AI Talent",
+    "subcategory": "Collaboration and Interdisciplinarity",
+    "question": "Do you encourage interdisciplinary collaboration in AI projects?",
+    "options": [
+      "Strongly encouraged",
+      "Moderately encouraged",
+      "Encouragement plans in progress",
+      "Not encouraged"
+    ]
+  }
+]
+
+
+]

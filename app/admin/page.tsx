@@ -94,6 +94,16 @@ export default function AdminPage() {
   // Report generation states
   const [generatingReportForUserId, setGeneratingReportForUserId] = useState<string | null>(null); // Track by ID
 
+  // Helper function to safely cast string to UserRole
+  const safeAsUserRole = (roleString: string): UserRole => {
+    // Check if the role is a valid UserRole
+    if (Object.keys(ROLE_TO_PILLAR).includes(roleString)) {
+      return roleString as UserRole;
+    }
+    // Default to a safe role if the provided role is invalid
+    return "ai_culture";
+  };
+
   // --- Core Logic Functions (Updated to use API) ---
 
   // Fetch users from API
@@ -156,7 +166,7 @@ export default function AdminPage() {
     setCurrentUser(userToEdit);
     setName(userToEdit.name);
     setEmail(userToEdit.email);
-    setRole(userToEdit.role);
+    setRole(safeAsUserRole(userToEdit.role));
     setIsDialogOpen(true);
   };
 
@@ -219,8 +229,8 @@ export default function AdminPage() {
     // Password validation (only required for new users)
     if (dialogMode === "add" && !password.trim()) {
       toast({ title: "Password Required", description: "Please enter a password for the new user.", variant: "destructive" });
-        return;
-      }
+      return;
+    }
 
     try {
       if (dialogMode === "add") {
@@ -229,11 +239,12 @@ export default function AdminPage() {
           name: name.trim(),
           email: email.trim(),
           password: password.trim(),
-          role
+          role: role as string // Role is already a UserRole, cast to string
         });
         
         if (error) {
-          throw new Error(error);
+          console.error("API error when creating user:", error);
+          throw new Error(typeof error === 'object' ? JSON.stringify(error) : error);
         }
         
         if (data) {
@@ -241,41 +252,63 @@ export default function AdminPage() {
           setUsers(prev => [...prev, data]);
           toast({ title: "User Added", description: `${data.name} has been added.`});
         }
-    } else if (dialogMode === "edit" && currentUser) {
-        // Update user via API
-        const { data, error } = await api.users.updateUser(currentUser.id, {
+      } else if (dialogMode === "edit" && currentUser) {
+        // Prepare update data with proper typing
+        const updateData: {
+          name: string;
+          email: string;
+          role: string;
+          password?: string;
+        } = {
           name: name.trim(),
           email: email.trim(),
-          role,
-          ...(password.trim() && { password: password.trim() })
-        });
+          role: role as string // Role is already a UserRole, cast to string
+        };
+        
+        // Only include password if it was provided
+        if (password.trim()) {
+          updateData.password = password.trim();
+        }
+        
+        console.log("Sending update with data:", updateData);
+        
+        // Update user via API
+        const { data, error } = await api.users.updateUser(currentUser.id, updateData);
         
         if (error) {
-          throw new Error(error);
+          console.error("API error when updating user:", error);
+          throw new Error(typeof error === 'object' ? JSON.stringify(error) : error);
         }
         
         if (data) {
           // Update user in state
           setUsers(prev => prev.map(u => u.id === currentUser.id ? data : u));
           toast({ title: "User Updated", description: `Information for ${data.name} has been updated.`});
-    }
+        }
       }
       
-    setIsDialogOpen(false);
-    resetForm();
+      setIsDialogOpen(false);
+      resetForm();
     } catch (error) {
       console.error("Error submitting user:", error);
+      let errorMessage = "An error occurred. Please try again.";
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: dialogMode === "add" ? "Failed to Add User" : "Failed to Update User",
-        description: "An error occurred. Please try again.",
+        description: errorMessage,
         variant: "destructive"
       });
     }
   };
 
-  const loadUserAssessmentResults = (userRole: UserRole): Record<string, AssessmentResult> => {
+  const loadUserAssessmentResults = (userRole: string): Record<string, AssessmentResult> => {
     const results: Record<string, AssessmentResult> = {};
-    const targetAssessments = userRole === 'admin' ? assessmentTypes : [ROLE_TO_PILLAR[userRole]].filter(Boolean); // Ensure pillar exists
+    const safeRole = safeAsUserRole(userRole);
+    const targetAssessments = safeRole === 'admin' ? assessmentTypes : [ROLE_TO_PILLAR[safeRole]].filter(Boolean); // Ensure pillar exists
 
     for (const type of targetAssessments) {
       const storedResult = localStorage.getItem(`assessment_result_${type}`);
@@ -386,7 +419,7 @@ export default function AdminPage() {
                           <TableCell className="font-medium">{user.name}</TableCell>
                           <TableCell className="hidden md:table-cell text-muted-foreground">{user.email}</TableCell>
                           <TableCell className="text-sm">
-                            {user.role === 'admin' ? 'Administrator' : (ROLE_TO_PILLAR[user.role] || 'N/A')}
+                            {user.role === 'admin' ? 'Administrator' : (ROLE_TO_PILLAR[safeAsUserRole(user.role)] || 'N/A')}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="inline-flex items-center gap-1">
@@ -509,13 +542,14 @@ export default function AdminPage() {
                 const completionPercentage = totalAssessments > 0 ? Math.round((completedAssessments / totalAssessments) * 100) : 0;
                 const isGenerating = generatingReportForUserId === reportUser.id;
                 const hasData = completedAssessments > 0;
+                const safeRole = safeAsUserRole(reportUser.role);
 
                 return (
                   <Card key={reportUser.id} className="flex flex-col">
                     <CardHeader>
                       <CardTitle>{reportUser.name}</CardTitle>
                       <CardDescription>
-                        {reportUser.email} <span className="mx-1.5">·</span> {ROLE_TO_PILLAR[reportUser.role] || reportUser.role}
+                        {reportUser.email} <span className="mx-1.5">·</span> {ROLE_TO_PILLAR[safeRole] || reportUser.role}
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="flex-grow space-y-4">
@@ -616,7 +650,7 @@ export default function AdminPage() {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="role" className="text-right">Pillar/Role</Label>
-                 <Select value={role} onValueChange={(value) => setRole(value as UserRole)}>
+                 <Select value={role} onValueChange={(value) => setRole(safeAsUserRole(value))}>
                   <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Select a role" />
                   </SelectTrigger>

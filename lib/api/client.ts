@@ -3,7 +3,7 @@ import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
 
 // Base API URL
 // const API_BASE_URL = '/api/backend'; // Use Next.js API proxy instead of direct backend URL
-const API_BASE_URL = 'http://103.18.20.205:8090'; http://103.18.20.205:8090/ // Point directly to the backend
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://103.18.20.205:8090'; // Point directly to the backend
 
 // Response type wrapper
 interface ApiResponse<T> {
@@ -88,10 +88,21 @@ async function apiCall<T>(
           return { error: errorData };
         }
         
-        const errorMessage = errorData.detail || 
-                             errorData.error || 
-                             (typeof errorData === 'object' ? JSON.stringify(errorData) : 
-                             `Error ${axiosError.response.status}: ${axiosError.response.statusText}`);
+        // Better error message extraction
+        let errorMessage;
+        if (errorData.detail) {
+          errorMessage = typeof errorData.detail === 'string' 
+            ? errorData.detail 
+            : JSON.stringify(errorData.detail);
+        } else if (errorData.error) {
+          errorMessage = typeof errorData.error === 'string'
+            ? errorData.error
+            : JSON.stringify(errorData.error);
+        } else if (typeof errorData === 'object') {
+          errorMessage = JSON.stringify(errorData);
+        } else {
+          errorMessage = `Error ${axiosError.response.status}: ${axiosError.response.statusText}`;
+        }
         
         return { error: errorMessage };
       }
@@ -157,7 +168,7 @@ export const usersApi = {
     });
   },
   
-  updateUser: async (userId: string, userData: { name?: string; email?: string; role?: string }): Promise<ApiResponse<User>> => {
+  updateUser: async (userId: string, userData: { name?: string; email?: string; role?: string; password?: string }): Promise<ApiResponse<User>> => {
     return apiCall<User>(`/users/${userId}`, {
       method: 'PUT',
       data: userData
@@ -350,7 +361,7 @@ export const assessmentsApi = {
       }
       
       // Direct fetch to backend instead of using the proxy
-      const response = await fetch('http://103.18.20.205:8090/assessments', {
+      const response = await fetch(`${API_BASE_URL}/assessments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -419,7 +430,7 @@ export const assessmentsApi = {
       }
       
       // Direct fetch to backend instead of using the proxy
-      const response = await fetch(`http://103.18.20.205:8090/assessments/${assessmentId}`, {
+      const response = await fetch(`${API_BASE_URL}/assessments/${assessmentId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

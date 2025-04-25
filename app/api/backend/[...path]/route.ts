@@ -57,7 +57,7 @@ async function handleApiRequest(
 ) {
   try {
     // Get backend API URL from environment variable or use default
-    const apiUrl = process.env.API_URL || 'http://103.18.20.205:8090';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || 'http://103.18.20.205:8090';
     
     // Handle OPTIONS requests directly for CORS preflight
     if (method === 'OPTIONS') {

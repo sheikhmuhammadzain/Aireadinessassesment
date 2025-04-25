@@ -239,7 +239,7 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
         const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
         
         // Use direct backend connection instead of proxy
-        const response = await fetch('http://103.18.20.205:8090/questionnaires', {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://103.18.20.205:8090'}/questionnaires`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -270,7 +270,7 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
           if (error.name === 'AbortError') {
             errorMessage = 'Request timed out after 15 seconds';
           } else if (error.message.includes('Failed to fetch')) {
-            errorMessage = 'Network error - Cannot connect to backend API (http://103.18.20.205:8090). Check if the server is running.';
+            errorMessage = 'Network error - Cannot connect to backend API. Check if the server is running.';
           }
         }
         
