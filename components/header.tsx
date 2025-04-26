@@ -4,7 +4,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { ModeToggle } from "@/components/mode-toggle";
 import { Activity, RefreshCw, Shield, User, LogOut, Menu } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -85,7 +84,7 @@ export default function Header() {
   };
   
   return (
-    <header className="sticky top-0 z-40 w-full border-b bg-background">
+    <header className="sticky top-0 z-40 w-full border-b bg-gradient-to-r from-blue-50 to-blue-100 shadow-sm">
       <div className="container flex h-16 items-center justify-between max-w-6xl mx-auto px-4">
         <div className="flex gap-6 md:gap-10">
           <Link href="/" className="flex items-center space-x-2">
@@ -97,8 +96,8 @@ export default function Header() {
             <Link 
               href="/" 
               className={cn(
-                "flex items-center text-sm font-medium text-muted-foreground",
-                pathname === "/" && "text-foreground"
+                "flex items-center text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors",
+                pathname === "/" && "text-blue-800 font-semibold"
               )}
             >
               Home
@@ -106,8 +105,8 @@ export default function Header() {
             <Link 
               href="/dashboard" 
               className={cn(
-                "flex items-center text-sm font-medium text-muted-foreground",
-                pathname === "/dashboard" && "text-foreground"
+                "flex items-center text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors",
+                pathname === "/dashboard" && "text-blue-800 font-semibold"
               )}
             >
               Dashboard
@@ -115,8 +114,8 @@ export default function Header() {
             <Link
               href="/assessment"
               className={cn(
-                "flex items-center text-sm font-medium text-muted-foreground",
-                pathname?.startsWith("/assessment") && "text-foreground"
+                "flex items-center text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors",
+                pathname?.startsWith("/assessment") && "text-blue-800 font-semibold"
               )}
             >
               Assessment
@@ -124,8 +123,8 @@ export default function Header() {
             <Link 
               href="/about" 
               className={cn(
-                "flex items-center text-sm font-medium text-muted-foreground",
-                pathname === "/about" && "text-foreground"
+                "flex items-center text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors",
+                pathname === "/about" && "text-blue-800 font-semibold"
               )}
             >
               About
@@ -134,8 +133,8 @@ export default function Header() {
               <Link
                 href="/admin"
                 className={cn(
-                  "flex items-center text-sm font-medium text-muted-foreground",
-                  pathname?.startsWith("/admin") && "text-foreground"
+                  "flex items-center text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors",
+                  pathname?.startsWith("/admin") && "text-blue-800 font-semibold"
                 )}
               >
                 Admin
@@ -146,7 +145,6 @@ export default function Header() {
         <div className="flex flex-1 items-center justify-end space-x-4">
           <nav className="flex items-center space-x-2">
           <div className="flex items-center gap-3">
-            <ModeToggle />
               {isAuthenticated ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -217,9 +215,9 @@ export default function Header() {
       {/* Reset confirmation dialog */}
       {showResetConfirmation && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg max-w-md w-full">
-            <h3 className="text-xl font-semibold mb-4">Reset Confirmation</h3>
-            <p className="text-gray-600 dark:text-gray-300 mb-6">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+            <h3 className="text-xl font-semibold text-blue-900 mb-4">Reset Confirmation</h3>
+            <p className="text-gray-600 mb-6">
               Are you sure you want to reset? This will clear all assessment data and cannot be undone.
             </p>
             <div className="flex justify-end gap-3">
