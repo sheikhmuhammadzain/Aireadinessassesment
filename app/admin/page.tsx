@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label"; // Import Label
 import { Progress } from "@/components/ui/progress"; // Import Progress
+import { Checkbox } from "@/components/ui/checkbox"; // Import Checkbox for multiple roles
 import {
   Table,
   TableBody,
@@ -89,7 +90,8 @@ export default function AdminPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<UserRole>("ai_culture"); // Default role example
+  const [role, setRole] = useState<UserRole>("ai_culture"); // For backward compatibility
+  const [selectedRoles, setSelectedRoles] = useState<UserRole[]>([]); // For multiple role selection
 
   // Report generation states
   const [generatingReportForUserId, setGeneratingReportForUserId] = useState<string | null>(null); // Track by ID
@@ -121,7 +123,12 @@ export default function AdminPage() {
         });
         setUsers(PREDEFINED_USERS); // Fallback to predefined users
       } else if (data && Array.isArray(data)) {
-        setUsers(data);
+        // Ensure all users have the roles array
+        const processedUsers = data.map(user => ({
+          ...user,
+          roles: user.roles || (user.role ? [user.role] : [])
+        }));
+        setUsers(processedUsers);
       } else {
         setUsers(PREDEFINED_USERS); // Fallback if data is not in expected format
       }
@@ -140,7 +147,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     // Check if user is authenticated and has admin role
-    if (!isAuthenticated || authUser?.role !== "admin") {
+    if (!isAuthenticated || !authUser?.roles.includes("admin")) {
       toast({
         title: "Access Denied",
         description: "Only administrators can access this page.",
@@ -166,7 +173,12 @@ export default function AdminPage() {
     setCurrentUser(userToEdit);
     setName(userToEdit.name);
     setEmail(userToEdit.email);
-    setRole(safeAsUserRole(userToEdit.role));
+    
+    // Set both the legacy role and the new selectedRoles array
+    const userRoles = userToEdit.roles || (userToEdit.role ? [userToEdit.role] : []);
+    setSelectedRoles(userRoles.map(r => safeAsUserRole(r)));
+    setRole(userRoles[0] ? safeAsUserRole(userRoles[0]) : "ai_culture"); // Set first role as primary
+    
     setIsDialogOpen(true);
   };
 
@@ -209,15 +221,21 @@ export default function AdminPage() {
     setName("");
     setEmail("");
     setPassword("");
-    // Set a sensible default role if needed, e.g., the first non-admin role
+    
+    // Reset selected roles
+    setSelectedRoles([]);
+    
+    // Set a sensible default role
     const firstNonAdminRole = Object.keys(ROLE_TO_PILLAR).find(r => r !== 'admin') as UserRole | undefined;
-    setRole(firstNonAdminRole || 'ai_culture');
+    const defaultRole = firstNonAdminRole || 'ai_culture';
+    setRole(defaultRole);
+    setSelectedRoles([defaultRole]);
   };
 
   const handleSubmit = async () => {
     // Basic validation
-    if (!name.trim() || !email.trim() || !role) {
-      toast({ title: "Missing Information", description: "Please fill in all fields.", variant: "destructive" });
+    if (!name.trim() || !email.trim() || selectedRoles.length === 0) {
+      toast({ title: "Missing Information", description: "Please fill in all fields and select at least one role.", variant: "destructive" });
       return;
     }
     // Email validation
@@ -234,12 +252,12 @@ export default function AdminPage() {
 
     try {
       if (dialogMode === "add") {
-        // Create user via API
+        // Create user via API with multiple roles
         const { data, error } = await api.users.createUser({
           name: name.trim(),
           email: email.trim(),
           password: password.trim(),
-          role: role as string // Role is already a UserRole, cast to string
+          roles: selectedRoles // Pass the array of selected roles
         });
         
         if (error) {
@@ -248,21 +266,27 @@ export default function AdminPage() {
         }
         
         if (data) {
+          // Ensure the user has roles array
+          const userWithRoles = {
+            ...data,
+            roles: data.roles || (data.role ? [data.role] : [])
+          };
+          
           // Add new user to state
-          setUsers(prev => [...prev, data]);
+          setUsers(prev => [...prev, userWithRoles]);
           toast({ title: "User Added", description: `${data.name} has been added.`});
         }
       } else if (dialogMode === "edit" && currentUser) {
-        // Prepare update data with proper typing
+        // Prepare update data with multiple roles
         const updateData: {
           name: string;
           email: string;
-          role: string;
+          roles: UserRole[];
           password?: string;
         } = {
           name: name.trim(),
           email: email.trim(),
-          role: role as string // Role is already a UserRole, cast to string
+          roles: selectedRoles
         };
         
         // Only include password if it was provided
@@ -281,8 +305,14 @@ export default function AdminPage() {
         }
         
         if (data) {
+          // Ensure the user has roles array
+          const updatedUser = {
+            ...data,
+            roles: data.roles || (data.role ? [data.role] : [])
+          };
+          
           // Update user in state
-          setUsers(prev => prev.map(u => u.id === currentUser.id ? data : u));
+          setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
           toast({ title: "User Updated", description: `Information for ${data.name} has been updated.`});
         }
       }
@@ -305,10 +335,28 @@ export default function AdminPage() {
     }
   };
 
-  const loadUserAssessmentResults = (userRole: string): Record<string, AssessmentResult> => {
+  // Handle toggling a role selection
+  const toggleRole = (roleToToggle: UserRole) => {
+    setSelectedRoles(prev => {
+      // If role is already selected, remove it
+      if (prev.includes(roleToToggle)) {
+        return prev.filter(r => r !== roleToToggle);
+      }
+      // Otherwise add it
+      return [...prev, roleToToggle];
+    });
+  };
+
+  const loadUserAssessmentResults = (userRoles: UserRole[]): Record<string, AssessmentResult> => {
     const results: Record<string, AssessmentResult> = {};
-    const safeRole = safeAsUserRole(userRole);
-    const targetAssessments = safeRole === 'admin' ? assessmentTypes : [ROLE_TO_PILLAR[safeRole]].filter(Boolean); // Ensure pillar exists
+    
+    // Check if user has admin role
+    const isAdmin = userRoles.includes("admin");
+    
+    // Get assessment types based on user roles
+    const targetAssessments = isAdmin ? 
+      assessmentTypes : 
+      userRoles.map(role => ROLE_TO_PILLAR[role]).filter(Boolean);
 
     for (const type of targetAssessments) {
       const storedResult = localStorage.getItem(`assessment_result_${type}`);
@@ -317,15 +365,13 @@ export default function AdminPage() {
           results[type] = JSON.parse(storedResult);
         } catch (error) {
           console.error(`Error parsing stored result for ${type}:`, error);
-          // Optionally add a toast or log this failure
         }
       }
     }
     return results;
   };
 
-
- const handleGenerateUserReport = async (targetUser: User) => {
+  const handleGenerateUserReport = async (targetUser: User) => {
     setGeneratingReportForUserId(targetUser.id); // Track which user's report is generating
     toast({
       title: "Report Generation Started",
@@ -333,7 +379,10 @@ export default function AdminPage() {
     });
 
     try {
-      const userResults = loadUserAssessmentResults(targetUser.role);
+      // Get user roles, ensuring it's an array
+      const userRoles = targetUser.roles || (targetUser.role ? [targetUser.role] : []);
+      
+      const userResults = loadUserAssessmentResults(userRoles as UserRole[]);
       if (Object.keys(userResults).length === 0) {
         toast({ title: "No Data", description: `No assessment data found for ${targetUser.name} to generate a report.`, variant: "destructive" });
         setGeneratingReportForUserId(null);
@@ -364,10 +413,19 @@ export default function AdminPage() {
     }
   };
 
-
   // --- UI Rendering ---
 
   const pillars = Object.entries(ROLE_TO_PILLAR).filter(([role]) => role !== "admin");
+
+  // Format roles for display
+  const formatRoles = (userRoles: UserRole[] | undefined, userRole?: UserRole): string => {
+    if (userRoles && userRoles.length > 0) {
+      if (userRoles.includes("admin")) return "Administrator";
+      return userRoles.map(role => ROLE_TO_PILLAR[role]).join(", ");
+    }
+    // Fallback to legacy role
+    return userRole === "admin" ? "Administrator" : (userRole ? ROLE_TO_PILLAR[userRole] || userRole : "Unknown");
+  };
 
   return (
     <TooltipProvider> {/* Needed for Tooltip components */}
@@ -419,7 +477,7 @@ export default function AdminPage() {
                           <TableCell className="font-medium">{user.name}</TableCell>
                           <TableCell className="hidden md:table-cell text-muted-foreground">{user.email}</TableCell>
                           <TableCell className="text-sm">
-                            {user.role === 'admin' ? 'Administrator' : (ROLE_TO_PILLAR[safeAsUserRole(user.role)] || 'N/A')}
+                            {formatRoles(user.roles, safeAsUserRole(user.role))}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="inline-flex items-center gap-1">
@@ -490,7 +548,12 @@ export default function AdminPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {pillars.length > 0 ? pillars.map(([role, pillarName]) => {
-                const pillarUsers = users.filter(u => u.role === role);
+                // Find users with this role either in legacy role field or in roles array
+                const pillarUsers = users.filter(u => 
+                  (u.role === role) || 
+                  (u.roles && u.roles.includes(role as UserRole))
+                );
+                
                 return (
                   <Card key={role}>
                     <CardHeader>
@@ -500,12 +563,26 @@ export default function AdminPage() {
                     <CardContent>
                       {pillarUsers.length > 0 ? (
                         <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
-                          {pillarUsers.map(pillarUser => (
-                            <div key={pillarUser.id} className="text-sm p-2 rounded-md border bg-muted/50">
-                              <p className="font-medium">{pillarUser.name}</p>
-                              <p className="text-xs text-muted-foreground">{pillarUser.email}</p>
-                            </div>
-                          ))}
+                          {pillarUsers.map(pillarUser => {
+                            // Show a badge if the user has multiple roles
+                            const hasMultipleRoles = 
+                              (pillarUser.roles && pillarUser.roles.length > 1) || 
+                              (pillarUser.roles && pillarUser.roles.length === 1 && pillarUser.role !== pillarUser.roles[0]);
+                            
+                            return (
+                              <div key={pillarUser.id} className="text-sm p-2 rounded-md border bg-muted/50">
+                                <div className="flex items-center justify-between">
+                                  <p className="font-medium">{pillarUser.name}</p>
+                                  {hasMultipleRoles && (
+                                    <span className="text-xs px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                                      Multi-Role
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-muted-foreground">{pillarUser.email}</p>
+                              </div>
+                            );
+                          })}
                         </div>
                       ) : (
                         <div className="flex items-center justify-center h-20 border border-dashed rounded-md">
@@ -536,20 +613,20 @@ export default function AdminPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {users.map((reportUser) => {
-                const userResults = loadUserAssessmentResults(reportUser.role);
+                const userResults = loadUserAssessmentResults(reportUser.roles || (reportUser.role ? [reportUser.role] : []));
                 const completedAssessments = Object.keys(userResults).length;
-                const totalAssessments = reportUser.role === 'admin' ? assessmentTypes.length : 1; // Or length of required assessments for role
+                const totalAssessments = reportUser.roles && reportUser.roles.length > 0 ? reportUser.roles.length : 1; // Or length of required assessments for role
                 const completionPercentage = totalAssessments > 0 ? Math.round((completedAssessments / totalAssessments) * 100) : 0;
                 const isGenerating = generatingReportForUserId === reportUser.id;
                 const hasData = completedAssessments > 0;
-                const safeRole = safeAsUserRole(reportUser.role);
+                const safeRole = safeAsUserRole(reportUser.role || "ai_culture");
 
                 return (
                   <Card key={reportUser.id} className="flex flex-col">
                     <CardHeader>
                       <CardTitle>{reportUser.name}</CardTitle>
                       <CardDescription>
-                        {reportUser.email} <span className="mx-1.5">·</span> {ROLE_TO_PILLAR[safeRole] || reportUser.role}
+                        {reportUser.email} <span className="mx-1.5">·</span> {formatRoles(reportUser.roles, safeRole)}
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="flex-grow space-y-4">
@@ -648,23 +725,74 @@ export default function AdminPage() {
                   placeholder={dialogMode === "edit" ? "Leave blank to keep current" : "Enter password"}
                 />
               </div>
+              
+              {/* Primary role selector for backward compatibility */}
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="role" className="text-right">Pillar/Role</Label>
-                 <Select value={role} onValueChange={(value) => setRole(safeAsUserRole(value))}>
+                <Label className="text-right">Primary Role</Label>
+                <Select value={role} onValueChange={(value) => {
+                  const newRole = safeAsUserRole(value);
+                  setRole(newRole);
+                  
+                  // Also add to selected roles if not already there
+                  if (!selectedRoles.includes(newRole)) {
+                    setSelectedRoles(prev => [...prev, newRole]);
+                  }
+                }}>
                   <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Select a role" />
+                    <SelectValue placeholder="Select primary role" />
                   </SelectTrigger>
                   <SelectContent>
-                    {/* Only allow assigning non-admin roles */}
-                    {Object.entries(ROLE_TO_PILLAR)
-                      .filter(([roleKey]) => roleKey !== 'admin')
-                      .map(([roleKey, pillarName]) => (
-                        <SelectItem key={roleKey} value={roleKey}>
-                          {pillarName}
-                        </SelectItem>
+                    {Object.entries(ROLE_TO_PILLAR).map(([roleKey, pillarName]) => (
+                      <SelectItem key={roleKey} value={roleKey}>
+                        {pillarName}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              
+              {/* Multiple role checkboxes */}
+              <div className="grid grid-cols-4 gap-4">
+                <Label className="text-right pt-2">Access to Pillars</Label>
+                <div className="col-span-3 border rounded-md p-3 space-y-2">
+                  <div className="text-sm text-muted-foreground mb-2">
+                    Select multiple roles to give this user access to multiple pillars:
+                  </div>
+                  {Object.entries(ROLE_TO_PILLAR).map(([roleKey, pillarName]) => (
+                    <div key={roleKey} className="flex items-center space-x-2">
+                      <Checkbox 
+                        id={`role-${roleKey}`}
+                        checked={selectedRoles.includes(roleKey as UserRole)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            toggleRole(roleKey as UserRole);
+                            // If this is the first role being selected, also set it as primary
+                            if (selectedRoles.length === 0 || !role) {
+                              setRole(roleKey as UserRole);
+                            }
+                          } else {
+                            toggleRole(roleKey as UserRole);
+                            // If removing the primary role, update the primary role
+                            if (role === roleKey) {
+                              const remainingRoles = selectedRoles.filter(r => r !== roleKey);
+                              if (remainingRoles.length > 0) {
+                                setRole(remainingRoles[0]);
+                              }
+                            }
+                          }
+                        }}
+                      />
+                      <Label htmlFor={`role-${roleKey}`} className="font-normal">
+                        {pillarName}
+                      </Label>
+                    </div>
+                  ))}
+                  {selectedRoles.length === 0 && (
+                    <div className="text-sm text-amber-600 mt-2">
+                      Please select at least one role
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
             <DialogFooter>

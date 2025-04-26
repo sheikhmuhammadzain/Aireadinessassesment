@@ -16,8 +16,16 @@ import {
   CheckCircle,
   Clock,
   XCircle,
+  ChevronDown
 } from "lucide-react";
+import { useState } from "react";
 import { CompanyInfo, CompanyAssessmentStatus } from "@/types";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
 
 interface CompanyCardProps {
   company: CompanyInfo;
@@ -28,7 +36,7 @@ interface CompanyCardProps {
   onManageAssessments: (companyId: string) => void;
   onStartAssessment: (assessmentType: string, companyId: string) => void;
   isAdmin: boolean;
-  userAssessmentType: string | null;
+  userAssessmentTypes: string[];
 }
 
 export function CompanyCard({
@@ -40,9 +48,13 @@ export function CompanyCard({
   onManageAssessments,
   onStartAssessment,
   isAdmin,
-  userAssessmentType,
+  userAssessmentTypes,
 }: CompanyCardProps) {
   const companyId = company.id || "";
+  
+  // If user has multiple assessment types, use the first one
+  const primaryAssessmentType = userAssessmentTypes.length > 0 ? userAssessmentTypes[0] : null;
+  const hasMultipleTypes = userAssessmentTypes.length > 1;
 
   return (
     <Card className="hover:shadow-md transition-all">
@@ -162,15 +174,33 @@ export function CompanyCard({
           >
             Manage Assessments
           </Button>
+        ) : hasMultipleTypes ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="default">
+                Start Assessment <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              {userAssessmentTypes.map((type) => (
+                <DropdownMenuItem 
+                  key={type}
+                  onClick={() => onStartAssessment(type, companyId)}
+                >
+                  {type}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         ) : (
           <Button
             variant="default"
             onClick={() => {
-              if (userAssessmentType) {
-                onStartAssessment(userAssessmentType, companyId);
+              if (primaryAssessmentType) {
+                onStartAssessment(primaryAssessmentType, companyId);
               }
             }}
-            disabled={!userAssessmentType}
+            disabled={!primaryAssessmentType}
           >
             Start Assessment
           </Button>

@@ -1484,7 +1484,7 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
                     const categoryNames = personalizedQuestions.categories.map((cat: any) => cat.name);
                     setCategories(categoryNames);
                     setCurrentCategory(categoryNames[0]);
-                    setCategoryIndex(0);
+      setCategoryIndex(0);
                   }
                 }} 
                 variant="default" 
@@ -1495,8 +1495,8 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
               </Button>
             </CardFooter>
           </Card>
-        </div>
-      );
+          </div>
+        );
     }
     
     if (!categories.length || !currentCategory) {

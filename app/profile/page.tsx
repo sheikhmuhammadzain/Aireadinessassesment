@@ -26,8 +26,15 @@ function UserProfileContent() {
     return null; // Should not happen due to ProtectedRoute
   }
 
+  // Use the first role from roles array, or fallback to the legacy role field
+  const primaryRole = user.roles && user.roles.length > 0 ? user.roles[0] : (user.role || 'admin');
+  const isAdmin = primaryRole === 'admin';
+  
   // Get the pillar name from the role
-  const pillarName = user.role === "admin" ? "Administrator (All Pillars)" : ROLE_TO_PILLAR[user.role];
+  const pillarName = isAdmin ? "Administrator (All Pillars)" : ROLE_TO_PILLAR[primaryRole];
+
+  // Check for multi-role user
+  const hasMultipleRoles = user.roles && user.roles.length > 1;
 
   return (
     <div className="container mx-auto py-10 px-4">
@@ -68,17 +75,17 @@ function UserProfileContent() {
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <h3 className="text-sm font-medium text-muted-foreground mb-1">Role</h3>
+                <h3 className="text-sm font-medium text-muted-foreground mb-1">Primary Role</h3>
                 <div className="flex items-center">
                   <Shield className="h-4 w-4 mr-2 text-muted-foreground" />
                   <Badge variant="outline" className="capitalize">
-                    {user.role === "admin" ? "Admin" : user.role.replace('ai_', '')}
+                    {isAdmin ? "Admin" : primaryRole.replace('ai_', '')}
                   </Badge>
                 </div>
               </div>
               
               <div>
-                <h3 className="text-sm font-medium text-muted-foreground mb-1">Pillar</h3>
+                <h3 className="text-sm font-medium text-muted-foreground mb-1">Primary Pillar</h3>
                 <div className="flex items-center">
                   <Building className="h-4 w-4 mr-2 text-muted-foreground" />
                   <Badge variant="secondary">
@@ -87,6 +94,19 @@ function UserProfileContent() {
                 </div>
               </div>
             </div>
+            
+            {hasMultipleRoles && (
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground mb-2">All Roles</h3>
+                <div className="flex flex-wrap gap-2">
+                  {user.roles.map(role => (
+                    <Badge key={role} variant="outline" className="capitalize">
+                      {role === "admin" ? "Admin" : role.replace('ai_', '')}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
             
             <Separator />
             
@@ -101,7 +121,7 @@ function UserProfileContent() {
                   <div className="flex justify-between">
                     <dt className="font-medium">Access Level:</dt>
                     <dd className="text-muted-foreground">
-                      {user.role === "admin" ? "Full Access" : "Pillar-specific Access"}
+                      {isAdmin ? "Full Access" : (hasMultipleRoles ? "Multi-Pillar Access" : "Pillar-specific Access")}
                     </dd>
                   </div>
                 </dl>
@@ -122,7 +142,7 @@ function UserProfileContent() {
             <CardDescription>Assessments you can manage</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {user.role === "admin" ? (
+            {isAdmin ? (
               <>
                 <div className="bg-green-50 p-4 rounded-md">
                   <p className="text-sm font-medium text-green-800 mb-1">Administrator Access</p>
@@ -147,32 +167,36 @@ function UserProfileContent() {
             ) : (
               <>
                 <div className="bg-blue-50 p-4 rounded-md">
-                  <p className="text-sm font-medium text-blue-800 mb-1">Pillar-specific Access</p>
+                  <p className="text-sm font-medium text-blue-800 mb-1">
+                    {hasMultipleRoles ? "Multi-Pillar Access" : "Pillar-specific Access"}
+                  </p>
                   <p className="text-sm text-blue-700">
-                    You can manage assessments for your assigned pillar.
+                    You can manage assessments for your assigned {hasMultipleRoles ? "pillars" : "pillar"}.
                   </p>
                 </div>
                 
                 <div className="space-y-2">
-                  {Object.values(ROLE_TO_PILLAR).map(pillar => {
-                    const hasAccess = pillar === ROLE_TO_PILLAR[user.role];
-                    return (
-                      <div key={pillar} className="flex items-center">
-                        {hasAccess ? (
-                          <Badge className="mr-2 bg-green-100 text-green-800 hover:bg-green-100">
-                            ✓
-                          </Badge>
-                        ) : (
-                          <Badge className="mr-2 bg-gray-100 text-gray-500 hover:bg-gray-100">
-                            ✗
-                          </Badge>
-                        )}
-                        <span className={hasAccess ? "" : "text-muted-foreground"}>
-                          {pillar} Assessment
-                        </span>
-                      </div>
-                    );
-                  })}
+                  {Object.entries(ROLE_TO_PILLAR)
+                    .filter(([role]) => role !== "admin")
+                    .map(([role, pillar]) => {
+                      const hasAccess = user.roles && user.roles.includes(role as any);
+                      return (
+                        <div key={pillar} className="flex items-center">
+                          {hasAccess ? (
+                            <Badge className="mr-2 bg-green-100 text-green-800 hover:bg-green-100">
+                              ✓
+                            </Badge>
+                          ) : (
+                            <Badge className="mr-2 bg-gray-100 text-gray-500 hover:bg-gray-100">
+                              ✗
+                            </Badge>
+                          )}
+                          <span className={hasAccess ? "" : "text-muted-foreground"}>
+                            {pillar} Assessment
+                          </span>
+                        </div>
+                      );
+                    })}
                 </div>
               </>
             )}

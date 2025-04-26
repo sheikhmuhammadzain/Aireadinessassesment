@@ -133,10 +133,13 @@ export const authApi = {
     });
   },
   
-  signup: async (email: string, name: string, password: string, role: string): Promise<ApiResponse<User>> => {
+  signup: async (email: string, name: string, password: string, roles: string[] | string): Promise<ApiResponse<User>> => {
+    // Support both string and array formats for roles for backward compatibility
+    const rolesArray = Array.isArray(roles) ? roles : [roles];
+    
     return apiCall<User>('/users', {
       method: 'POST',
-      data: { email, name, password, role }
+      data: { email, name, password, roles: rolesArray }
     });
   },
   
@@ -155,10 +158,14 @@ export const usersApi = {
     return apiCall<User>(`/users/${userId}`);
   },
   
-  createUser: async (userData: { name: string; email: string; role: string; password?: string }): Promise<ApiResponse<User>> => {
+  createUser: async (userData: { name: string; email: string; roles: string[] | string; password?: string }): Promise<ApiResponse<User>> => {
     // If no password provided, generate a random temporary one
+    // Support both string and array formats for roles for backward compatibility
+    const rolesArray = Array.isArray(userData.roles) ? userData.roles : [userData.roles];
+    
     const data = {
       ...userData,
+      roles: rolesArray,
       password: userData.password || Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8)
     };
     
@@ -168,10 +175,16 @@ export const usersApi = {
     });
   },
   
-  updateUser: async (userId: string, userData: { name?: string; email?: string; role?: string; password?: string }): Promise<ApiResponse<User>> => {
+  updateUser: async (userId: string, userData: { name?: string; email?: string; roles?: string[] | string; password?: string }): Promise<ApiResponse<User>> => {
+    // If roles provided, ensure it's an array
+    const data = { ...userData };
+    if (userData.roles) {
+      data.roles = Array.isArray(userData.roles) ? userData.roles : [userData.roles];
+    }
+    
     return apiCall<User>(`/users/${userId}`, {
       method: 'PUT',
-      data: userData
+      data
     });
   },
   

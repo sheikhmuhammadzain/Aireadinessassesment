@@ -168,6 +168,29 @@ def authenticate_user(db: Session, email: str, password: str):
         return False
     return user
 
+# Helper function to parse roles for all user objects
+def parse_user_roles(user_obj):
+    """
+    Parse the roles field of a user object to ensure it's properly formatted.
+    This should be called before returning user objects to the API.
+    """
+    # If user doesn't have roles attribute, return as is
+    if not hasattr(user_obj, 'roles'):
+        return user_obj
+    
+    # Parse roles from JSON string if needed
+    if isinstance(user_obj.roles, str):
+        try:
+            user_obj.roles = json.loads(user_obj.roles)
+        except:
+            user_obj.roles = []
+    
+    # Set default roles from legacy role if needed
+    if (not user_obj.roles or len(user_obj.roles) == 0) and hasattr(user_obj, 'role') and user_obj.role:
+        user_obj.roles = [user_obj.role]
+    
+    return user_obj
+
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -185,7 +208,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     user = get_user(db, email=token_data.email)
     if user is None:
         raise credentials_exception
-    return user
+    # Parse roles before returning
+    return parse_user_roles(user)
 
 @app.get("/")
 def read_root():
@@ -371,10 +395,27 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.email}, expires_delta=access_token_expires
     )
+    
+    # Convert user.roles to a Python list if it's stored as JSON string
+    user_roles = []
+    if hasattr(user, 'roles') and user.roles:
+        if isinstance(user.roles, str):
+            try:
+                user_roles = json.loads(user.roles)
+            except:
+                user_roles = []
+        else:
+            user_roles = user.roles
+    
+    # Use legacy role as fallback
+    if not user_roles and user.role:
+        user_roles = [user.role]
+    
     return {
         "access_token": access_token,
         "token_type": "bearer",
@@ -382,7 +423,8 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
             "id": user.id,
             "email": user.email,
             "name": user.name,
-            "role": user.role
+            "role": user.role,  # Include legacy role for backward compatibility
+            "roles": user_roles
         }
     }
 
@@ -395,45 +437,68 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     user_id = f"user_{uuid.uuid4()}"
     hashed_password = get_password_hash(user.password)
     
+    # Handle the roles field
+    roles = user.roles if user.roles else []
+    # For backward compatibility, if no roles are provided but a role is, use that
+    if not roles and hasattr(user, 'role') and user.role:
+        roles = [user.role]
+    
+    # Set a primary role for backward compatibility
+    primary_role = roles[0] if roles else None
+    
+    # Convert roles to JSON string for storage
+    roles_json = json.dumps(roles)
+    
     db_user = User(
         id=user_id,
         email=user.email,
         name=user.name,
-        role=user.role,
+        role=primary_role,  # Legacy field, set to first role for compatibility
+        roles=roles_json,   # Store as JSON string
         hashed_password=hashed_password
     )
     
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-    return db_user
+    return parse_user_roles(db_user)
 
 @app.get("/users", response_model=List[UserResponse])
 def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    if current_user.role != "admin":
+    # Check if user has admin role in their roles list
+    is_admin = 'admin' in (current_user.roles if hasattr(current_user, 'roles') and current_user.roles else [current_user.role])
+    
+    if not is_admin:
         raise HTTPException(status_code=403, detail="Not authorized to view all users")
     
     users = db.query(User).offset(skip).limit(limit).all()
-    return users
+    # Parse roles for each user
+    return [parse_user_roles(user) for user in users]
 
 @app.get("/users/me", response_model=UserResponse)
 def read_user_me(current_user: User = Depends(get_current_user)):
+    # No need to parse roles again as get_current_user already does it
     return current_user
 
 @app.get("/users/{user_id}", response_model=UserResponse)
 def read_user(user_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    if current_user.role != "admin" and current_user.id != user_id:
+    # Check if user has admin role in their roles list
+    is_admin = 'admin' in (current_user.roles if hasattr(current_user, 'roles') and current_user.roles else [current_user.role])
+    
+    if not is_admin and current_user.id != user_id:
         raise HTTPException(status_code=403, detail="Not authorized to view this user")
     
     db_user = db.query(User).filter(User.id == user_id).first()
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    return db_user
+    return parse_user_roles(db_user)
 
 @app.put("/users/{user_id}", response_model=UserResponse)
 def update_user(user_id: str, user: UserUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     # Only admins can update any user, regular users can only update themselves
-    if current_user.role != "admin" and current_user.id != user_id:
+    is_admin = 'admin' in (current_user.roles if hasattr(current_user, 'roles') and current_user.roles else [current_user.role])
+    
+    if not is_admin and current_user.id != user_id:
         raise HTTPException(status_code=403, detail="Not authorized to update this user")
     
     # Check if user exists
@@ -450,7 +515,13 @@ def update_user(user_id: str, user: UserUpdate, db: Session = Depends(get_db), c
     # Update user fields
     db_user.email = user.email
     db_user.name = user.name
-    db_user.role = user.role
+    
+    # Update roles
+    if hasattr(user, 'roles') and user.roles:
+        # Store roles as JSON string
+        db_user.roles = json.dumps(user.roles)
+        # Update legacy role field for backward compatibility
+        db_user.role = user.roles[0] if user.roles else None
     
     # Update password only if provided
     if user.password:
@@ -460,12 +531,14 @@ def update_user(user_id: str, user: UserUpdate, db: Session = Depends(get_db), c
     
     db.commit()
     db.refresh(db_user)
-    return db_user
+    return parse_user_roles(db_user)
 
 @app.delete("/users/{user_id}")
 def delete_user(user_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     # Only admins can delete users
-    if current_user.role != "admin":
+    is_admin = 'admin' in (current_user.roles if hasattr(current_user, 'roles') and current_user.roles else [current_user.role])
+    
+    if not is_admin:
         raise HTTPException(status_code=403, detail="Not authorized to delete users")
     
     # Prevent admins from deleting their own account
@@ -492,7 +565,10 @@ def get_public_companies(db: Session = Depends(get_db)):
 
 @app.post("/companies", response_model=CompanyResponse)
 def create_company(company: CompanyCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    if current_user.role != "admin":
+    # Check if user has admin role
+    is_admin = 'admin' in (current_user.roles if hasattr(current_user, 'roles') and current_user.roles else [current_user.role])
+    
+    if not is_admin:
         raise HTTPException(status_code=403, detail="Not authorized to create companies")
     
     # Get the highest existing company ID
@@ -533,19 +609,29 @@ def create_company(company: CompanyCreate, db: Session = Depends(get_db), curren
 
 @app.get("/companies", response_model=List[CompanyResponse])
 def read_companies(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    # Check if user has admin role in their roles list
+    is_admin = 'admin' in (current_user.roles if hasattr(current_user, 'roles') and current_user.roles else [current_user.role])
+    
+    # Add logging to troubleshoot
+    logger.info(f"User {current_user.id} ({current_user.email}) requesting companies. Is admin: {is_admin}")
+    
     # Admin can see all companies
-    if current_user.role == "admin":
+    if is_admin:
         companies = db.query(Company).offset(skip).limit(limit).all()
+        logger.info(f"Admin user. Returning all {len(companies)} companies")
     else:
-        # Other users can only see companies they're assigned to
+        # Other users can only see companies they're explicitly assigned to in the company_user_association table
+        # This uses the relationship defined in the User model
         companies = db.query(Company).join(Company.users).filter(User.id == current_user.id).offset(skip).limit(limit).all()
+        logger.info(f"Non-admin user. Returning {len(companies)} companies that user is assigned to")
     
     return companies
 
 @app.get("/companies/{company_id}", response_model=CompanyResponse)
 def read_company(company_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    # Check if user has access to this company
-    has_access = current_user.role == "admin" or any(c.id == company_id for c in current_user.companies)
+    # Check if user has admin role or is assigned to this company
+    is_admin = 'admin' in (current_user.roles if hasattr(current_user, 'roles') and current_user.roles else [current_user.role])
+    has_access = is_admin or any(c.id == company_id for c in current_user.companies)
     
     if not has_access:
         raise HTTPException(status_code=403, detail="Not authorized to view this company")
@@ -558,7 +644,10 @@ def read_company(company_id: str, db: Session = Depends(get_db), current_user: U
 
 @app.put("/companies/{company_id}", response_model=CompanyResponse)
 def update_company(company_id: str, company: CompanyCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    if current_user.role != "admin":
+    # Check if user has admin role
+    is_admin = 'admin' in (current_user.roles if hasattr(current_user, 'roles') and current_user.roles else [current_user.role])
+    
+    if not is_admin:
         raise HTTPException(status_code=403, detail="Not authorized to update companies")
     
     db_company = db.query(Company).filter(Company.id == company_id).first()
@@ -580,7 +669,10 @@ def update_company(company_id: str, company: CompanyCreate, db: Session = Depend
 
 @app.delete("/companies/{company_id}")
 def delete_company(company_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    if current_user.role != "admin":
+    # Check if user has admin role in their roles array
+    is_admin = 'admin' in (current_user.roles if hasattr(current_user, 'roles') and current_user.roles else [current_user.role])
+    
+    if not is_admin:
         raise HTTPException(status_code=403, detail="Not authorized to delete companies")
     
     db_company = db.query(Company).filter(Company.id == company_id).first()
@@ -594,13 +686,21 @@ def delete_company(company_id: str, db: Session = Depends(get_db), current_user:
 # Company-User assignment endpoints
 @app.post("/companies/{company_id}/assign-users")
 def assign_users_to_company(company_id: str, assignment: CompanyUserAssignment, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    if current_user.role != "admin":
+    # Check if user has admin role in their roles array
+    is_admin = 'admin' in (current_user.roles if hasattr(current_user, 'roles') and current_user.roles else [current_user.role])
+    
+    if not is_admin:
         raise HTTPException(status_code=403, detail="Not authorized to assign users")
     
     # Validate company exists
     db_company = db.query(Company).filter(Company.id == company_id).first()
     if db_company is None:
         raise HTTPException(status_code=404, detail="Company not found")
+    
+    # Log the current assignment for debugging
+    current_users = db.query(User).join(User.companies).filter(Company.id == company_id).all()
+    logger.info(f"Company {company_id} current assigned users: {[u.id for u in current_users]}")
+    logger.info(f"New user assignments: {assignment.user_ids}")
     
     # Validate all users exist
     for user_id in assignment.user_ids:
@@ -610,28 +710,45 @@ def assign_users_to_company(company_id: str, assignment: CompanyUserAssignment, 
     
     # Clear existing assignments
     db_company.users = []
+    db.flush()  # Flush to ensure the association table is cleared
     
     # Add new assignments
     for user_id in assignment.user_ids:
         db_user = db.query(User).filter(User.id == user_id).first()
         db_company.users.append(db_user)
     
-    db.commit()
+    # Log after update for verification
+    logger.info(f"Updated company {company_id} with new user assignments: {assignment.user_ids}")
+    
+    try:
+        db.commit()
+        logger.info(f"Successfully committed user assignments for company {company_id}")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error committing user assignments: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to save user assignments: {str(e)}")
+    
     return {"detail": "Users assigned successfully"}
 
 @app.get("/companies/{company_id}/users", response_model=List[UserResponse])
 def get_company_users(company_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     # Check if user has access to this company
-    has_access = current_user.role == "admin" or any(c.id == company_id for c in current_user.companies)
+    is_admin = 'admin' in (current_user.roles if hasattr(current_user, 'roles') and current_user.roles else [current_user.role])
+    has_access = is_admin or any(c.id == company_id for c in current_user.companies)
     
     if not has_access:
         raise HTTPException(status_code=403, detail="Not authorized to view users for this company")
     
+    # Get the company
     db_company = db.query(Company).filter(Company.id == company_id).first()
     if db_company is None:
         raise HTTPException(status_code=404, detail="Company not found")
     
-    return db_company.users
+    # Get users associated with this company
+    users = db_company.users
+    
+    # Parse roles for each user
+    return [parse_user_roles(user) for user in users]
 
 class AssessmentCreate(BaseModel):
     """
@@ -723,8 +840,18 @@ def create_assessment(assessment: AssessmentCreate, db: Session = Depends(get_db
 @app.get("/companies/{company_id}/assessments")
 def get_company_assessments(company_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     # Check if user has access to this company
-    logger.info(f"Fetching assessments for company {company_id}, user {current_user.id}")
-    has_access = current_user.role == "admin" or any(c.id == company_id for c in current_user.companies)
+    logger.info(f"User {current_user.id} ({current_user.email}) requesting assessments for company {company_id}")
+    
+    # Check if user has admin role in their roles array
+    is_admin = 'admin' in (current_user.roles if hasattr(current_user, 'roles') and current_user.roles else [current_user.role])
+    logger.info(f"User is admin: {is_admin}")
+    
+    # List user's assigned companies for debugging
+    user_company_ids = [c.id for c in current_user.companies]
+    logger.info(f"User is assigned to companies: {user_company_ids}")
+    
+    # Check if user has access to this company
+    has_access = is_admin or any(c.id == company_id for c in current_user.companies)
     
     if not has_access:
         logger.warning(f"User {current_user.id} denied access to assessments for company {company_id}")
@@ -770,8 +897,11 @@ def get_assessment(assessment_id: str, db: Session = Depends(get_db), current_us
     if db_assessment is None:
         raise HTTPException(status_code=404, detail="Assessment not found")
     
+    # Check if user has admin role in their roles array
+    is_admin = 'admin' in (current_user.roles if hasattr(current_user, 'roles') and current_user.roles else [current_user.role])
+    
     # Check if user has access to this company
-    has_access = current_user.role == "admin" or any(c.id == db_assessment.company_id for c in current_user.companies)
+    has_access = is_admin or any(c.id == db_assessment.company_id for c in current_user.companies)
     
     if not has_access:
         raise HTTPException(status_code=403, detail="Not authorized to view this assessment")
@@ -784,8 +914,11 @@ def update_assessment(assessment_id: str, assessment: AssessmentCreate, db: Sess
     if db_assessment is None:
         raise HTTPException(status_code=404, detail="Assessment not found")
     
+    # Check if user has admin role in their roles array
+    is_admin = 'admin' in (current_user.roles if hasattr(current_user, 'roles') and current_user.roles else [current_user.role])
+    
     # Check if user has access to this company
-    has_access = current_user.role == "admin" or any(c.id == db_assessment.company_id for c in current_user.companies)
+    has_access = is_admin or any(c.id == db_assessment.company_id for c in current_user.companies)
     
     if not has_access:
         raise HTTPException(status_code=403, detail="Not authorized to update this assessment")

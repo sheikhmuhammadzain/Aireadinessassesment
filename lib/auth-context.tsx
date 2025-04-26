@@ -11,7 +11,8 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: UserRole;
+  role?: UserRole; // Legacy field, kept for backward compatibility
+  roles: UserRole[]; // New field for multiple roles
 }
 
 // Predefined users for fallback (will be replaced with API data)
@@ -20,49 +21,64 @@ export const PREDEFINED_USERS: User[] = [
     id: "1",
     email: "admin@cybergen.com",
     name: "Admin User",
-    role: "admin"
+    role: "admin",
+    roles: ["admin"]
   },
   {
     id: "2",
     email: "governance@cybergen.com",
     name: "Governance Manager",
-    role: "ai_governance"
+    role: "ai_governance",
+    roles: ["ai_governance"]
   },
   {
     id: "3",
     email: "culture@cybergen.com",
     name: "Culture Director",
-    role: "ai_culture"
+    role: "ai_culture",
+    roles: ["ai_culture"]
   },
   {
     id: "4",
     email: "infrastructure@cybergen.com",
     name: "Infrastructure Lead",
-    role: "ai_infrastructure"
+    role: "ai_infrastructure",
+    roles: ["ai_infrastructure"]
   },
   {
     id: "5",
     email: "strategy@cybergen.com",
     name: "Strategy Officer",
-    role: "ai_strategy"
+    role: "ai_strategy",
+    roles: ["ai_strategy"]
   },
   {
     id: "6",
     email: "dataengineer@cybergen.com",
     name: "Data Engineer",
-    role: "ai_data"
+    role: "ai_data",
+    roles: ["ai_data"]
   },
   {
     id: "7",
     email: "talent@cybergen.com",
     name: "Talent Manager",
-    role: "ai_talent"
+    role: "ai_talent",
+    roles: ["ai_talent"]
   },
   {
     id: "8",
     email: "security@cybergen.com",
     name: "Security Specialist",
-    role: "ai_security"
+    role: "ai_security",
+    roles: ["ai_security"]
+  },
+  {
+    id: "9",
+    email: "multi@cybergen.com",
+    name: "Multi-Role User",
+    role: "ai_governance", // Legacy primary role is ai_governance
+    roles: ["ai_governance", "ai_culture", "ai_security"] // But has access to multiple pillars
   }
 ];
 
@@ -83,7 +99,7 @@ interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
-  signup: (email: string, name: string, password: string, role: UserRole) => Promise<boolean>;
+  signup: (email: string, name: string, password: string, roles: UserRole[]) => Promise<boolean>;
   isAuthenticated: boolean;
   isLoading: boolean;
   canEditPillar: (pillar: string) => boolean;
@@ -116,6 +132,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        // Ensure user has a roles array
+        if (!data.roles && data.role) {
+          data.roles = [data.role];
+        } else if (!data.roles) {
+          data.roles = [];
+        }
+
         setUser(data);
         setIsAuthenticated(true);
       } catch (error) {
@@ -141,11 +164,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // Save token and user info
       localStorage.setItem('token', data.access_token);
+      
+      // Ensure user has a roles array
+      if (!data.user.roles && data.user.role) {
+        data.user.roles = [data.user.role];
+      } else if (!data.user.roles) {
+        data.user.roles = [];
+      }
+      
       setUser(data.user);
       setIsAuthenticated(true);
       
       // Log success for debugging
-      console.log("Login successful, user role:", data.user.role);
+      console.log("Login successful, user roles:", data.user.roles);
       return true;
     } catch (error) {
       console.error("Login error:", error);
@@ -165,9 +196,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Signup function
-  const signup = async (email: string, name: string, password: string, role: UserRole): Promise<boolean> => {
+  const signup = async (email: string, name: string, password: string, roles: UserRole[]): Promise<boolean> => {
     try {
-      const { data, error } = await api.auth.signup(email, name, password, role);
+      const { data, error } = await api.auth.signup(email, name, password, roles);
       
       if (error || !data) {
         console.error("Signup failed:", error);
@@ -187,10 +218,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return false;
     
     // Admin can edit all pillars
-    if (user.role === "admin") return true;
+    if (user.roles.includes("admin")) return true;
     
-    // Other users can only edit their assigned pillar
-    return ROLE_TO_PILLAR[user.role] === pillar;
+    // Check if any of the user's roles match the pillar
+    return user.roles.some(role => ROLE_TO_PILLAR[role] === pillar);
   };
 
   return (

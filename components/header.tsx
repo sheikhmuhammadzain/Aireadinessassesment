@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/mode-toggle";
@@ -89,7 +90,7 @@ export default function Header() {
         <div className="flex gap-6 md:gap-10">
           <Link href="/" className="flex items-center space-x-2">
             <span className="hidden font-bold sm:inline-block">
-              AI Readiness
+              <Image src="/logo.png" alt="Logo" width={180} height={180} />
             </span>
           </Link>
           <nav className="hidden gap-6 md:flex">

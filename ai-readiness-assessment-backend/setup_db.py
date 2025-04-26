@@ -2,7 +2,7 @@ import uuid
 import json
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from models import Base, User, Company, Assessment, DefaultPillarWeight, CompanyPillarWeight, CategoryWeight
 
@@ -25,48 +25,71 @@ DEFAULT_USERS = [
         "email": "admin@cybergen.com",
         "name": "Admin User",
         "role": "admin",
+        "roles": ["admin"],
         "password": "admin123"
     },
     {
         "email": "governance@cybergen.com",
         "name": "Governance Manager",
         "role": "ai_governance",
+        "roles": ["ai_governance"],
         "password": "password123"
     },
     {
         "email": "culture@cybergen.com",
         "name": "Culture Director",
         "role": "ai_culture",
+        "roles": ["ai_culture"],
         "password": "password123"
     },
     {
         "email": "infrastructure@cybergen.com",
         "name": "Infrastructure Lead",
         "role": "ai_infrastructure",
+        "roles": ["ai_infrastructure"],
         "password": "password123"
     },
     {
         "email": "strategy@cybergen.com",
         "name": "Strategy Officer",
         "role": "ai_strategy",
+        "roles": ["ai_strategy"],
         "password": "password123"
     },
     {
         "email": "dataengineer@cybergen.com",
         "name": "Data Engineer",
         "role": "ai_data",
+        "roles": ["ai_data"],
         "password": "password123"
     },
     {
         "email": "talent@cybergen.com",
         "name": "Talent Manager",
         "role": "ai_talent",
+        "roles": ["ai_talent"],
         "password": "password123"
     },
     {
         "email": "security@cybergen.com",
         "name": "Security Specialist",
         "role": "ai_security",
+        "roles": ["ai_security"],
+        "password": "password123"
+    },
+    # Multi-role users
+    {
+        "email": "multi1@cybergen.com",
+        "name": "Multi Role User 1",
+        "role": "ai_governance",  # Primary role
+        "roles": ["ai_governance", "ai_culture", "ai_security"],
+        "password": "password123"
+    },
+    {
+        "email": "multi2@cybergen.com",
+        "name": "Multi Role User 2",
+        "role": "ai_data",  # Primary role
+        "roles": ["ai_data", "ai_infrastructure"],
         "password": "password123"
     }
 ]
@@ -115,6 +138,23 @@ SAMPLE_COMPANIES = [
     }
 ]
 
+# Ensure the roles column exists
+try:
+    # Check if users table exists
+    result = db.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='users'"))
+    if result.fetchone():
+        # Check if roles column exists
+        result = db.execute(text("PRAGMA table_info(users)"))
+        columns = [row[1] for row in result.fetchall()]
+        
+        if 'roles' not in columns:
+            print("Adding 'roles' column to users table...")
+            db.execute(text("ALTER TABLE users ADD COLUMN roles JSON DEFAULT NULL"))
+            db.commit()
+            print("Added 'roles' column to users table")
+except Exception as e:
+    print(f"Error checking/adding roles column: {e}")
+    
 # Check if we need to create default users
 existing_users = db.query(User).count()
 
@@ -124,11 +164,16 @@ if existing_users == 0:
     
     for user_data in DEFAULT_USERS:
         user_id = f"user_{uuid.uuid4()}"
+        
+        # Convert roles to JSON string for storage
+        roles_json = json.dumps(user_data.get("roles", [user_data["role"]]))
+        
         db_user = User(
             id=user_id,
             email=user_data["email"],
             name=user_data["name"],
-            role=user_data["role"],
+            role=user_data["role"],  # Legacy role field for backward compatibility
+            roles=roles_json,        # New multiple roles field as JSON
             hashed_password=pwd_context.hash(user_data["password"])
         )
         db.add(db_user)
@@ -166,6 +211,19 @@ if existing_users == 0:
         for company in created_companies:
             company.users.append(admin_user)
         
+        # Assign multi-role users to some companies
+        if len(created_users) >= 10:  # Make sure we have enough users
+            multi_user1 = created_users[8]  # First multi-role user
+            multi_user2 = created_users[9]  # Second multi-role user
+            
+            # Assign multi-role users to first three companies
+            for i in range(min(3, len(created_companies))):
+                created_companies[i].users.append(multi_user1)
+                
+            # Assign second multi-role user to companies 3-5
+            for i in range(2, min(5, len(created_companies))):
+                created_companies[i].users.append(multi_user2)
+        
         db.commit()
         
         # Create some default assessments for each company
@@ -188,7 +246,22 @@ if existing_users == 0:
         
         db.commit()
         
-        print("Created 5 sample companies with 7 assessments each")
+        print(f"Created {len(created_companies)} sample companies with {len(assessment_types)} assessments each")
+else:
+    # If users exist, make sure they have the roles field populated
+    print("Checking existing users for roles field...")
+    users_without_roles = db.query(User).filter(User.roles == None).all()
+    updated_count = 0
+    
+    for user in users_without_roles:
+        if user.role:
+            # Set roles from single role
+            user.roles = json.dumps([user.role])
+            updated_count += 1
+    
+    if updated_count > 0:
+        db.commit()
+        print(f"Updated {updated_count} existing users with roles field")
 
 # Create default pillar weights
 def create_default_weights(db):

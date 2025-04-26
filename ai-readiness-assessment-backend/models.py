@@ -5,6 +5,7 @@ from sqlalchemy.sql import func
 from typing import List, Dict, Optional
 from pydantic import BaseModel
 import datetime
+import json
 
 Base = declarative_base()
 
@@ -16,13 +17,22 @@ company_user_association = Table(
     Column("user_id", String, ForeignKey("users.id")),
 )
 
+# Association table for user-role relationships (new)
+user_role_association = Table(
+    "user_role_association",
+    Base.metadata,
+    Column("user_id", String, ForeignKey("users.id")),
+    Column("role", String),  # One of: admin, ai_governance, ai_culture, etc.
+)
+
 class User(Base):
     __tablename__ = "users"
 
     id = Column(String, primary_key=True, index=True)
     email = Column(String, unique=True, index=True)
     name = Column(String)
-    role = Column(String)  # admin, ai_governance, ai_culture, etc.
+    role = Column(String, nullable=True)  # Legacy field, kept for backward compatibility
+    roles = Column(JSON, default=list)  # New field to store multiple roles
     hashed_password = Column(String)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
@@ -111,7 +121,7 @@ class DefaultPillarWeight(Base):
 class UserBase(BaseModel):
     email: str
     name: str
-    role: str
+    roles: List[str]  # Changed from single role to multiple roles
 
 class UserCreate(UserBase):
     password: str
@@ -123,6 +133,19 @@ class UserResponse(UserBase):
 
     class Config:
         orm_mode = True
+        
+    @classmethod
+    def model_validate(cls, obj, *args, **kwargs):
+        # Handle roles field - convert JSON string to list
+        if hasattr(obj, 'roles') and isinstance(obj.roles, str):
+            try:
+                obj.roles = json.loads(obj.roles)
+            except:
+                obj.roles = [obj.role] if obj.role else []
+        elif not hasattr(obj, 'roles') or obj.roles is None:
+            obj.roles = [obj.role] if hasattr(obj, 'role') and obj.role else []
+        
+        return super().model_validate(obj, *args, **kwargs)
 
 class UserUpdate(UserBase):
     password: Optional[str] = None

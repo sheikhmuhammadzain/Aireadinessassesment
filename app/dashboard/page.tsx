@@ -52,16 +52,25 @@ function DashboardContent() {
     const [results, setResults] = useState<Record<string, AssessmentResult>>({});
     const [overallData, setOverallData] = useState<ChartDataItem[]>([]);
 
-    // Filter assessment types based on user role
+    // Filter assessment types based on user roles
     const filteredAssessmentTypes = React.useMemo(() => {
         return assessmentTypes.filter(type => {
             // Admin can see all assessment types
-            if (user?.role === "admin") return true;
+            if (!user) return false;
             
-            // Other users can only see their assigned assessment type
-            return user?.role ? ROLE_TO_PILLAR[user.role] === type.title : false;
+            // Check if user has admin role
+            const isAdmin = user.roles?.includes('admin') || user.role === 'admin';
+            if (isAdmin) return true;
+            
+            // Check if user has a role corresponding to this assessment type
+            if (user.roles && user.roles.length > 0) {
+                return user.roles.some(role => ROLE_TO_PILLAR[role] === type.title);
+            }
+            
+            // Fallback to legacy role if no roles array
+            return user.role ? ROLE_TO_PILLAR[user.role] === type.title : false;
         });
-    }, [user?.role]);
+    }, [user]);
 
     // Load data from API and localStorage
     useEffect(() => {
@@ -72,8 +81,11 @@ function DashboardContent() {
                 // Dynamically import API client
                 const { default: api } = await import('@/lib/api/client');
                 
+                // Check if user has admin role
+                const isAdmin = user?.roles?.includes('admin') || user?.role === 'admin';
+                
                 // Fetch companies based on user role
-                if (user?.role === "admin") {
+                if (isAdmin) {
                     // Admin sees all companies
                     const { data: companiesData, error: companiesError } = await api.companies.getCompanies();
                     
@@ -114,8 +126,11 @@ function DashboardContent() {
                                                                     categoryScores: assessmentDetails.data.categoryScores || {},
                                                                     qValues: assessmentDetails.data.qValues || {},
                                                                     overallScore: assessment.score,
-                                                                    // Handle softmaxWeights field
-                                                                    softmaxWeights: assessmentDetails.data.adjustedWeights || {}
+                                                                    // Use adjusted weights if available, otherwise empty object
+                                                                    softmaxWeights: assessmentDetails.data.adjustedWeights || {},
+                                                                    // Add missing properties required by AssessmentResult type
+                                                                    userWeights: assessmentDetails.data.userWeights || {},
+                                                                    adjustedWeights: assessmentDetails.data.adjustedWeights || {}
                                                                 };
                                                                 
                                                                 assessmentResultsMap[assessment.type] = resultData;
@@ -170,13 +185,24 @@ function DashboardContent() {
                         // Try to get user companies directly if available
                         const { data: userCompanies, error: companiesError } = await api.companies.getCompanies();
                         
-                        // Filter companies for this user
+                        // Filter companies for this user - only include companies where the user is explicitly assigned
                         const filteredCompanies = userCompanies ? userCompanies.filter(company => {
-                            // In a real app, you would have a proper way to determine if the user is assigned to this company
-                            // This is a simplified version
-                            return company.hasOwnProperty('users') ? 
-                                ((company as any).users as any[]).some(u => u.id === user.id) : true;
+                            // Check if the company has users property
+                            if (!company.hasOwnProperty('users')) {
+                                console.warn(`Company ${company.id} has no users property - excluding`);
+                                return false;
+                            }
+                            
+                            // Check if the user is in the company's users list
+                            const isAssigned = ((company as any).users as any[]).some(u => u.id === user.id);
+                            if (!isAssigned) {
+                                console.warn(`User ${user.id} is not assigned to company ${company.id} - excluding`);
+                            }
+                            return isAssigned;
                         }) : [];
+                        
+                        // Log for debugging
+                        console.log(`User ${user.id} filtered companies:`, filteredCompanies.map(c => c.id));
                         
                         if (companiesError) {
                             console.warn("Error fetching user companies:", companiesError);
@@ -203,8 +229,13 @@ function DashboardContent() {
                                             if (assessmentData.assessments) {
                                                 for (const assessment of assessmentData.assessments) {
                                                     if (assessment.status === 'completed' && assessment.score) {
-                                                        // Only care about assessments this role can access
-                                                        if (user.role && ROLE_TO_PILLAR[user.role] === assessment.type) {
+                                                        // Check if user has access to this assessment type based on roles
+                                                        const assessmentTypeTitle = assessment.type;
+                                                        const userHasAccess = user.roles 
+                                                            ? user.roles.some(role => ROLE_TO_PILLAR[role] === assessmentTypeTitle)
+                                                            : (user.role ? ROLE_TO_PILLAR[user.role] === assessmentTypeTitle : false);
+                                                            
+                                                        if (userHasAccess) {
                                                             try {
                                                                 if (assessment.id) {
                                                                     const { data: assessmentDetails } = await api.assessments.getAssessment(assessment.id);
@@ -216,8 +247,11 @@ function DashboardContent() {
                                                                             categoryScores: assessmentDetails.data.categoryScores || {},
                                                                             qValues: assessmentDetails.data.qValues || {},
                                                                             overallScore: assessment.score,
-                                                                            // Handle softmaxWeights field
-                                                                            softmaxWeights: assessmentDetails.data.adjustedWeights || {}
+                                                                            // Use adjusted weights if available, otherwise empty object
+                                                                            softmaxWeights: assessmentDetails.data.adjustedWeights || {},
+                                                                            // Add missing properties required by AssessmentResult type
+                                                                            userWeights: assessmentDetails.data.userWeights || {},
+                                                                            adjustedWeights: assessmentDetails.data.adjustedWeights || {}
                                                                         };
                                                                         
                                                                         assessmentResultsMap[assessment.type] = resultData;
@@ -468,6 +502,31 @@ function DashboardContent() {
         }
     }, [results, assessmentTypes]);
 
+    // Get the user's assessment types based on roles
+    const userAssessmentTypes = React.useMemo(() => {
+        if (!user) return [];
+        
+        const types: string[] = [];
+        
+        // Get assessment types from roles array
+        if (user.roles && user.roles.length > 0) {
+            user.roles.forEach(role => {
+                if (role !== 'admin' && ROLE_TO_PILLAR[role]) {
+                    types.push(ROLE_TO_PILLAR[role]);
+                }
+            });
+        } 
+        // Fallback to legacy role if needed
+        else if (user.role && user.role !== 'admin' && ROLE_TO_PILLAR[user.role]) {
+            types.push(ROLE_TO_PILLAR[user.role]);
+        }
+        
+        return types;
+    }, [user]);
+    
+    // Check if user has admin role
+    const isAdmin = user?.roles?.includes('admin') || user?.role === 'admin';
+
     if (loading) {
         return (
             <div className="container mx-auto py-8 px-4 flex justify-center items-center min-h-[calc(100vh-200px)]">
@@ -479,22 +538,21 @@ function DashboardContent() {
         );
     }
 
-    // Get the user's assessment type based on role
-    const userAssessmentType = user?.role ? ROLE_TO_PILLAR[user.role] : null;
-
     return (
         <div className="container mx-auto py-8 px-4">
             <div className="flex justify-between items-center mb-6">
                 <div>
-                    <h1 className="text-3xl font-bold">{user?.role === 'admin' ? 'Companies Dashboard' : 'My Companies'}</h1>
+                    <h1 className="text-3xl font-bold">
+                        {isAdmin ? 'Companies Dashboard' : 'My Companies'}
+                    </h1>
                     <p className="text-muted-foreground">
-                        {user?.role === 'admin' 
+                        {isAdmin 
                             ? 'Overview of all companies and their assessment progress' 
                             : `Welcome back, ${user?.name || 'User'}`}
                     </p>
                 </div>
 
-                {user?.role === 'admin' && (
+                {isAdmin && (
                     <Button onClick={() => router.push('/admin/companies/add')}>
                         Add New Company
                     </Button>
@@ -502,45 +560,45 @@ function DashboardContent() {
             </div>
 
             <div className="space-y-6">
-                    <h2 className="text-2xl font-semibold mb-4">
-                        {user?.role === 'admin' ? 'All Companies' : 'Companies Assigned to You'}
-                    </h2>
-                    
-                    {companies.length === 0 ? (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>No Companies Found</CardTitle>
-                                <CardDescription>
-                                    {user?.role === 'admin' 
-                                        ? 'No companies have been added to the system yet.' 
-                                        : 'You have not been assigned to any companies yet.'}
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="flex justify-center py-6">
-                            <Button onClick={() => router.push('/admin/companies')}>
-                                {user?.role === 'admin' ? 'View Companies' : 'Start Assessments'}
-                                    </Button>
-                            </CardContent>
-                        </Card>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {companies.map((company) => (
-                            <CompanyCard
-                                key={company.id}
-                                company={company}
-                                status={assessmentStatuses[company.id || ""]}
-                                completionPercentage={getCompanyCompletionPercentage(company.id || "")}
-                                overallScore={getCompanyOverallScore(company.id || "")}
-                                onViewDetails={handleViewCompany}
-                                onManageAssessments={(id: string) => router.push(`/admin/companies/${id}/assessments`)}
-                                onStartAssessment={handleStartAssessment}
-                                isAdmin={user?.role === 'admin'}
-                                userAssessmentType={userAssessmentType}
-                            />
-                        ))}
-                                                </div>
-                                            )}
-                        </div>
-        </div>
-    );
+                <h2 className="text-2xl font-semibold mb-4">
+                    {isAdmin ? 'All Companies' : 'Companies Assigned to You'}
+                </h2>
+                
+                {companies.length === 0 ? (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>No Companies Found</CardTitle>
+                            <CardDescription>
+                                {isAdmin 
+                                    ? 'No companies have been added to the system yet.' 
+                                    : 'You have not been assigned to any companies yet.'}
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="flex justify-center py-6">
+                        <Button onClick={() => router.push('/admin/companies')}>
+                            {isAdmin ? 'View Companies' : 'Start Assessments'}
+                                </Button>
+                        </CardContent>
+                    </Card>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {companies.filter(company => company.id).map((company) => (
+                        <CompanyCard
+                            key={company.id}
+                            company={company}
+                            status={assessmentStatuses[company.id || ""]}
+                            completionPercentage={getCompanyCompletionPercentage(company.id || "")}
+                            overallScore={getCompanyOverallScore(company.id || "")}
+                            onViewDetails={handleViewCompany}
+                            onManageAssessments={(id: string) => router.push(`/admin/companies/${id}/assessments`)}
+                            onStartAssessment={handleStartAssessment}
+                            isAdmin={isAdmin}
+                            userAssessmentTypes={userAssessmentTypes}
+                        />
+                    ))}
+                                    </div>
+                                )}
+            </div>
+    </div>
+);
 }

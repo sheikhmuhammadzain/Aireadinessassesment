@@ -12,7 +12,7 @@ import {
   Database,
   Brain,
   ShieldCheck,
-  CheckCircle, // Example for benefits
+  CheckCircle,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -37,69 +37,80 @@ const staggerContainer = {
   },
 };
 
+// Define primary blue color for consistency (Tailwind class)
+// You can adjust this shade (e.g., 'blue-600', 'blue-700')
+const primaryBlue = "blue-600";
+const primaryBlueHover = "blue-700"; // Slightly darker for hover
+const primaryBlueText = `text-${primaryBlue}`;
+const primaryBlueBg = `bg-${primaryBlue}`;
+const primaryBlueBorder = `border-${primaryBlue}`;
+const primaryBlueRing = `ring-${primaryBlue}`;
+
+// Helper function to construct Tailwind classes
+const cn = (...classes) => classes.filter(Boolean).join(' ');
+
 export default function Home() {
   const features = [
     {
       title: "AI Governance",
       description: "Establish robust policies, accountability, and risk management for responsible AI.",
-      icon: <Shield className="h-6 w-6 text-primary" />, // Pass color directly
+      icon: <Shield className={cn("h-6 w-6", primaryBlueText)} />,
     },
     {
-      title: "AI Strategy ",
+      title: "AI Strategy",
       description: "Align AI initiatives with business goals for measurable impact and growth.",
-      icon: <BarChart4 className="h-6 w-6 text-primary" />,
+      icon: <BarChart4 className={cn("h-6 w-6", primaryBlueText)} />,
     },
     {
-      title: "AI Data ",
+      title: "AI Data",
       description: "Ensure high-quality, accessible, and governed data pipelines for AI success.",
-      icon: <Database className="h-6 w-6 text-primary" />,
+      icon: <Database className={cn("h-6 w-6", primaryBlueText)} />,
     },
     {
       title: "AI Infrastructure",
       description: "Build scalable, secure, and flexible cloud or on-premise AI foundations.",
-      icon: <Layers className="h-6 w-6 text-primary" />,
+      icon: <Layers className={cn("h-6 w-6", primaryBlueText)} />,
     },
     {
-      title: "AI Talent ",
+      title: "AI Talent",
       description: "Cultivate in-house expertise and attract specialized AI talent.",
-      icon: <Brain className="h-6 w-6 text-primary" />,
+      icon: <Brain className={cn("h-6 w-6", primaryBlueText)} />,
     },
     {
-      title: "AI Culture ",
+      title: "AI Culture",
       description: "Foster an AI-driven mindset with strong leadership and change management.",
-      icon: <Users className="h-6 w-6 text-primary" />,
+      icon: <Users className={cn("h-6 w-6", primaryBlueText)} />,
     },
     {
       title: "AI Security",
       description: "Ensure secure and ethical AI systems that protect data and uphold fairness.",
-      icon: <ShieldCheck className="h-6 w-6 text-primary" />,
+      icon: <ShieldCheck className={cn("h-6 w-6", primaryBlueText)} />,
     },
   ];
 
-  // Placeholder for "Trusted By" logos
-  const trustedLogos = [
-    { name: "Placeholder Corp", logo: "/placeholder-logo-1.svg" }, // Replace with actual paths
-    { name: "Innovate Inc", logo: "/placeholder-logo-2.svg" },
-    { name: "Enterprise Solutions", logo: "/placeholder-logo-3.svg" },
-    { name: "Global Tech", logo: "/placeholder-logo-4.svg" },
-    { name: "Data Systems", logo: "/placeholder-logo-5.svg" },
-  ];
-
   return (
-    // Apply subtle background pattern to the whole page body or a main wrapper
-    <div className="min-h-screen w-full bg-background text-foreground overflow-x-hidden dot-background"> {/* Apply dot-background */}
+    // Apply a subtle light background, maybe with a very faint blue tint or pattern
+    // NOTE: You'll need to define the `dot-background` style in your global CSS if you keep it.
+    // Example: `body { background-color: #f8fafc; background-image: radial-gradient(#cbd5e1 1px, transparent 0); background-size: 20px 20px; }`
+    <div className="min-h-screen w-full bg-slate-50 text-slate-900 overflow-x-hidden"> {/* Light background */}
 
       {/* --- Hero Section --- */}
       <motion.section
-        className="relative isolate pt-32 pb-24 sm:pt-32 sm:pb-32 lg:pt-32 lg:pb-40 gradient-overlay" // Apply gradient overlay
+        // Use a subtle blue gradient overlay or keep it cleaner
+        className="relative isolate pt-32 pb-24 sm:pt-36 sm:pb-32 lg:pt-40 lg:pb-48 bg-gradient-to-b from-white via-blue-50/60 to-slate-50" // Subtle blue gradient background
         initial="hidden"
         animate="visible"
         variants={staggerContainer}
       >
-        {/* Optional: Subtle background shapes/glows */}
+        {/* Background abstract shapes with blue tints */}
         <div className="absolute inset-x-0 -top-40 -z-10 transform-gpu overflow-hidden blur-3xl sm:-top-80" aria-hidden="true">
           <div
-            className="relative left-[calc(50%-11rem)] aspect-[1155/678] w-[36.125rem] -translate-x-1/2 rotate-[30deg] bg-gradient-to-tr from-primary/20 via-primary/10 to-secondary/10 opacity-30 sm:left-[calc(50%-30rem)] sm:w-[72.1875rem]"
+            className={cn(
+              "relative left-[calc(50%-11rem)] aspect-[1155/678] w-[36.125rem]",
+              "-translate-x-1/2 rotate-[30deg]",
+              "bg-gradient-to-tr from-blue-300/30 via-blue-100/30 to-sky-300/30", // Adjusted blue gradient
+              "opacity-50 sm:left-[calc(50%-30rem)] sm:w-[72.1875rem]"
+            )}
             style={{
               clipPath:
                 'polygon(74.1% 44.1%, 100% 61.6%, 97.5% 26.9%, 85.5% 0.1%, 80.7% 2%, 72.5% 32.5%, 60.2% 62.4%, 52.4% 68.1%, 47.5% 58.3%, 45.2% 34.5%, 27.5% 76.7%, 0.1% 64.9%, 17.9% 100%, 27.6% 76.8%, 76.1% 97.7%, 74.1% 44.1%)',
@@ -107,28 +118,31 @@ export default function Home() {
           />
         </div>
 
-        <div className="container mx-auto px-6 text-center relative z-10"> {/* Ensure content is above gradient */}
-          <motion.div variants={fadeIn} className="max-w-4xl mx-auto"> {/* Increased max-width */}
-            {/* Optional Pill Badge */}
+        <div className="container mx-auto px-6 text-center relative z-10">
+          <motion.div variants={fadeIn} className="max-w-4xl mx-auto">
+             {/* Pill Badge with blue theme */}
              <motion.div variants={fadeIn} className="mb-6">
-               <span className="inline-flex items-center rounded-full bg-primary/5 px-4 py-1.5 text-sm font-medium text-primary ring-1 ring-inset ring-primary/20">
+               <span className={cn(
+                 "inline-flex items-center rounded-full px-4 py-1.5 text-sm font-medium",
+                 "bg-blue-100/60", // Lighter blue bg
+                 primaryBlueText,
+                 `ring-1 ring-inset ring-${primaryBlue}/20`
+               )}>
                   AI Readiness Platform
                </span>
              </motion.div>
 
             <motion.h1
               variants={fadeIn}
-              // More sophisticated gradient or just solid color
-              className="text-4xl font-bold tracking-tight text-foreground sm:text-6xl lg:text-7xl leading-tight"
-              // Example subtle gradient:
-              // className="text-4xl font-bold tracking-tight sm:text-6xl lg:text-7xl leading-tight text-transparent bg-clip-text bg-gradient-to-b from-gray-900 to-gray-700 dark:from-white dark:to-gray-300"
+              // Premium feel with strong contrast
+              className="text-4xl font-bold tracking-tight text-slate-900 sm:text-6xl lg:text-7xl leading-tight"
             >
               Unlock Your Organization's AI Potential
             </motion.h1>
 
             <motion.p
               variants={fadeIn}
-              className="mt-6 text-lg lg:text-xl leading-8 text-muted-foreground max-w-2xl mx-auto"
+              className="mt-6 text-lg lg:text-xl leading-8 text-slate-600 max-w-3xl mx-auto" // Adjusted text color for better contrast
             >
               Gain strategic clarity with our comprehensive AI readiness assessment. Identify strengths, pinpoint gaps, and receive a tailored roadmap for successful AI adoption.
             </motion.p>
@@ -137,12 +151,24 @@ export default function Home() {
               variants={fadeIn}
               className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4"
             >
-              <Button asChild size="lg" className="shadow-sm hover:shadow-md transition-shadow duration-300 w-full sm:w-auto">
+              {/* Primary Button with Blue Theme */}
+              <Button asChild size="lg" className={cn(
+                primaryBlueBg,
+                `hover:${primaryBlueHover}`,
+                'text-white', // Ensure text is white
+                'shadow-md hover:shadow-lg transition-all duration-300 w-full sm:w-auto'
+              )}>
                 <Link href="/assessment">
                   Start Your Assessment <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
               </Button>
-              <Button asChild variant="outline" size="lg" className="w-full sm:w-auto">
+              {/* Outline Button with Blue Theme */}
+              <Button asChild variant="outline" size="lg" className={cn(
+                `border-${primaryBlue}/70`, // Blue border
+                primaryBlueText,
+                `hover:bg-blue-50/70`, // Light blue background on hover
+                'w-full sm:w-auto transition-colors duration-300'
+                )}>
                 <Link href="#features">
                   Explore Dimensions
                 </Link>
@@ -151,10 +177,15 @@ export default function Home() {
           </motion.div>
         </div>
 
-        {/* Optional: Another background element */}
-        <div className="absolute inset-x-0 top-[calc(100%-13rem)] -z-10 transform-gpu overflow-hidden blur-3xl sm:top-[calc(100%-30rem)]" aria-hidden="true">
-          <div
-            className="relative left-[calc(50%+3rem)] aspect-[1155/678] w-[36.125rem] -translate-x-1/2 bg-gradient-to-tr from-secondary/20 via-secondary/5 to-primary/5 opacity-20 sm:left-[calc(50%+36rem)] sm:w-[72.1875rem]"
+        {/* Optional: Another background element with blue tints */}
+        <div className="absolute inset-x-0 top-[calc(100%-13rem)] -z-10 transform-gpu overflow-hidden blur-3xl sm:top-[calc(100%-35rem)]" aria-hidden="true">
+           <div
+            className={cn(
+              "relative left-[calc(50%+3rem)] aspect-[1155/678] w-[36.125rem]",
+              "-translate-x-1/2",
+               "bg-gradient-to-tr from-sky-300/30 via-blue-100/20 to-indigo-300/20", // Adjusted blue gradient
+              "opacity-40 sm:left-[calc(50%+36rem)] sm:w-[72.1875rem]"
+            )}
             style={{
               clipPath:
                 'polygon(74.1% 44.1%, 100% 61.6%, 97.5% 26.9%, 85.5% 0.1%, 80.7% 2%, 72.5% 32.5%, 60.2% 62.4%, 52.4% 68.1%, 47.5% 58.3%, 45.2% 34.5%, 27.5% 76.7%, 0.1% 64.9%, 17.9% 100%, 27.6% 76.8%, 76.1% 97.7%, 74.1% 44.1%)',
@@ -163,32 +194,8 @@ export default function Home() {
         </div>
       </motion.section>
 
-      {/* --- Trusted By Section --- */}
-       <section className="py-16 sm:py-20 bg-background">
-        <div className="container mx-auto px-6">
-          <h2 className="text-center text-base font-semibold text-muted-foreground tracking-wider uppercase">
-            Trusted by forward-thinking organizations
-          </h2>
-          <motion.div
-             className="mt-10 grid grid-cols-2 gap-y-8 gap-x-6 sm:grid-cols-3 lg:grid-cols-5 justify-items-center items-center"
-             initial="hidden"
-             whileInView="visible"
-             viewport={{ once: true, amount: 0.2 }}
-             variants={staggerContainer}
-           >
-            {trustedLogos.map((item) => (
-              <motion.div key={item.name} variants={fadeIn} className="opacity-60 hover:opacity-100 transition-opacity">
-                {/* Replace with actual img tags or SVG components */}
-                 <span className="text-sm text-muted-foreground">{item.name}</span> {/* Placeholder text */}
-                {/* <img className="h-8 lg:h-10 w-auto" src={item.logo} alt={item.name} /> */}
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
-
       {/* --- Features Section --- */}
-      <section id="features" className="py-24 sm:py-32 bg-muted/40"> {/* Slightly different bg */}
+      <section id="features" className="py-24 sm:py-32 bg-white"> {/* Clean white background */}
         <div className="container mx-auto px-6">
           <motion.div
             className="mx-auto max-w-3xl text-center mb-16 lg:mb-20"
@@ -197,11 +204,11 @@ export default function Home() {
             viewport={{ once: true, amount: 0.2 }}
             variants={fadeIn}
           >
-            <h2 className="text-base font-semibold leading-7 text-primary">Assessment Framework</h2>
-            <p className="mt-2 text-3xl font-bold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
+            <h2 className={cn("text-base font-semibold leading-7", primaryBlueText)}>Assessment Framework</h2>
+            <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl lg:text-5xl">
               Holistic View Across 7 Key Dimensions
             </p>
-            <p className="mt-6 text-lg leading-8 text-muted-foreground">
+            <p className="mt-6 text-lg leading-8 text-slate-600">
               Our methodology provides deep insights into every critical aspect of AI readiness, ensuring a well-rounded transformation strategy.
             </p>
           </motion.div>
@@ -210,21 +217,31 @@ export default function Home() {
             className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3"
             initial="hidden"
             whileInView="visible"
-            viewport={{ once: true, amount: 0.1 }} // Trigger slightly earlier for grid
+            viewport={{ once: true, amount: 0.1 }}
             variants={staggerContainer}
           >
             {features.map((feature) => (
               <motion.div key={feature.title} variants={fadeIn}>
-                 {/* Use Card component with refined styling */}
-                <Card className="h-full flex flex-col bg-card border border-border/50 hover:border-border hover:shadow-sm transition-all duration-300 ease-in-out group"> {/* Subtle hover */}
-                   <CardHeader className="flex flex-row items-start gap-4 space-y-0 pb-4"> {/* Adjust layout */}
-                    <div className="flex-shrink-0 w-10 h-10 bg-primary/5 rounded-lg flex items-center justify-center border border-primary/10 group-hover:border-primary/20 transition-colors">
+                 {/* Premium Card Styling */}
+                <Card className={cn(
+                    "h-full flex flex-col bg-white border border-slate-200/80",
+                    "hover:border-blue-300/80 hover:shadow-lg", // Enhanced hover effect
+                    "transition-all duration-300 ease-in-out group"
+                 )}>
+                   <CardHeader className="flex flex-row items-start gap-4 space-y-0 pb-4">
+                     {/* Icon Background */}
+                    <div className={cn(
+                      "flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center",
+                      "bg-blue-50/70 border border-blue-100/90", // Light blue bg & border
+                      "group-hover:bg-blue-100/80 group-hover:border-blue-200", // Hover effect for icon bg
+                      "transition-colors"
+                      )}>
                       {feature.icon}
                     </div>
-                    <CardTitle className="text-lg font-semibold leading-tight pt-1">{feature.title}</CardTitle>
+                    <CardTitle className="text-lg font-semibold text-slate-800 leading-tight pt-1">{feature.title}</CardTitle>
                   </CardHeader>
                   <CardContent className="flex-grow pt-0">
-                    <p className="text-muted-foreground">{feature.description}</p>
+                    <p className="text-slate-600">{feature.description}</p>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -233,46 +250,46 @@ export default function Home() {
         </div>
       </section>
 
-       {/* --- Example: Benefits/How it Works Section --- */}
-      <section className="py-24 sm:py-32 bg-background">
+       {/* --- Benefits/How it Works Section --- */}
+      <section className="py-24 sm:py-32 bg-slate-50"> {/* Slightly off-white background */}
         <div className="container mx-auto px-6">
           <motion.div
             className="mx-auto max-w-3xl text-center mb-16 lg:mb-20"
              initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.2 }} variants={fadeIn}
           >
-            <h2 className="text-base font-semibold leading-7 text-primary">Your Strategic Advantage</h2>
-            <p className="mt-2 text-3xl font-bold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
+            <h2 className={cn("text-base font-semibold leading-7", primaryBlueText)}>Your Strategic Advantage</h2>
+            <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl lg:text-5xl">
               From Assessment to Actionable Insights
             </p>
-            <p className="mt-6 text-lg leading-8 text-muted-foreground">
+            <p className="mt-6 text-lg leading-8 text-slate-600">
               Understand precisely where you stand and receive clear, prioritized recommendations to accelerate your AI journey and achieve business outcomes.
             </p>
           </motion.div>
 
           <motion.div
-            className="grid grid-cols-1 md:grid-cols-3 gap-8"
+            className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-12" // Increased gap
             initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.1 }} variants={staggerContainer}
            >
-             {/* Example Benefit Cards */}
+             {/* Benefit Items with Blue Check */}
             <motion.div variants={fadeIn} className="flex items-start space-x-4">
-              <CheckCircle className="h-6 w-6 text-green-500 mt-1 flex-shrink-0" />
+              <CheckCircle className={cn("h-6 w-6 mt-0.5 flex-shrink-0", primaryBlueText)} />
               <div>
-                <h3 className="font-semibold text-foreground">Benchmark Performance</h3>
-                <p className="mt-1 text-muted-foreground">Compare your readiness against industry standards and best practices.</p>
+                <h3 className="font-semibold text-slate-800">Benchmark Performance</h3>
+                <p className="mt-1 text-slate-600">Compare your readiness against industry standards and best practices.</p>
               </div>
             </motion.div>
              <motion.div variants={fadeIn} className="flex items-start space-x-4">
-              <CheckCircle className="h-6 w-6 text-green-500 mt-1 flex-shrink-0" />
+              <CheckCircle className={cn("h-6 w-6 mt-0.5 flex-shrink-0", primaryBlueText)} />
               <div>
-                <h3 className="font-semibold text-foreground">Identify Roadblocks</h3>
-                <p className="mt-1 text-muted-foreground">Proactively uncover potential challenges in data, talent, or infrastructure.</p>
+                <h3 className="font-semibold text-slate-800">Identify Roadblocks</h3>
+                <p className="mt-1 text-slate-600">Proactively uncover potential challenges in data, talent, or infrastructure.</p>
               </div>
             </motion.div>
              <motion.div variants={fadeIn} className="flex items-start space-x-4">
-              <CheckCircle className="h-6 w-6 text-green-500 mt-1 flex-shrink-0" />
+              <CheckCircle className={cn("h-6 w-6 mt-0.5 flex-shrink-0", primaryBlueText)} />
               <div>
-                <h3 className="font-semibold text-foreground">Prioritize Initiatives</h3>
-                <p className="mt-1 text-muted-foreground">Focus resources effectively with a clear, data-driven action plan.</p>
+                <h3 className="font-semibold text-slate-800">Prioritize Initiatives</h3>
+                <p className="mt-1 text-slate-600">Focus resources effectively with a clear, data-driven action plan.</p>
               </div>
             </motion.div>
           </motion.div>
@@ -280,7 +297,7 @@ export default function Home() {
       </section>
 
       {/* --- CTA Section --- */}
-      <section className="py-24 sm:py-32 bg-muted/40">
+      <section className="py-24 sm:py-32 bg-gradient-to-b from-white to-blue-50/60"> {/* Subtle gradient into CTA */}
         <div className="container mx-auto px-6">
           <motion.div
             className="mx-auto max-w-3xl text-center space-y-6"
@@ -289,14 +306,19 @@ export default function Home() {
             viewport={{ once: true, amount: 0.3 }}
             variants={fadeIn}
           >
-            <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
+            <h2 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl lg:text-5xl">
               Ready to Lead with AI?
             </h2>
-            <p className="text-lg lg:text-xl leading-8 text-muted-foreground">
+            <p className="text-lg lg:text-xl leading-8 text-slate-600">
               Take the first step towards a data-driven future. Start your complimentary AI readiness assessment today and unlock strategic insights in minutes.
             </p>
             <div className="pt-6">
-              <Button asChild size="lg" className="shadow-sm hover:shadow-md transition-shadow duration-300">
+              <Button asChild size="lg" className={cn(
+                primaryBlueBg,
+                `hover:${primaryBlueHover}`,
+                'text-white',
+                'shadow-md hover:shadow-lg transition-all duration-300'
+              )}>
                 <Link href="/assessment">
                    Start Free Assessment <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
@@ -307,14 +329,14 @@ export default function Home() {
       </section>
 
       {/* --- Footer --- */}
-      <footer className="py-12 border-t border-border/50 bg-background">
+      <footer className="py-12 border-t border-slate-200/80 bg-slate-50"> {/* Match light bg */}
         <div className="container mx-auto px-6 text-center">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-slate-500">
             © {new Date().getFullYear()} Your Enterprise Name, Inc. All rights reserved.
           </p>
           <div className="mt-4 flex justify-center space-x-6">
-             <Link href="/privacy" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Privacy Policy</Link>
-             <Link href="/terms" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Terms of Service</Link>
+             <Link href="/privacy" className="text-sm text-slate-500 hover:text-blue-600 transition-colors">Privacy Policy</Link>
+             <Link href="/terms" className="text-sm text-slate-500 hover:text-blue-600 transition-colors">Terms of Service</Link>
           </div>
         </div>
       </footer>
