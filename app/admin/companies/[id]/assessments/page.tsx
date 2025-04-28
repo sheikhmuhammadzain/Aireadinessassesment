@@ -627,7 +627,7 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
         const generateScore = () => Math.round(Math.random() * 30 + 60);
         
         // Function to create subcategories with appropriate properties
-        const createSubcategory = (name: string, weight: number, qFactor: number = 1.0): void => {
+        const createCategory = (name: string, weight: number, qFactor: number = 1.0): void => {
           const score = generateScore();
           const qValue = (0.3 + Math.random() * 0.6) * qFactor; // Generate Q-value between 0.3-0.9 with adjustment factor
           
@@ -644,47 +644,51 @@ export default function CompanyAssessmentsPage({ params }: { params: Promise<{ i
         let subcategoryNames: string[] = [];
         
         // Create subcategories based on assessment type
-              if (assessmentType === "AI Talent") {
-          subcategoryNames = ["Talent Acquisition", "Talent Development", "AI Skills Assessment", "Team Structure", "Hiring Strategy"];
-              } 
-              else if (assessmentType === "AI Data") {
-          subcategoryNames = ["Data Quality", "Data Governance", "Data Integration", "Data Security", "Data Processing"];
-              }
-              else if (assessmentType === "AI Governance") {
-          subcategoryNames = ["Ethics Guidelines", "Risk Management", "Compliance Process", "Oversight Structure", "Documentation"];
-              }
-              else if (assessmentType === "AI Culture") {
-          subcategoryNames = ["Leadership Support", "Adoption Readiness", "Change Management", "Innovation Climate", "Cross-functional Collaboration"];
-              }
-              else if (assessmentType === "AI Infrastructure") {
-          subcategoryNames = ["Compute Resources", "MLOps Capability", "Technical Debt", "Cloud Integration", "Development Environment", "Model Deployment", "Scalability Architecture"];
-              }
-              else if (assessmentType === "AI Strategy") {
-          subcategoryNames = ["Vision Alignment", "Investment Planning", "Business Integration", "Success Metrics", "Roadmap Development"];
-              }
-              else if (assessmentType === "AI Security") {
-          subcategoryNames = ["Model Security", "Data Protection", "Adversarial Defense", "Access Management", "Security Testing"];
+        let categoryNames: string[] = [];
+
+        // Create categories based on assessment type
+        if (assessmentType === "AI Talent") {
+          categoryNames = ["Talent Acquisition", "Talent Development", "AI Skills Assessment", "Team Structure", "Hiring Strategy"];
+        } 
+        else if (assessmentType === "AI Data") {
+          categoryNames = ["Data Quality", "Data Governance", "Data Integration", "Data Security", "Data Processing"];
+        }
+        else if (assessmentType === "AI Governance") {
+          categoryNames = ["Ethics Guidelines", "Risk Management", "Compliance Process", "Oversight Structure", "Documentation"];
+        }
+        else if (assessmentType === "AI Culture") {
+          categoryNames = ["Leadership Support", "Adoption Readiness", "Change Management", "Innovation Climate", "Cross-functional Collaboration"];
+        }
+        else if (assessmentType === "AI Infrastructure") {
+          categoryNames = ["Compute Resources", "MLOps Capability", "Technical Debt", "Cloud Integration", "Development Environment", "Model Deployment", "Scalability Architecture"];
+        }
+        else if (assessmentType === "AI Strategy") {
+          categoryNames = ["Vision Alignment", "Investment Planning", "Business Integration", "Success Metrics", "Roadmap Development"];
+        }
+        else if (assessmentType === "AI Security") {
+          categoryNames = ["Model Security", "Data Protection", "Adversarial Defense", "Access Management", "Security Testing"];
         }
         else {
-          // Generic subcategories for any other type
-          subcategoryNames = ["Implementation", "Strategy", "Operations", "Resources", "Management"];
+          // Generic categories for any other type
+          categoryNames = ["Implementation", "Strategy", "Operations", "Resources", "Management"];
         }
         
-        // Evenly distribute weights among subcategories
-        const weight = 100 / subcategoryNames.length;
+        // Evenly distribute weights among categories
+        const weight = 100 / categoryNames.length;
         
-        // Create all subcategories with initial weights
-        subcategoryNames.forEach(name => {
-          // Add some variation to Q-values for certain important subcategories
+        // Create all categories with initial weights
+        categoryNames.forEach(name => {
+          // Add some variation to Q-values for certain important categories
           let qFactor = 1.0;
           if (name === "Data Quality" || name === "Compute Resources" || name === "Vision Alignment" || name === "Model Security") {
             qFactor = 1.3; // Higher importance
           }
           
-          createSubcategory(name, weight, qFactor);
+          createCategory(name, weight, qFactor);
         });
         
         // Calculate softmax weights from Q-values
+        const calculateSoftmaxForCategories = () => {
         const calculateSoftmaxForSubcategories = () => {
           const qValues = Object.entries(subcategories).map(([name, data]) => data.qValue);
           const maxQ = Math.max(...qValues);

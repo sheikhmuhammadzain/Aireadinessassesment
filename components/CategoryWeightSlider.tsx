@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Loader2, Lock, Unlock, AlertCircle } from "lucide-react";
-import { SubcategoryWeights } from "@/types"; // Ensure this path is correct for your project
+import { CategoryWeights } from "@/types"; // Ensure this path is correct for your project
 import { cn } from "@/lib/utils"; // Ensure this path is correct for your project
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -21,13 +21,13 @@ const roundToOneDecimal = (num: number): number => {
 interface CategoryWeightSliderProps {
   // --- Data Props (Controlled State from Parent) ---
   /** The current weights for all categories, grouped by pillar. */
-  weights: SubcategoryWeights;
+  weights: CategoryWeights;
   /** The state of which categories are locked, preventing adjustment. Key format: `${pillar}-${category}` */
   lockedCategories: Record<string, boolean>;
   /** An array of pillar names to be displayed in order. */
   categories: string[];
   /** Optional recommended weights to display alongside the current weights. */
-  recommendedWeights?: SubcategoryWeights;
+  recommendedWeights?: CategoryWeights;
 
   // --- Callbacks to Parent ---
   /**
@@ -35,7 +35,7 @@ interface CategoryWeightSliderProps {
    * The parent component receives the updated weights after
    * redistribution has been performed to ensure the total is 100%.
    */
-  onWeightsChange: (newWeights: SubcategoryWeights) => void;
+  onWeightsChange: (newWeights: CategoryWeights) => void;
   /**
    * Callback function triggered when a lock/unlock button is clicked.
    * The parent MUST implement the logic to update the lock state.
@@ -250,7 +250,7 @@ export function CategoryWeightSlider({
                               </Tooltip>
                             </TooltipProvider>
                             
-                            {/* Subcategory name (truncate with ellipsis if too long) */}
+                            {/* Category name (truncate with ellipsis if too long) */}
                             <span 
                               className="font-medium truncate"
                               title={category} // Show full name on hover

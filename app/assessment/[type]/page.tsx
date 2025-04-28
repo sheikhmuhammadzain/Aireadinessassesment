@@ -19,7 +19,7 @@ import { CompanyInfoForm } from "@/components/CompanyInfoForm";
 import { WeightAdjuster } from "@/components/WeightAdjuster";
 import { CategoryWeightAdjuster } from "@/components/CategoryWeightAdjuster";
 import PersonalizedQuestions from "@/app/components/PersonalizedQuestions"; // Fixed path
-import { CompanyInfo, CategoryWeights, SubcategoryWeights } from "@/types";
+import { CompanyInfo, CategoryWeights } from "@/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { 
   fetchQuestionnaire, 
@@ -57,13 +57,13 @@ interface AssessmentSubmission {
       responses: { question: string; answer: number }[]; // Simplified answer structure
       // Add subcategory details if needed by backend
       subcategoryResponses?: {
-          subcategory: string;
+          category: string;
           weight: number;
-          // Map relevant questions/answers here if backend needs it per subcategory
+          // Map relevant questions/answers here if backend needs it per category
       }[];
   }[];
   finalWeights: CategoryWeights; // Use renamed type
-  finalSubcategoryWeights: SubcategoryWeights;
+  finalSubcategoryWeights: CategoryWeights;
 }
 
 // --- Personalized Question Interface ---
@@ -142,10 +142,8 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
   const [questions, setQuestions] = useState<CategoryQuestions>({}); // Use defined type
   const [loadingError, setLoadingError] = useState<string | null>(null);
 
-  const [weights, setWeights] = useState<CategoryWeights>({}); // Renamed type
-  const [recommendedWeights, setRecommendedWeights] = useState<CategoryWeights | undefined>(undefined); // Renamed type
-  const [subcategoryWeights, setSubcategoryWeights] = useState<SubcategoryWeights>({});
-  const [recommendedSubcategoryWeights, setRecommendedSubcategoryWeights] = useState<SubcategoryWeights | undefined>(undefined);
+  const [categoryWeights, setCategoryWeights] = useState<CategoryWeights>({});
+  const [recommendedCategoryWeights, setRecommendedCategoryWeights] = useState<CategoryWeights | undefined>(undefined);
 
   const [progress, setProgress] = useState(0);
   const [activeTab, setActiveTab] = useState<string>("questions");
@@ -174,51 +172,51 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
   };
 
   // --- Helper Function: Initialize Default Weights ---
-  const initializeDefaultSubcategoryWeights = (data: Record<string, any>): SubcategoryWeights => {
+  const initializeDefaultCategoryWeights = (data: Record<string, any>): CategoryWeights => {
     const categories = Object.keys(data);
     if (categories.length === 0) return {};
 
-    const subWeights: SubcategoryWeights = {};
+    const catWeights: CategoryWeights = {};
 
-    // Initialize weights for each category and its subcategories
+    // Initialize weights for each category and its categories
     categories.forEach(category => {
-      subWeights[category] = {};
+      catWeights[category] = {};
       const categoryData = data[category];
       
-      // Determine subcategories: could be keys of an object, or the category name itself
-      let subcategories: string[] = [];
+      // Determine categories: could be keys of an object, or the category name itself
+      let categories: string[] = [];
       if (typeof categoryData === 'object' && !Array.isArray(categoryData) && categoryData !== null) {
-        subcategories = Object.keys(categoryData);
+        categories = Object.keys(categoryData);
       } else if (Array.isArray(categoryData)) {
-        // If it's an array of questions, use the category name as the only subcategory
-        subcategories = [category];
+        // If it's an array of questions, use the category name as the only category
+        categories = [category];
       }
       
-      if (subcategories.length === 0) return;
+      if (categories.length === 0) return;
       
-      // Distribute 100% evenly among subcategories within THIS category
-      const equalWeight = Math.floor((100 / subcategories.length) * 10) / 10; // Round to 1 decimal
+      // Distribute 100% evenly among categories within THIS category
+      const equalWeight = Math.floor((100 / categories.length) * 10) / 10; // Round to 1 decimal
       
-      // First assign the equal weight to all subcategories
-      subcategories.forEach(subcat => {
-        subWeights[category][subcat] = equalWeight;
+      // First assign the equal weight to all categories
+      categories.forEach(cat => {
+        catWeights[category][cat] = equalWeight;
       });
       
       // Calculate the actual total (might be slightly off due to rounding)
-      const total = Object.values(subWeights[category]).reduce((sum, weight) => sum + weight, 0);
+      const total = Object.values(catWeights[category]).reduce((sum, weight) => sum + weight, 0);
       
-      // If the total isn't exactly 100, adjust the last subcategory
+      // If the total isn't exactly 100, adjust the last category
       if (Math.abs(total - 100) > 0.01) {
-        const lastSubcat = subcategories[subcategories.length - 1];
-        subWeights[category][lastSubcat] = Number((subWeights[category][lastSubcat] + (100 - total)).toFixed(1));
+        const lastCat = categories[categories.length - 1];
+        catWeights[category][lastCat] = Number((catWeights[category][lastCat] + (100 - total)).toFixed(1));
       }
     });
 
-    return subWeights;
+    return catWeights;
   };
 
   // --- Helper Function: Convert Subcategory Weights to Category Weights ---
-  const convertSubcategoryToCategory = (subWeights: SubcategoryWeights): CategoryWeights => {
+  const convertSubcategoryToCategory = (subWeights: CategoryWeights): CategoryWeights => {
     const catWeights: CategoryWeights = {};
     const categoryCount = Object.keys(subWeights).length;
     
@@ -248,9 +246,7 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
 
   // Add a function to clear assessment weights when resetting
   const clearAssessmentData = () => {
-    localStorage.removeItem('subcategory_weights');
-    localStorage.removeItem('assessment_weights');
-    localStorage.removeItem('locked_categories');
+    localStorage.removeItem('category_weights');
   };
 
   // Implement fetchRecommendedWeights for this component
@@ -266,8 +262,8 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
         const aiRecommendedWeights = await getRecommendedWeights(info);
         
         // Set the recommended weights
-        setRecommendedWeights(aiRecommendedWeights);
-        setWeights(aiRecommendedWeights);
+        setRecommendedCategoryWeights(aiRecommendedWeights);
+        setCategoryWeights(aiRecommendedWeights);
         
         // Progress to weight adjustment step
         setLoading(false);
@@ -287,8 +283,8 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
         fallbackWeights[category] = defaultWeight;
       });
       
-      setRecommendedWeights(fallbackWeights);
-      setWeights(fallbackWeights);
+      setRecommendedCategoryWeights(fallbackWeights);
+      setCategoryWeights(fallbackWeights);
       setLoading(false);
       setStep('weight-adjustment');
       } catch (error) {
@@ -642,8 +638,8 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
           fallbackWeights[category] = defaultWeight;
         });
         
-        setRecommendedWeights(fallbackWeights);
-        setWeights(fallbackWeights);
+        setRecommendedCategoryWeights(fallbackWeights);
+        setCategoryWeights(fallbackWeights);
         
         // Now load personalized questions/questionnaire
         console.log("Auto-loading questionnaires for:", companyInfo.name);
@@ -893,8 +889,8 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
   };
 
   // CORRECTED: Update handler with controlled distribution and saved changes
-  const handleSubcategoryWeightsChange = useCallback(async (newWeights: SubcategoryWeights) => {
-    console.log("Subcategory weights changed:", newWeights);
+  const handleCategoryWeightsChange = useCallback(async (newWeights: CategoryWeights) => {
+    console.log("Category weights changed:", newWeights);
     
     // Define toast functions
     const showWarningToast = () => {
@@ -928,11 +924,10 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
     }
     
     // Update state
-    setSubcategoryWeights(newWeights);
+    setCategoryWeights(newWeights);
     
-    // Derive category weights from subcategory weights
+    // Derive category weights from category weights
     const derivedCategoryWeights = convertSubcategoryToCategory(newWeights);
-    setWeights(derivedCategoryWeights);
     
     try {
       // First, try to save to backend if we have a valid company ID
@@ -949,8 +944,7 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
       }
       
       // Save to localStorage (backup)
-      localStorage.setItem('subcategory_weights', JSON.stringify(newWeights));
-      localStorage.setItem('assessment_weights', JSON.stringify(derivedCategoryWeights));
+      localStorage.setItem('category_weights', JSON.stringify(newWeights));
     } catch (storageError) {
       console.error("Error saving weights:", storageError);
       showStorageErrorToast();
@@ -958,7 +952,7 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
   }, [companyInfo, convertSubcategoryToCategory, toast, assessmentType]);
 
   const handleWeightsSubmit = () => {
-    // Weights are saved live via handleSubcategoryWeightsChange.
+    // Weights are saved live via handleCategoryWeightsChange.
     // This button confirms the user is done adjusting and wants to proceed.
     console.log("Weights adjustment confirmed by user.");
     // Reset loading states before proceeding
@@ -981,8 +975,8 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
   };
 
   // CORRECTED: Parent handler only updates lock state and saves
-  const toggleCategoryLock = (category: string, subcategory: string) => {
-    const lockKey = `${category}-${subcategory}`;
+  const toggleCategoryLock = (category: string, subcat: string) => {
+    const lockKey = `${category}-${subcat}`;
     
     // Create a local reference for toast to use outside state update
     const showStorageErrorToast = () => {
@@ -1302,7 +1296,7 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
         <Button onClick={() => {
           setError(null);
           setIsLoading(true);
-          setWeights({});
+          setCategoryWeights({});
           setScores({});
           
           // Use our simple fetchQuestionnaires implementation
@@ -1390,26 +1384,26 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
   // Step: Weight Adjustment
   if (step === 'weight-adjustment') {
      // Ensure categories are available for the adjustment component
-     const adjustmentCategories = Object.keys(subcategoryWeights);
+     const adjustmentCategories = Object.keys(categoryWeights);
     return (
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-3xl font-bold text-center mb-2">Adjust Assessment Weights</h1>
           <p className="text-center text-muted-foreground mb-8">
-            Review and adjust the importance of each category and subcategory. Total must equal 100% per category group implicitly.
+            Review and adjust the importance of each pillar and category. Total must equal 100% per pillar group implicitly.
           </p>
           <WeightAdjuster
-            weights={subcategoryWeights}
-            recommendedWeights={recommendedSubcategoryWeights}
-            onWeightsChange={(newWeights: SubcategoryWeights) => {
-              // Call the handler for each changed category to match expected signature
+            weights={categoryWeights}
+            recommendedWeights={recommendedCategoryWeights}
+            onWeightsChange={(newWeights: CategoryWeights) => {
+              // Only update the weights if this category has changed
               Object.keys(newWeights).forEach(category => {
-                if (subcategoryWeights[category] && 
-                    JSON.stringify(subcategoryWeights[category]) !== JSON.stringify(newWeights[category])) {
-                  // Need to update the entire structure
-                  const updatedWeights = {...subcategoryWeights};
+                if (categoryWeights[category] &&
+                  JSON.stringify(categoryWeights[category]) !== JSON.stringify(newWeights[category])) {
+                  // Clone and update
+                  const updatedWeights = {...categoryWeights};
                   updatedWeights[category] = newWeights[category];
-                  handleSubcategoryWeightsChange(updatedWeights);
+                  handleCategoryWeightsChange(updatedWeights);
                 }
               });
             }}
@@ -1630,8 +1624,8 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
                       // Create weights object from the questionnaire categories
                       Object.keys(questionnaire[assessmentType]).reduce((acc, category) => {
                         // Use existing weights if available, otherwise set equal weights
-                        if (subcategoryWeights[assessmentType] && subcategoryWeights[assessmentType][category]) {
-                          acc[category] = subcategoryWeights[assessmentType][category];
+                        if (categoryWeights[assessmentType] && categoryWeights[assessmentType][category]) {
+                          acc[category] = categoryWeights[assessmentType][category];
                         } else {
                           const totalCategories = Object.keys(questionnaire[assessmentType]).length;
                           acc[category] = Math.round(100 / totalCategories * 10) / 10;
@@ -1641,16 +1635,16 @@ function AssessmentTypeContent({ type }: { type: string }): JSX.Element {
                     }
               onWeightsChange={(newWeights) => {
                       if (assessmentType) {
-                        // Update the subcategory weights with the new category weights
-                        const updatedSubcategoryWeights = {
-                          ...subcategoryWeights,
+                        // Update the category weights with the new category weights
+                        const updatedCategoryWeights = {
+                          ...categoryWeights,
                           [assessmentType]: newWeights
                         };
-                        setSubcategoryWeights(updatedSubcategoryWeights);
-                        localStorage.setItem('subcategory_weights', JSON.stringify(updatedSubcategoryWeights));
+                        setCategoryWeights(updatedCategoryWeights);
+                        localStorage.setItem('category_weights', JSON.stringify(updatedCategoryWeights));
                         
                         // Also save via the handler
-                        handleSubcategoryWeightsChange(updatedSubcategoryWeights);
+                        handleCategoryWeightsChange(updatedCategoryWeights);
                       }
                     }}
                   />

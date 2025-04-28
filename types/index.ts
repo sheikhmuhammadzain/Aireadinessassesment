@@ -58,20 +58,21 @@ export interface CategoryQuestions {
   [category: string]: Question[];
 }
 
+// New interface for category weights
 export interface CategoryWeights {
   [category: string]: number;
 }
 
-// New interface for subcategory weights
+// Interface for subcategory weights (renamed to category)
 export interface SubcategoryWeights {
   [category: string]: {
-    [subcategory: string]: number;
+    [category: string]: number;
   };
 }
 
-// New interface for subcategory responses
+// Interface for subcategory responses (renamed to category)
 export interface SubcategoryResponse {
-  subcategory: string;
+  category: string;
   responses: {
     question: string;
     answer: number;
@@ -86,7 +87,7 @@ export interface CategoryResponse {
     answer: number;
   }[];
   weight: number;
-  // Add subcategory responses for nested structure
+  // Add category responses for nested structure
   subcategoryResponses?: SubcategoryResponse[];
 }
 
